@@ -1,0 +1,50 @@
+{
+  "name": "@nsplit/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "require": "./index.js",
+      "default": "./index.js"
+    },
+    "./permissions": {
+      "import": "./permissions/index.js",
+      "require": "./permissions/index.js",
+      "default": "./permissions/index.js"
+    },
+    "./permissions.js": {
+      "import": "./permissions/index.js",
+      "default": "./permissions/index.js"
+    },
+    "./split": {
+      "import": "./split/index.js",
+      "require": "./split/index.js",
+      "default": "./split/index.js"
+    },
+    "./balance": {
+      "import": "./balance/index.js",
+      "require": "./balance/index.js",
+      "default": "./balance/index.js"
+    },
+    "./categories": {
+      "import": "./categories/index.js",
+      "require": "./categories/index.js",
+      "default": "./categories/index.js"
+    },
+    "./money": {
+      "import": "./money/amount.js",
+      "require": "./money/amount.js",
+      "default": "./money/amount.js"
+    },
+    "./sync": {
+      "import": "./sync/mutation-types.js",
+      "require": "./sync/mutation-types.js",
+      "default": "./sync/mutation-types.js"
+    },
+    "./package.json": "./package.json"
+  }
+}
