@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# builds / caches
+.next/
+.expo/
+dist/
+out/
+build/
+web-build/
+
+# env / secrets
+.env
+.env*.local
+.env.local
+
+# debug / misc
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+*.tsbuildinfo
+.vercel/
+.metro-health-check*
