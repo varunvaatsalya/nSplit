@@ -40,7 +40,7 @@ export function ConfirmDialog({
       <DialogContent
         showCloseButton={false}
         overlayClassName="z-[70]"
-        className="z-[70] max-w-sm gap-0 overflow-hidden p-0 sm:rounded-2xl"
+        className="z-70 max-w-sm gap-0 overflow-hidden p-0 sm:rounded-2xl"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="gap-3 px-5 pb-2 pt-5 pr-5">

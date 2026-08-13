@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   Dialog,
   DialogContent,
@@ -21,23 +22,144 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CURRENCIES, GROUP_ICONS, getGroupIcon } from "@/lib/group-options";
+import {
+  CURRENCIES,
+  GROUP_ICONS,
+  getGroupIcon,
+  suggestGroupIconFromName,
+} from "@/lib/group-options";
 import { cn } from "@/lib/utils";
 
 function emptyMember() {
   return { name: "", email: "", invite: false, permission: "ADD" };
 }
 
+function contactMatchesRow(member, contact) {
+  const email = contact.email?.trim().toLowerCase();
+  const name = contact.name?.trim().toLowerCase();
+  const mEmail = member.email?.trim().toLowerCase();
+  const mName = member.name?.trim().toLowerCase();
+  if (email && mEmail && email === mEmail) return true;
+  if (name && mName && name === mName && (!email || !mEmail)) return true;
+  return false;
+}
+
+function isContactTaken(members, contact, exceptIndex) {
+  return members.some(
+    (m, i) => i !== exceptIndex && contactMatchesRow(m, contact)
+  );
+}
+
+function filterContactSuggestions(contacts, members, index, query) {
+  const q = String(query || "")
+    .trim()
+    .toLowerCase();
+  if (!q) return [];
+
+  return contacts
+    .filter((c) => {
+      if (isContactTaken(members, c, index)) return false;
+      const name = (c.name || "").toLowerCase();
+      const email = (c.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    })
+    .slice(0, 6);
+}
+
+function MemberSuggestField({
+  value,
+  onChange,
+  onPick,
+  suggestions,
+  open,
+  onOpenChange,
+  placeholder,
+  type = "text",
+  className,
+  inputMode,
+}) {
+  const blurTimer = useRef(null);
+  const show = open && suggestions.length > 0;
+
+  useEffect(() => {
+    return () => {
+      if (blurTimer.current) clearTimeout(blurTimer.current);
+    };
+  }, []);
+
+  return (
+    <div className={cn("relative min-w-0", className)}>
+      <Input
+        type={type}
+        inputMode={inputMode}
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        onChange={(e) => {
+          onChange(e.target.value);
+          onOpenChange(true);
+        }}
+        onFocus={() => onOpenChange(true)}
+        onBlur={() => {
+          blurTimer.current = setTimeout(() => onOpenChange(false), 120);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onOpenChange(false);
+        }}
+      />
+      {show ? (
+        <ul className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
+          {suggestions.map((contact) => (
+            <li key={contact.id}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm hover:bg-soft"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPick(contact);
+                  onOpenChange(false);
+                }}
+              >
+                <UserAvatar
+                  className="h-7 w-7"
+                  fallbackClassName="text-[10px]"
+                  name={contact.name}
+                  avatar={contact.avatar}
+                  seed={contact.userId || contact.email || contact.name}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {contact.name}
+                  </span>
+                  {contact.email ? (
+                    <span className="block truncate text-xs text-muted">
+                      {contact.email}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("users");
+  const [iconManual, setIconManual] = useState(false);
+  const [iconsOpen, setIconsOpen] = useState(false);
   const [currency, setCurrency] = useState("INR");
   const [members, setMembers] = useState([emptyMember()]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [suggestKey, setSuggestKey] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -47,9 +169,27 @@ export default function GroupsPage() {
     setLoading(false);
   }
 
+  async function loadContacts() {
+    const res = await fetch("/api/contacts");
+    const json = await res.json();
+    if (res.ok) setContacts(json.data.contacts || []);
+  }
+
   useEffect(() => {
     load();
+    loadContacts();
   }, []);
+
+  function applyNameSuggestion(nextName, { force = false } = {}) {
+    if (iconManual && !force) return;
+    setIcon(suggestGroupIconFromName(nextName).key);
+  }
+
+  function pickIcon(key) {
+    setIcon(key);
+    setIconManual(true);
+    setIconsOpen(false);
+  }
 
   function updateMember(index, patch) {
     setMembers((prev) =>
@@ -59,13 +199,34 @@ export default function GroupsPage() {
 
   function removeMember(index) {
     setMembers((prev) => prev.filter((_, i) => i !== index));
+    setSuggestKey(null);
+  }
+
+  function applyContact(index, contact) {
+    updateMember(index, {
+      name: contact.name || "",
+      email: contact.email || "",
+      invite: Boolean(contact.email),
+      permission: "ADD",
+    });
+    setSuggestKey(null);
+  }
+
+  function suggestionsFor(index, field) {
+    const member = members[index];
+    if (!member) return [];
+    const query = field === "email" ? member.email : member.name;
+    return filterContactSuggestions(contacts, members, index, query);
   }
 
   function resetForm() {
     setName("");
     setIcon("users");
+    setIconManual(false);
+    setIconsOpen(false);
     setCurrency("INR");
     setMembers([emptyMember()]);
+    setSuggestKey(null);
     setError("");
   }
 
@@ -101,7 +262,7 @@ export default function GroupsPage() {
       }
       resetForm();
       setShowForm(false);
-      await load();
+      await Promise.all([load(), loadContacts()]);
     } catch {
       setError("Something went wrong");
     } finally {
@@ -110,7 +271,7 @@ export default function GroupsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Groups</h1>
@@ -141,34 +302,25 @@ export default function GroupsPage() {
 
           <form onSubmit={createGroup} className="space-y-4">
             <div className="flex gap-2">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-soft text-lg">
+              <button
+                type="button"
+                onClick={() => setIconsOpen(true)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-soft text-lg hover:bg-background"
+                aria-label="Choose group icon"
+                title="Choose icon"
+              >
                 {getGroupIcon(icon).emoji}
-              </span>
+              </button>
               <Input
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setName(next);
+                  applyNameSuggestion(next);
+                }}
                 placeholder="Trip to Goa"
                 required
               />
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {GROUP_ICONS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  title={item.label}
-                  onClick={() => setIcon(item.key)}
-                  className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-lg border text-base",
-                    icon === item.key
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-background hover:bg-soft"
-                  )}
-                >
-                  {item.emoji}
-                </button>
-              ))}
             </div>
 
             <Select value={currency} onValueChange={setCurrency}>
@@ -197,55 +349,71 @@ export default function GroupsPage() {
                   + Add
                 </button>
               </div>
-              {members.map((member, index) => (
-                <div
-                  key={index}
-                  className="space-y-2 rounded-lg border border-border p-2.5"
-                >
-                  <Input
-                    value={member.name}
-                    onChange={(e) =>
-                      updateMember(index, { name: e.target.value })
-                    }
-                    placeholder="Name / nickname"
-                  />
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      type="email"
-                      value={member.email}
-                      onChange={(e) =>
-                        updateMember(index, {
-                          email: e.target.value,
-                          invite: e.target.value.trim()
-                            ? member.invite
-                            : false,
-                        })
+
+              {members.map((member, index) => {
+                const nameKey = `${index}:name`;
+                const emailKey = `${index}:email`;
+                const nameSuggestions = suggestionsFor(index, "name");
+                const emailSuggestions = suggestionsFor(index, "email");
+
+                return (
+                  <div
+                    key={index}
+                    className="space-y-2 rounded-lg border border-border p-2.5"
+                  >
+                    <MemberSuggestField
+                      value={member.name}
+                      placeholder="Name / nickname"
+                      suggestions={nameSuggestions}
+                      open={suggestKey === nameKey}
+                      onOpenChange={(open) =>
+                        setSuggestKey(open ? nameKey : null)
                       }
-                      placeholder="Email (optional)"
-                      className="min-w-0 flex-1"
+                      onChange={(next) => updateMember(index, { name: next })}
+                      onPick={(contact) => applyContact(index, contact)}
                     />
-                    <label className="flex items-center gap-1.5 text-xs text-muted">
-                      <Checkbox
-                        checked={member.invite}
-                        disabled={!member.email.trim()}
-                        onCheckedChange={(v) =>
-                          updateMember(index, { invite: Boolean(v) })
+                    <div className="flex flex-wrap items-center gap-2">
+                      <MemberSuggestField
+                        type="email"
+                        value={member.email}
+                        placeholder="Email (optional)"
+                        className="min-w-0 flex-1"
+                        suggestions={emailSuggestions}
+                        open={suggestKey === emailKey}
+                        onOpenChange={(open) =>
+                          setSuggestKey(open ? emailKey : null)
                         }
+                        onChange={(next) =>
+                          updateMember(index, {
+                            email: next,
+                            invite: next.trim() ? member.invite : false,
+                          })
+                        }
+                        onPick={(contact) => applyContact(index, contact)}
                       />
-                      Invite
-                    </label>
-                    {members.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => removeMember(index)}
-                        className="text-xs text-muted hover:text-danger"
-                      >
-                        Remove
-                      </button>
-                    ) : null}
+                      <label className="flex items-center gap-1.5 text-xs text-muted">
+                        <Checkbox
+                          checked={member.invite}
+                          disabled={!member.email.trim()}
+                          onCheckedChange={(v) =>
+                            updateMember(index, { invite: Boolean(v) })
+                          }
+                        />
+                        Invite
+                      </label>
+                      {members.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeMember(index)}
+                          className="text-xs text-muted hover:text-danger"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -263,6 +431,56 @@ export default function GroupsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={iconsOpen} onOpenChange={setIconsOpen}>
+        <DialogContent className="flex max-h-[min(85vh,480px)] max-w-md flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-border px-4 py-3 pr-10">
+            <DialogTitle>Choose icon</DialogTitle>
+            <DialogDescription>
+              Tap an emoji for this group.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="nsplit-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+              {GROUP_ICONS.map((item) => {
+                const selected = icon === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    title={item.label}
+                    onClick={() => pickIcon(item.key)}
+                    className={cn(
+                      "flex h-10 w-full items-center justify-center rounded-lg border text-xl transition-colors hover:bg-soft",
+                      selected
+                        ? "border-primary bg-soft"
+                        : "border-border bg-background"
+                    )}
+                  >
+                    {item.emoji}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="shrink-0 border-t border-border p-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setIconManual(false);
+                applyNameSuggestion(name, { force: true });
+                setIconsOpen(false);
+              }}
+            >
+              Auto from name
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

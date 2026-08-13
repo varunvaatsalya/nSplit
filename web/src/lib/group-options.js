@@ -1,20 +1,105 @@
 export const GROUP_ICONS = [
-  { key: "users", label: "Group", emoji: "👥" },
-  { key: "home", label: "Home", emoji: "🏠" },
-  { key: "plane", label: "Trip", emoji: "✈️" },
-  { key: "utensils", label: "Food", emoji: "🍽️" },
-  { key: "briefcase", label: "Work", emoji: "💼" },
-  { key: "heart", label: "Family", emoji: "❤️" },
-  { key: "party", label: "Party", emoji: "🎉" },
-  { key: "car", label: "Ride", emoji: "🚗" },
-  { key: "mountain", label: "Adventure", emoji: "🏔️" },
-  { key: "coffee", label: "Cafe", emoji: "☕" },
-  { key: "gift", label: "Gift", emoji: "🎁" },
-  { key: "wallet", label: "Money", emoji: "💸" },
+  {
+    key: "users",
+    label: "Group",
+    emoji: "👥",
+    keywords: ["group", "friends", "team", "squad", "gang", "crew"],
+  },
+  {
+    key: "home",
+    label: "Home",
+    emoji: "🏠",
+    keywords: ["home", "house", "flat", "apartment", "roommates", "pg", "rent"],
+  },
+  {
+    key: "plane",
+    label: "Trip",
+    emoji: "✈️",
+    keywords: [
+      "trip",
+      "travel",
+      "flight",
+      "vacation",
+      "holiday",
+      "goa",
+      "manali",
+      "tour",
+    ],
+  },
+  {
+    key: "utensils",
+    label: "Food",
+    emoji: "🍽️",
+    keywords: ["food", "dinner", "lunch", "restaurant", "meal", "eat"],
+  },
+  {
+    key: "briefcase",
+    label: "Work",
+    emoji: "💼",
+    keywords: ["work", "office", "job", "colleague", "company", "business"],
+  },
+  {
+    key: "heart",
+    label: "Family",
+    emoji: "❤️",
+    keywords: ["family", "wedding", "couple", "parents"],
+  },
+  {
+    key: "party",
+    label: "Party",
+    emoji: "🎉",
+    keywords: ["party", "birthday", "celebration", "fest", "new year"],
+  },
+  {
+    key: "car",
+    label: "Ride",
+    emoji: "🚗",
+    keywords: ["ride", "car", "drive", "taxi", "uber", "cab"],
+  },
+  {
+    key: "mountain",
+    label: "Adventure",
+    emoji: "🏔️",
+    keywords: ["trek", "hiking", "adventure", "camp", "mountain"],
+  },
+  {
+    key: "coffee",
+    label: "Cafe",
+    emoji: "☕",
+    keywords: ["cafe", "coffee", "chai"],
+  },
+  {
+    key: "gift",
+    label: "Gift",
+    emoji: "🎁",
+    keywords: ["gift", "present", "surprise"],
+  },
+  {
+    key: "wallet",
+    label: "Money",
+    emoji: "💸",
+    keywords: ["money", "budget", "expense", "split", "bills"],
+  },
 ];
 
+const DEFAULT_ICON = GROUP_ICONS[0];
+
 export function getGroupIcon(key) {
-  return GROUP_ICONS.find((i) => i.key === key) || GROUP_ICONS[0];
+  return GROUP_ICONS.find((i) => i.key === key) || DEFAULT_ICON;
+}
+
+export function suggestGroupIconFromName(name = "") {
+  const normalized = String(name).trim().toLowerCase();
+  if (!normalized) return { ...DEFAULT_ICON };
+
+  for (const icon of GROUP_ICONS) {
+    for (const keyword of icon.keywords || []) {
+      if (normalized.includes(keyword)) {
+        return { ...icon };
+      }
+    }
+  }
+  return { ...DEFAULT_ICON };
 }
 
 export const CURRENCIES = [

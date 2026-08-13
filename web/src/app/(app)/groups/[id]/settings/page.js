@@ -239,7 +239,7 @@ export default function GroupSettingsPage() {
   const iconMeta = getGroupIcon(group.icon);
 
   return (
-    <div className="mx-auto max-w-2xl pb-16">
+    <div className="pb-16">
       <div className="mb-6 flex items-center gap-3">
         <Button type="button" size="icon" variant="ghost" asChild>
           <Link href={`/groups/${id}`} aria-label="Back">

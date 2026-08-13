@@ -6,7 +6,7 @@ export default async function ProfilePage() {
   const session = await getSessionUser();
 
   return (
-    <div className="mx-auto max-w-lg">
+    <div>
       <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
       <div className="mt-6 space-y-4 rounded-xl border border-border bg-surface p-5 text-sm">
         <div className="flex items-center gap-3">

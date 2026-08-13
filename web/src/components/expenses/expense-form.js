@@ -171,7 +171,7 @@ export function ExpenseForm({
   const [showDesc, setShowDesc] = useState(false);
   const [description, setDescription] = useState("");
   const [splitMethod, setSplitMethod] = useState(() =>
-    normalizeSplitMethod(group?.settings?.defaultSplitMethod)
+    normalizeSplitMethod(group?.settings?.defaultSplitMethod),
   );
   const [includedIds, setIncludedIds] = useState([]);
   const [exactInputs, setExactInputs] = useState({});
@@ -260,16 +260,23 @@ export function ExpenseForm({
       .map((p) => String(p.memberId));
     const fallbackIncluded = (exp.splits || [])
       .filter(
-        (s) => (s.amountMinor || 0) > 0 && memberIds.has(String(s.memberId))
+        (s) => (s.amountMinor || 0) > 0 && memberIds.has(String(s.memberId)),
       )
       .map((s) => String(s.memberId));
     const nextIncluded = included.length ? included : fallbackIncluded;
-    setIncludedIds(nextIncluded.length ? nextIncluded : members.map((m) => m.id));
+    setIncludedIds(
+      nextIncluded.length ? nextIncluded : members.map((m) => m.id),
+    );
 
     const exact = {};
     const { parts: defaultShareParts } = resolveGroupSplitDefaults(
-      { settings: { defaultSplitMethod: "SHARES", defaultSplitConfig: group?.settings?.defaultSplitConfig } },
-      members.map((m) => m.id)
+      {
+        settings: {
+          defaultSplitMethod: "SHARES",
+          defaultSplitConfig: group?.settings?.defaultSplitConfig,
+        },
+      },
+      members.map((m) => m.id),
     );
     const parts = { ...defaultShareParts };
     for (const s of exp.splits || []) {
@@ -289,7 +296,7 @@ export function ExpenseForm({
     setPartInputs(parts);
 
     const payers = (exp.payers || []).filter((p) =>
-      memberIds.has(String(p.memberId))
+      memberIds.has(String(p.memberId)),
     );
     if (payers.length) {
       setPayerIds(payers.map((p) => String(p.memberId)));
@@ -310,10 +317,10 @@ export function ExpenseForm({
   }
 
   const defaultSplitMethod = normalizeSplitMethod(
-    group?.settings?.defaultSplitMethod
+    group?.settings?.defaultSplitMethod,
   );
   const defaultSplitConfigKey = JSON.stringify(
-    group?.settings?.defaultSplitConfig ?? null
+    group?.settings?.defaultSplitConfig ?? null,
   );
 
   useEffect(() => {
@@ -344,14 +351,16 @@ export function ExpenseForm({
     if (payerIds.length === 1) {
       return { [payerIds[0]]: amountMinor };
     }
-    const hasManual = payerIds.every((id) => Number.isInteger(payerAmounts[id]));
+    const hasManual = payerIds.every((id) =>
+      Number.isInteger(payerAmounts[id]),
+    );
     if (hasManual) return payerAmounts;
     return distributePayerAmounts(amountMinor, payerIds);
   }, [amountMinor, payerIds, payerAmounts]);
 
   const payerSum = useMemo(
     () => payerIds.reduce((s, id) => s + (resolvedPayerAmounts[id] || 0), 0),
-    [payerIds, resolvedPayerAmounts]
+    [payerIds, resolvedPayerAmounts],
   );
 
   const splitPreview = useMemo(() => {
@@ -393,7 +402,7 @@ export function ExpenseForm({
         if (draftPayerIds.length === 1) return amountMinor;
         return s + (draftPayerAmounts[id] || 0);
       }, 0),
-    [draftPayerIds, draftPayerAmounts, amountMinor]
+    [draftPayerIds, draftPayerAmounts, amountMinor],
   );
 
   const payerSummary = useMemo(() => {
@@ -407,7 +416,7 @@ export function ExpenseForm({
 
   function openPayersModal() {
     setDraftPayerIds(
-      payerIds.length ? payerIds : defaultPayer ? [defaultPayer.id] : []
+      payerIds.length ? payerIds : defaultPayer ? [defaultPayer.id] : [],
     );
     setDraftPayerAmounts({ ...resolvedPayerAmounts });
     setPayerFieldErrors([]);
@@ -484,9 +493,7 @@ export function ExpenseForm({
     setSplitMethod(method);
     setFieldErrors((prev) => ({ ...prev, exactIds: [] }));
     if (method === "SHARES") {
-      const ids = includedIds.length
-        ? includedIds
-        : members.map((m) => m.id);
+      const ids = includedIds.length ? includedIds : members.map((m) => m.id);
       const { parts } = resolveGroupSplitDefaults(
         {
           settings: {
@@ -494,7 +501,7 @@ export function ExpenseForm({
             defaultSplitConfig: group?.settings?.defaultSplitConfig,
           },
         },
-        ids
+        ids,
       );
       setPartInputs((prev) => {
         const next = { ...parts };
@@ -591,11 +598,9 @@ export function ExpenseForm({
           method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            isEdit
-              ? { ...payload, baseVersion: expense.version }
-              : payload
+            isEdit ? { ...payload, baseVersion: expense.version } : payload,
           ),
-        }
+        },
       );
       const json = await res.json();
       if (!res.ok) {
@@ -633,7 +638,7 @@ export function ExpenseForm({
             className={cn(
               "h-14 border bg-soft text-center text-3xl font-semibold tracking-tight shadow-none focus-visible:ring-1",
               fieldErrors.amount &&
-                "border-danger focus-visible:ring-danger animate-nsplit-shake"
+                "border-danger focus-visible:ring-danger animate-nsplit-shake",
             )}
           />
         </div>
@@ -660,19 +665,21 @@ export function ExpenseForm({
             className={cn(
               "flex-1",
               fieldErrors.title &&
-                "border-danger focus-visible:ring-danger animate-nsplit-shake"
+                "border-danger focus-visible:ring-danger animate-nsplit-shake",
             )}
           />
         </div>
 
         {!showDesc ? (
-          <button
-            type="button"
-            onClick={() => setShowDesc(true)}
-            className="text-sm text-primary"
-          >
-            + Add description
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDesc(true)}
+              className="text-sm text-primary hover:text-primary/80 cursor-pointer"
+            >
+              + Add description
+            </button>
+          </div>
         ) : (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
@@ -685,7 +692,7 @@ export function ExpenseForm({
                   setShowDesc(false);
                   setDescription("");
                 }}
-                className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground"
+                className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground cursor-pointer"
                 aria-label="Remove description"
               >
                 <X className="h-3.5 w-3.5" />
@@ -710,12 +717,12 @@ export function ExpenseForm({
             onClick={openPayersModal}
             className={cn(
               "flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-sm hover:bg-soft",
-              fieldErrors.paidBy && "border-danger animate-nsplit-shake"
+              fieldErrors.paidBy && "border-danger animate-nsplit-shake",
             )}
           >
             <Users className="h-4 w-4 text-muted" />
             <span className="min-w-0 flex-1 truncate">
-              <span className="block text-[10px] uppercase tracking-wide text-muted">
+              <span className="block text-[10px] tracking-wide text-muted">
                 Paid by
               </span>
               <span className="font-medium">{payerSummary}</span>
@@ -729,12 +736,10 @@ export function ExpenseForm({
           >
             <CalendarDays className="h-4 w-4 text-muted" />
             <span className="min-w-0 flex-1 truncate">
-              <span className="block text-[10px] uppercase tracking-wide text-muted">
+              <span className="block text-[10px] tracking-wide text-muted">
                 When
               </span>
-              <span className="font-medium">
-                {formatWhenLabel(expenseAt)}
-              </span>
+              <span className="font-medium">{formatWhenLabel(expenseAt)}</span>
             </span>
           </button>
         </div>
@@ -747,7 +752,7 @@ export function ExpenseForm({
               value={splitMethod}
               onValueChange={onSplitMethodChange}
             >
-              <SelectTrigger className="h-7 w-[8.25rem] border-0 bg-soft shadow-none">
+              <SelectTrigger className="h-7 w-33 border-0 bg-soft shadow-none">
                 <SelectValue
                   placeholder={
                     SPLIT_METHODS.find((m) => m.value === splitMethod)?.label ||
@@ -772,29 +777,25 @@ export function ExpenseForm({
               const parts = partInputs[m.id] ?? 1;
               const exactInvalid = fieldErrors.exactIds.includes(m.id);
               return (
-                <li
-                  key={m.id}
-                  className="flex items-center gap-3 px-3 py-2.5"
-                >
+                <li key={m.id} className="flex items-center gap-3 px-3 py-2.5">
                   <Checkbox
                     checked={included}
                     onCheckedChange={() => toggleIncluded(m.id)}
                   />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
-                      {memberLabel(m)}
-                    </div>
-
-                    {included && splitMethod === "EXACT" ? (
+                  <div className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {memberLabel(m)}
+                  </div>
+                  <div>
+                    {splitMethod === "EXACT" ? (
                       <Input
                         key={`exact-${m.id}-${shakeKey}`}
                         className={cn(
-                          "mt-1 h-7 text-xs",
+                          "w-20 h-7 text-xs text-end",
                           exactInvalid &&
-                            "border-danger focus-visible:ring-danger animate-nsplit-shake"
+                            "border-danger focus-visible:ring-danger animate-nsplit-shake",
                         )}
                         inputMode="decimal"
-                        placeholder={currency}
+                        placeholder={" 0.00"}
                         value={exactInputs[m.id] ?? ""}
                         onChange={(e) => {
                           setExactInputs((prev) => ({
@@ -803,49 +804,57 @@ export function ExpenseForm({
                           }));
                           setFieldErrors((prev) => ({
                             ...prev,
-                            exactIds: prev.exactIds.filter(
-                              (id) => id !== m.id
-                            ),
+                            exactIds: prev.exactIds.filter((id) => id !== m.id),
                           }));
                         }}
                       />
                     ) : null}
 
                     {included && splitMethod === "SHARES" ? (
-                      <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-border bg-soft px-1 py-0.5">
-                        <button
-                          type="button"
-                          className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
-                          disabled={parts <= 1}
-                          onClick={() => setParts(m.id, parts - 1)}
-                          aria-label="Decrease parts"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <span className="min-w-8 text-center text-xs font-semibold tabular-nums">
-                          {parts}x
-                        </span>
-                        <button
-                          type="button"
-                          className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
-                          disabled={parts >= 99}
-                          onClick={() => setParts(m.id, parts + 1)}
-                          aria-label="Increase parts"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium tabular-nums">
+                          {amountMinor && included
+                            ? formatMinor(share ?? 0, currency)
+                            : "0.00"}
+                        </div>
+                        <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-border bg-soft px-1 py-0.5">
+                          <button
+                            type="button"
+                            className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
+                            disabled={parts <= 1}
+                            onClick={() => setParts(m.id, parts - 1)}
+                            aria-label="Decrease parts"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="min-w-8 text-center text-xs font-semibold tabular-nums">
+                            {parts}x
+                          </span>
+                          <button
+                            type="button"
+                            className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
+                            disabled={parts >= 99}
+                            onClick={() => setParts(m.id, parts + 1)}
+                            aria-label="Increase parts"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ) : null}
-                  </div>
-                  <div
-                    className={cn(
-                      "shrink-0 text-sm font-medium tabular-nums",
-                      included ? "text-foreground" : "text-muted"
-                    )}
-                  >
-                    {amountMinor && included
-                      ? formatMinor(share ?? 0, currency)
-                      : "-"}
+
+                    {splitMethod === "EQUAL" ? (
+                      <div
+                        className={cn(
+                          "shrink-0 text-sm font-medium tabular-nums",
+                          included ? "text-foreground" : "text-muted",
+                        )}
+                      >
+                        {amountMinor && included
+                          ? formatMinor(share ?? 0, currency)
+                          : "0.00"}
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -895,7 +904,7 @@ export function ExpenseForm({
                       className={cn(
                         "h-8 w-24 text-right text-xs",
                         amountInvalid &&
-                          "border-danger focus-visible:ring-danger animate-nsplit-shake"
+                          "border-danger focus-visible:ring-danger animate-nsplit-shake",
                       )}
                       inputMode="decimal"
                       value={
@@ -912,7 +921,7 @@ export function ExpenseForm({
                             : 0,
                         }));
                         setPayerFieldErrors((prev) =>
-                          prev.filter((id) => id !== m.id)
+                          prev.filter((id) => id !== m.id),
                         );
                       }}
                     />
@@ -969,7 +978,7 @@ export function ExpenseForm({
                           "flex h-10 w-full items-center justify-center rounded-lg border text-xl transition-colors hover:bg-soft",
                           selected
                             ? "border-primary bg-soft"
-                            : "border-border bg-background"
+                            : "border-border bg-background",
                         )}
                       >
                         {item.emoji}
@@ -1025,13 +1034,13 @@ export function ExpenseForm({
                     {draftTime
                       ? new Date(`1970-01-01T${draftTime}`).toLocaleTimeString(
                           undefined,
-                          { hour: "numeric", minute: "2-digit" }
+                          { hour: "numeric", minute: "2-digit" },
                         )
                       : "-"}
                     <ChevronDown
                       className={cn(
                         "h-4 w-4 text-muted transition-transform",
-                        timeOpen && "rotate-180"
+                        timeOpen && "rotate-180",
                       )}
                     />
                   </span>

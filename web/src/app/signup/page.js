@@ -27,7 +27,7 @@ export default function SignupPage() {
         setError(json?.error?.message || "Signup failed");
         return;
       }
-      router.push("/dashboard");
+      router.push("/groups");
       router.refresh();
     } catch {
       setError("Something went wrong");

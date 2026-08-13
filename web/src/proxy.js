@@ -28,7 +28,7 @@ export function proxy(request) {
 
   if (isAuthPage && session) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = "/groups";
     return NextResponse.redirect(url);
   }
 

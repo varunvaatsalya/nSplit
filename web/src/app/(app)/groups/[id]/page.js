@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { History, Settings } from "lucide-react";
+import { ArrowLeft, History, Settings } from "lucide-react";
 import { format, isToday, isValid } from "date-fns";
 import { AddRecordModal } from "@/components/records/add-record-modal";
 import { GroupBalancePanel } from "@/components/groups/group-balance-panel";
@@ -58,18 +58,6 @@ function formatRowTime(expense) {
   if (!isValid(d)) return "";
   const time = format(d, "h:mm a");
   return time;
-}
-
-function relativeCreated(date) {
-  if (!date) return null;
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return null;
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (days <= 0) return "created today";
-  if (days === 1) return "created 1 day ago";
-  if (days < 14) return `created ${days} days ago`;
-  if (days < 60) return `created ${Math.floor(days / 7)} weeks ago`;
-  return `created ${d.toLocaleDateString(undefined, { month: "short", year: "numeric" })}`;
 }
 
 function payerLabel(expense, members) {
@@ -193,23 +181,22 @@ export default function GroupDashboardPage() {
   if (error) return <p className="text-danger">{error}</p>;
   if (!group) return <p className="text-sm text-muted">Loading…</p>;
 
-  const createdLabel = relativeCreated(group.createdAt);
-
   return (
-    <div className="relative mx-auto max-w-3xl pb-24 md:pb-8">
-      <div className="mb-6 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-soft text-2xl">
+    <div className="relative pb-24">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button type="button" size="icon" variant="ghost" asChild>
+            <Link href="/groups" aria-label="Back to groups">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <span className="flex h-12 aspect-square shrink-0 items-center justify-center rounded-lg bg-primary/10 text-2xl">
             {iconMeta.emoji}
           </span>
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
+          <div className="min-w-0 px-2">
+            <h1 className="truncate text-lg font-semibold tracking-tight sm:text-xl">
               {group.name}
             </h1>
-            <p className="mt-0.5 text-sm text-muted">
-              {members.length} member{members.length === 1 ? "" : "s"}
-              {createdLabel ? ` · ${createdLabel}` : ""}
-            </p>
           </div>
         </div>
 
@@ -239,7 +226,7 @@ export default function GroupDashboardPage() {
       </div>
 
       <div className="mb-5 flex justify-start">
-        <div className="inline-flex rounded-full bg-soft p-1">
+        <div className="inline-flex rounded-full bg-muted-foreground/10 p-1">
           <button
             type="button"
             onClick={() => setView("expenses")}
@@ -305,9 +292,9 @@ export default function GroupDashboardPage() {
                           <button
                             type="button"
                             onClick={() => openExpense(expense.id)}
-                            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors cursor-pointer hover:border-primary/25 hover:bg-soft/30"
+                            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors cursor-pointer hover:border-primary/25 hover:bg-surface/10"
                           >
-                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-soft text-lg">
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted-foreground/10 text-lg">
                               {getExpenseEmoji(
                                 expense.icon,
                                 expense.categoryKey
@@ -329,7 +316,7 @@ export default function GroupDashboardPage() {
                                       return (
                                         <UserAvatar
                                           key={m.id}
-                                          className="h-5 w-5"
+                                          className="h-5 w-5 ring-transparent"
                                           fallbackClassName="text-[8px]"
                                           name={label}
                                           avatar={m.avatar || m.user?.avatar}
