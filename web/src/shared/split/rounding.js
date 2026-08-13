@@ -1,7 +1,7 @@
 /**
  * Largest-remainder (Hamilton) rounding so parts sum exactly to totalMinor.
  * @param {number} totalMinor
- * @param {number[]} weights — non-negative weights
+ * @param {number[]} weights - non-negative weights
  * @returns {number[]}
  */
 export function distributeByWeights(totalMinor, weights) {

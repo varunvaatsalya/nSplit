@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const METHODS = [
   { value: "EQUAL", label: "Equally" },
@@ -81,6 +82,8 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [confirmDeleteGroupOpen, setConfirmDeleteGroupOpen] = useState(false);
+  const [confirmRemoveMemberOpen, setConfirmRemoveMemberOpen] = useState(false);
 
   useEffect(() => {
     if (!open || !group) return;
@@ -237,13 +240,11 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
     }
   }
 
-  async function removeMember(member) {
-    if (!group?.id) return;
+  async function removeMember() {
+    const member = editing;
+    if (!group?.id || !member) return;
     if (member.permission === "ADMIN") {
       setEditError("Cannot remove the admin");
-      return;
-    }
-    if (!window.confirm(`Remove ${memberLabel(member)} from this group?`)) {
       return;
     }
     setSavingEdit(true);
@@ -256,9 +257,11 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
       const json = await res.json();
       if (!res.ok) {
         setEditError(json?.error?.message || "Failed to remove");
+        setConfirmRemoveMemberOpen(false);
         return;
       }
       setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      setConfirmRemoveMemberOpen(false);
       setEditOpen(false);
       setEditing(null);
       onUpdated?.();
@@ -269,9 +272,6 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
 
   async function deleteGroup() {
     if (!group?.id) return;
-    if (!window.confirm(`Delete “${group.name}”? This cannot be undone.`)) {
-      return;
-    }
     setDeleting(true);
     setDeleteError("");
     try {
@@ -279,8 +279,10 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
       const json = await res.json();
       if (!res.ok) {
         setDeleteError(json?.error?.message || "Failed to delete");
+        setConfirmDeleteGroupOpen(false);
         return;
       }
+      setConfirmDeleteGroupOpen(false);
       onOpenChange?.(false);
       router.push("/groups");
     } finally {
@@ -333,7 +335,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
             <div className="mt-6 overflow-hidden rounded-xl border border-border">
               <button
                 type="button"
-                onClick={deleteGroup}
+                onClick={() => setConfirmDeleteGroupOpen(true)}
                 disabled={deleting}
                 className="flex w-full items-center gap-3 bg-surface px-3 py-3 text-left hover:bg-soft disabled:opacity-60"
               >
@@ -342,7 +344,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
                     {deleting ? "Deleting…" : "Delete group"}
                   </div>
                   <div className="text-xs text-muted">
-                    Permanent — cannot be undone
+                    Permanent - cannot be undone
                   </div>
                 </div>
                 <Trash2 className="h-4 w-4 text-danger" />
@@ -520,7 +522,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
           <DialogHeader>
             <DialogTitle>Add member</DialogTitle>
             <DialogDescription>
-              Name is enough — email is optional.
+              Name is enough - email is optional.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={addMember} className="space-y-3">
@@ -620,7 +622,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
                   variant="outline"
                   className="border-danger text-danger"
                   disabled={savingEdit}
-                  onClick={() => removeMember(editing)}
+                  onClick={() => setConfirmRemoveMemberOpen(true)}
                 >
                   Remove
                 </Button>
@@ -643,6 +645,32 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeleteGroupOpen}
+        onOpenChange={setConfirmDeleteGroupOpen}
+        title="Delete group?"
+        description={`“${group.name}” and its expenses will be permanently removed. This cannot be undone.`}
+        confirmLabel="Delete group"
+        cancelLabel="Cancel"
+        loading={deleting}
+        onConfirm={deleteGroup}
+      />
+
+      <ConfirmDialog
+        open={confirmRemoveMemberOpen}
+        onOpenChange={setConfirmRemoveMemberOpen}
+        title="Remove member?"
+        description={
+          editing
+            ? `${memberLabel(editing)} will be removed from this group.`
+            : "This member will be removed from the group."
+        }
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        loading={savingEdit}
+        onConfirm={removeMember}
+      />
     </>
   );
 }

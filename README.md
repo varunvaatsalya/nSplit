@@ -1,6 +1,6 @@
 # Nsplit
 
-Modern expense splitting for groups — web (Next.js) + mobile (Expo SDK 54).
+Modern expense splitting for groups - web (Next.js) + mobile (Expo SDK 54).
 
 ## Docs
 
@@ -25,7 +25,7 @@ npm install
 npm run dev
 ```
 
-4. Open http://localhost:3000 — sign up, create a group, add expenses
+4. Open http://localhost:3000 - sign up, create a group, add expenses
 
 Default local URI:
 

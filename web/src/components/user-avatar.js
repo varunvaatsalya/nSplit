@@ -23,7 +23,7 @@ export function UserAvatar({
         <AvatarImage src={avatar.url} alt={name || "User"} />
       ) : null}
       <AvatarFallback
-        className={cn("bg-transparent text-xs font-semibold", fallbackClassName)}
+        className={cn("bg-transparent text-xs font-semibold select-none", fallbackClassName)}
         style={{ backgroundColor: style.bg, color: style.fg }}
       >
         {letters}

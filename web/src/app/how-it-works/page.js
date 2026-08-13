@@ -14,7 +14,7 @@ export default function HowItWorksPage() {
           <li>Create a group and invite or add members</li>
           <li>Add expenses, income, or transfers</li>
           <li>Nsplit calculates balances on the server</li>
-          <li>Settle via transfers — no duplicate settlement system</li>
+          <li>Settle via transfers - no duplicate settlement system</li>
         </ol>
       </main>
     </div>

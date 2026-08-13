@@ -18,5 +18,5 @@ applyIdTransform(PasswordResetSchema);
 export const PasswordReset =
   models.PasswordReset || model("PasswordReset", PasswordResetSchema);
 
-/** @deprecated alias — prefer PasswordReset */
+/** @deprecated alias - prefer PasswordReset */
 export const PasswordResetToken = PasswordReset;

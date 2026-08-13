@@ -37,7 +37,7 @@ export default function HomePage() {
           </h1>
           <p className="mt-4 text-lg text-muted">
             Multi-payer expenses, configurable defaults, clear transfers, and an
-            offline-first mobile app — built for real shared money.
+            offline-first mobile app - built for real shared money.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -59,7 +59,7 @@ export default function HomePage() {
           {[
             {
               title: "Flexible splits",
-              body: "Equal, exact, percentage, shares, or custom — with group defaults.",
+              body: "Equal, exact, percentage, shares, or custom - with group defaults.",
             },
             {
               title: "Real transfers",

@@ -12,9 +12,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Nsplit — Split expenses, calmly",
+  title: "Nsplit - Split expenses, calmly",
   description:
-    "Modern expense splitting for groups — flexible permissions, multi-payer expenses, and offline-ready mobile.",
+    "Modern expense splitting for groups - flexible permissions, multi-payer expenses, and offline-ready mobile.",
 };
 
 export default function RootLayout({ children }) {

@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/user-avatar";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getGroupIcon } from "@/lib/group-options";
 import { CURRENCIES } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,7 @@ export default function GroupSettingsPage() {
   const [memberError, setMemberError] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/groups/${id}`);
@@ -215,17 +217,16 @@ export default function GroupSettingsPage() {
   }
 
   async function deleteGroup() {
-    if (!window.confirm(`Delete “${group?.name}”? This cannot be undone.`)) {
-      return;
-    }
     setDeleting(true);
     try {
       const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) {
         setError(json?.error?.message || "Failed to delete");
+        setConfirmDeleteOpen(false);
         return;
       }
+      setConfirmDeleteOpen(false);
       router.push("/groups");
     } finally {
       setDeleting(false);
@@ -383,7 +384,7 @@ export default function GroupSettingsPage() {
             variant="ghost"
             className="text-danger hover:bg-danger/10 hover:text-danger"
             disabled={deleting}
-            onClick={deleteGroup}
+            onClick={() => setConfirmDeleteOpen(true)}
           >
             {deleting ? "Deleting…" : "Delete Group"}
           </Button>
@@ -572,6 +573,17 @@ export default function GroupSettingsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete group?"
+        description={`“${group.name}” and its expenses will be permanently removed. This cannot be undone.`}
+        confirmLabel="Delete group"
+        cancelLabel="Cancel"
+        loading={deleting}
+        onConfirm={deleteGroup}
+      />
     </div>
   );
 }

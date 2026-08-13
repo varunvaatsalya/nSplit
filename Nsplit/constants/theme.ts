@@ -1,5 +1,5 @@
 /**
- * Nsplit Indigo design tokens — aligned with web CSS variables.
+ * Nsplit Indigo design tokens - aligned with web CSS variables.
  */
 import { Platform } from 'react-native';
 

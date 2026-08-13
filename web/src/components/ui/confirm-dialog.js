@@ -1,0 +1,93 @@
+"use client";
+
+import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
+/**
+ * App-wide confirm modal (replaces window.confirm).
+ * Use tone="danger" for destructive actions.
+ */
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  tone = "danger",
+  loading = false,
+  onConfirm,
+}) {
+  const isDanger = tone === "danger";
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (loading) return;
+        onOpenChange?.(next);
+      }}
+    >
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName="z-[70]"
+        className="z-[70] max-w-sm gap-0 overflow-hidden p-0 sm:rounded-2xl"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <DialogHeader className="gap-3 px-5 pb-2 pt-5 pr-5">
+          <div
+            className={cn(
+              "flex h-11 w-11 items-center justify-center rounded-full",
+              isDanger ? "bg-danger/10 text-danger" : "bg-primary/10 text-primary"
+            )}
+          >
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div className="space-y-1.5">
+            <DialogTitle className="text-base font-semibold tracking-tight">
+              {title}
+            </DialogTitle>
+            {description ? (
+              <DialogDescription className="text-sm leading-relaxed text-muted">
+                {description}
+              </DialogDescription>
+            ) : null}
+          </div>
+        </DialogHeader>
+
+        <DialogFooter className="gap-2 border-t border-border bg-soft/40 px-5 py-4 sm:flex-row">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1 sm:flex-none"
+            disabled={loading}
+            onClick={() => onOpenChange?.(false)}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            className={cn(
+              "flex-1 sm:flex-none",
+              isDanger &&
+                "bg-danger text-white hover:bg-danger/90 hover:opacity-100"
+            )}
+            disabled={loading}
+            onClick={() => onConfirm?.()}
+          >
+            {loading ? "Please wait…" : confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

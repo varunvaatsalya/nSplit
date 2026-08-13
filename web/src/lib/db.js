@@ -28,7 +28,7 @@ export async function connectDb() {
 
 /**
  * Run work in a Mongo transaction when supported; otherwise sequential.
- * Standalone local Mongo often has no replica set — fallback keeps DX easy.
+ * Standalone local Mongo often has no replica set - fallback keeps DX easy.
  */
 export async function withTransaction(fn) {
   await connectDb();

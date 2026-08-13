@@ -24,11 +24,8 @@ function formatMinor(minor, currency = "INR") {
 }
 
 function dateHeaderLabel(date) {
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).toUpperCase();
+  if (!isValid(date)) return "Unknown date";
+  return format(date, "EEE, d MMM yyyy");
 }
 
 function expenseDayKey(expense) {
@@ -134,6 +131,7 @@ export default function GroupDashboardPage() {
   const [activityOpen, setActivityOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
+  const [editExpense, setEditExpense] = useState(null);
 
   async function load() {
     const [gRes, bRes, eRes, meRes] = await Promise.all([
@@ -246,7 +244,7 @@ export default function GroupDashboardPage() {
             type="button"
             onClick={() => setView("expenses")}
             className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+              "rounded-full px-4 py-1.5 text-sm font-medium cursor-pointer transition-colors",
               view === "expenses"
                 ? "bg-surface text-foreground shadow-sm"
                 : "text-muted hover:text-foreground"
@@ -258,7 +256,7 @@ export default function GroupDashboardPage() {
             type="button"
             onClick={() => setView("balance")}
             className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+              "rounded-full px-4 py-1.5 text-sm font-medium cursor-pointer transition-colors",
               view === "balance"
                 ? "bg-surface text-foreground shadow-sm"
                 : "text-muted hover:text-foreground"
@@ -394,7 +392,12 @@ export default function GroupDashboardPage() {
         </section>
       )}
 
-      <AddRecordModal group={group} onCreated={load} />
+      <AddRecordModal
+        group={group}
+        onCreated={load}
+        editExpense={editExpense}
+        onEditClose={() => setEditExpense(null)}
+      />
 
       <GroupActivityDialog
         groupId={group.id}
@@ -409,8 +412,20 @@ export default function GroupDashboardPage() {
         index={detailIndex}
         onIndexChange={setDetailIndex}
         group={group}
-        showAddedBy={showAddedBy}
         currentUserId={me?.id}
+        onEdit={(expense) => {
+          setDetailOpen(false);
+          setEditExpense(expense);
+        }}
+        onDeleted={() => {
+          const remaining = flatExpenses.length - 1;
+          if (remaining <= 0) {
+            setDetailOpen(false);
+          } else if (detailIndex >= remaining) {
+            setDetailIndex(remaining - 1);
+          }
+          load();
+        }}
       />
     </div>
   );

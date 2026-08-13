@@ -31,10 +31,21 @@ async function loadGroup(id) {
   }
 
   const lean = group.toObject();
+  const settings = lean.settings || {};
   return {
     ...toJSON(lean),
     createdById: String(lean.createdById),
-    settings: lean.settings || null,
+    settings: {
+      defaultSplitMethod: ["EQUAL", "EXACT", "SHARES"].includes(
+        settings.defaultSplitMethod
+      )
+        ? settings.defaultSplitMethod
+        : "EQUAL",
+      defaultSplitConfig: Array.isArray(settings.defaultSplitConfig)
+        ? settings.defaultSplitConfig
+        : null,
+      simplifyDebts: Boolean(settings.simplifyDebts),
+    },
     members: activeMembers(lean).map((m) =>
       serializeMember(m, m.userId ? userMap.get(String(m.userId)) : null)
     ),

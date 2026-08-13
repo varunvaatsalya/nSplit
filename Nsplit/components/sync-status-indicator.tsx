@@ -13,7 +13,7 @@ const LABELS: Record<SyncStatus, string> = {
   sync_failed: 'Sync failed',
 };
 
-/** Subtle sync status strip — not an intrusive banner. */
+/** Subtle sync status strip - not an intrusive banner. */
 export function SyncStatusIndicator() {
   const scheme = useColorScheme() ?? 'light';
   const colors = Colors[scheme];

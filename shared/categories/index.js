@@ -1,6 +1,6 @@
 /**
  * Local rule-based category / icon suggestion from expense title.
- * Extensible — replace mapping later without changing call sites.
+ * Extensible - replace mapping later without changing call sites.
  */
 
 export const CATEGORIES = [

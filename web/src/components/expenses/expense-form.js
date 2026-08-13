@@ -50,6 +50,36 @@ const EMPTY_FIELD_ERRORS = {
   payerIds: [],
 };
 
+function normalizeSplitMethod(value) {
+  return ["EQUAL", "EXACT", "SHARES"].includes(value) ? value : "EQUAL";
+}
+
+function defaultParts(memberIds) {
+  const map = {};
+  for (const id of memberIds) map[id] = 1;
+  return map;
+}
+
+/** Apply group default split method + shares config onto member ids. */
+function resolveGroupSplitDefaults(group, memberIds) {
+  const method = normalizeSplitMethod(group?.settings?.defaultSplitMethod);
+  const parts = defaultParts(memberIds);
+  if (method === "SHARES") {
+    const config = group?.settings?.defaultSplitConfig;
+    if (Array.isArray(config)) {
+      const idSet = new Set(memberIds.map(String));
+      for (const row of config) {
+        const mid = row?.memberId != null ? String(row.memberId) : "";
+        if (!mid || !idSet.has(mid)) continue;
+        const n = Number(row.value);
+        parts[mid] =
+          Number.isFinite(n) && n >= 1 ? Math.min(99, Math.round(n)) : 1;
+      }
+    }
+  }
+  return { method, parts };
+}
+
 function formatMinor(minor, currency = "INR") {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
@@ -112,23 +142,20 @@ function distributePayerAmounts(totalMinor, payerIds) {
   return map;
 }
 
-function defaultParts(memberIds) {
-  const map = {};
-  for (const id of memberIds) map[id] = 1;
-  return map;
-}
-
 /**
- * Expense create UI — modal by default, or embed inside Add Record.
+ * Expense create/edit UI - modal by default, or embed inside Add Record.
  */
 export function ExpenseForm({
   group,
   onCreated,
+  onUpdated,
   triggerLabel = "Add expense",
   embedded = false,
   active = false,
   onClose,
+  expense = null,
 }) {
+  const isEdit = Boolean(expense?.id);
   const members = group?.members || [];
   const currency = group?.currency || "INR";
   const defaultPayer =
@@ -143,7 +170,9 @@ export function ExpenseForm({
   const [iconsOpen, setIconsOpen] = useState(false);
   const [showDesc, setShowDesc] = useState(false);
   const [description, setDescription] = useState("");
-  const [splitMethod, setSplitMethod] = useState("EQUAL");
+  const [splitMethod, setSplitMethod] = useState(() =>
+    normalizeSplitMethod(group?.settings?.defaultSplitMethod)
+  );
   const [includedIds, setIncludedIds] = useState([]);
   const [exactInputs, setExactInputs] = useState({});
   const [partInputs, setPartInputs] = useState({});
@@ -197,27 +226,9 @@ export function ExpenseForm({
     setIcon(fallback.emoji);
     setIconManual(false);
     setExactInputs({});
-    const method = ["EQUAL", "EXACT", "SHARES"].includes(
-      group?.settings?.defaultSplitMethod
-    )
-      ? group.settings.defaultSplitMethod
-      : "EQUAL";
+    const { method, parts } = resolveGroupSplitDefaults(group, ids);
     setSplitMethod(method);
-    if (method === "SHARES") {
-      const map = defaultParts(ids);
-      const config = group?.settings?.defaultSplitConfig;
-      if (Array.isArray(config)) {
-        for (const row of config) {
-          if (!row?.memberId || !ids.includes(row.memberId)) continue;
-          const n = Number(row.value);
-          map[row.memberId] =
-            Number.isFinite(n) && n >= 1 ? Math.min(99, Math.round(n)) : 1;
-        }
-      }
-      setPartInputs(map);
-    } else {
-      setPartInputs(defaultParts(ids));
-    }
+    setPartInputs(parts);
     setExpenseAt(new Date());
     setIncludedIds(ids);
     setFieldErrors(EMPTY_FIELD_ERRORS);
@@ -230,12 +241,97 @@ export function ExpenseForm({
     }
   }
 
+  function hydrateFromExpense(exp) {
+    const memberIds = new Set(members.map((m) => m.id));
+    const amountMajor = ((exp.amountMinor || 0) / 100).toString();
+    setAmount(amountMajor);
+    setTitle(exp.title || "");
+    const desc = exp.description || "";
+    setDescription(desc);
+    setShowDesc(Boolean(desc));
+    setCategoryKey(exp.categoryKey || "other");
+    setIcon(getExpenseEmoji(exp.icon, exp.categoryKey || "other"));
+    setIconManual(Boolean(exp.icon));
+    const method = normalizeSplitMethod(exp.splitMethod);
+    setSplitMethod(method);
+
+    const included = (exp.participants || [])
+      .filter((p) => p.included !== false && memberIds.has(String(p.memberId)))
+      .map((p) => String(p.memberId));
+    const fallbackIncluded = (exp.splits || [])
+      .filter(
+        (s) => (s.amountMinor || 0) > 0 && memberIds.has(String(s.memberId))
+      )
+      .map((s) => String(s.memberId));
+    const nextIncluded = included.length ? included : fallbackIncluded;
+    setIncludedIds(nextIncluded.length ? nextIncluded : members.map((m) => m.id));
+
+    const exact = {};
+    const { parts: defaultShareParts } = resolveGroupSplitDefaults(
+      { settings: { defaultSplitMethod: "SHARES", defaultSplitConfig: group?.settings?.defaultSplitConfig } },
+      members.map((m) => m.id)
+    );
+    const parts = { ...defaultShareParts };
+    for (const s of exp.splits || []) {
+      const mid = String(s.memberId);
+      if (!memberIds.has(mid)) continue;
+      if (method === "EXACT") {
+        exact[mid] = ((s.amountMinor || 0) / 100).toString();
+      }
+      if (method === "SHARES") {
+        const n = Number(s.inputValue);
+        if (Number.isFinite(n) && n >= 1) {
+          parts[mid] = Math.min(99, Math.round(n));
+        }
+      }
+    }
+    setExactInputs(exact);
+    setPartInputs(parts);
+
+    const payers = (exp.payers || []).filter((p) =>
+      memberIds.has(String(p.memberId))
+    );
+    if (payers.length) {
+      setPayerIds(payers.map((p) => String(p.memberId)));
+      const amounts = {};
+      for (const p of payers) amounts[String(p.memberId)] = p.amountMinor || 0;
+      setPayerAmounts(amounts);
+    } else if (defaultPayer) {
+      setPayerIds([defaultPayer.id]);
+      setPayerAmounts({});
+    } else {
+      setPayerIds([]);
+      setPayerAmounts({});
+    }
+
+    const when = exp.expenseDate || exp.createdAt;
+    setExpenseAt(when ? new Date(when) : new Date());
+    setFieldErrors(EMPTY_FIELD_ERRORS);
+  }
+
+  const defaultSplitMethod = normalizeSplitMethod(
+    group?.settings?.defaultSplitMethod
+  );
+  const defaultSplitConfigKey = JSON.stringify(
+    group?.settings?.defaultSplitConfig ?? null
+  );
+
   useEffect(() => {
     const isActive = embedded ? active : open;
     if (!isActive || !members.length) return;
-    resetForm();
+    if (expense?.id) hydrateFromExpense(expense);
+    else resetForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embedded ? active : open, group?.id]);
+  }, [
+    embedded,
+    active,
+    open,
+    group?.id,
+    expense?.id,
+    defaultSplitMethod,
+    defaultSplitConfigKey,
+    members.length,
+  ]);
 
   const amountMinor = useMemo(() => {
     const n = Number(amount);
@@ -384,13 +480,26 @@ export function ExpenseForm({
   }
 
   function onSplitMethodChange(value) {
-    setSplitMethod(value);
+    const method = normalizeSplitMethod(value);
+    setSplitMethod(method);
     setFieldErrors((prev) => ({ ...prev, exactIds: [] }));
-    if (value === "SHARES") {
+    if (method === "SHARES") {
+      const ids = includedIds.length
+        ? includedIds
+        : members.map((m) => m.id);
+      const { parts } = resolveGroupSplitDefaults(
+        {
+          settings: {
+            defaultSplitMethod: "SHARES",
+            defaultSplitConfig: group?.settings?.defaultSplitConfig,
+          },
+        },
+        ids
+      );
       setPartInputs((prev) => {
-        const next = { ...prev };
-        for (const id of includedIds) {
-          if (!next[id] || next[id] < 1) next[id] = 1;
+        const next = { ...parts };
+        for (const id of ids) {
+          if (prev[id] >= 1) next[id] = prev[id];
         }
         return next;
       });
@@ -452,31 +561,42 @@ export function ExpenseForm({
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/groups/${group.id}/expenses`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          amountMinor,
-          splitMethod,
-          icon,
-          categoryId: categoryKey,
-          expenseDate: expenseAt.toISOString(),
-          payers,
-          participants: members.map((m) => ({
-            memberId: m.id,
-            included: includedIds.includes(m.id),
-            inputValue: !includedIds.includes(m.id)
+      const payload = {
+        title: title.trim(),
+        description: description.trim() || null,
+        amountMinor,
+        splitMethod,
+        icon,
+        categoryId: categoryKey,
+        expenseDate: expenseAt.toISOString(),
+        payers,
+        participants: members.map((m) => ({
+          memberId: m.id,
+          included: includedIds.includes(m.id),
+          inputValue: !includedIds.includes(m.id)
+            ? null
+            : splitMethod === "EQUAL"
               ? null
-              : splitMethod === "EQUAL"
-                ? null
-                : splitMethod === "SHARES"
-                  ? Number(partInputs[m.id] || 1)
-                  : Math.round(Number(exactInputs[m.id] || 0) * 100),
-          })),
-        }),
-      });
+              : splitMethod === "SHARES"
+                ? Number(partInputs[m.id] || 1)
+                : Math.round(Number(exactInputs[m.id] || 0) * 100),
+        })),
+      };
+
+      const res = await fetch(
+        isEdit
+          ? `/api/groups/${group.id}/expenses/${expense.id}`
+          : `/api/groups/${group.id}/expenses`,
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            isEdit
+              ? { ...payload, baseVersion: expense.version }
+              : payload
+          ),
+        }
+      );
       const json = await res.json();
       if (!res.ok) {
         bumpShake();
@@ -484,7 +604,8 @@ export function ExpenseForm({
       }
       setOpen(false);
       onClose?.();
-      onCreated?.();
+      if (isEdit) onUpdated?.();
+      else onCreated?.();
     } catch {
       bumpShake();
     } finally {
@@ -621,9 +742,18 @@ export function ExpenseForm({
         <div className="overflow-hidden rounded-xl border border-border bg-background">
           <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-2">
             <span className="text-xs font-medium text-muted">Split with</span>
-            <Select value={splitMethod} onValueChange={onSplitMethodChange}>
-              <SelectTrigger className="h-7 w-32.5 border-0 bg-soft shadow-none">
-                <SelectValue />
+            <Select
+              key={`split-method-${splitMethod}`}
+              value={splitMethod}
+              onValueChange={onSplitMethodChange}
+            >
+              <SelectTrigger className="h-7 w-[8.25rem] border-0 bg-soft shadow-none">
+                <SelectValue
+                  placeholder={
+                    SPLIT_METHODS.find((m) => m.value === splitMethod)?.label ||
+                    "Split"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {SPLIT_METHODS.map((m) => (
@@ -715,7 +845,7 @@ export function ExpenseForm({
                   >
                     {amountMinor && included
                       ? formatMinor(share ?? 0, currency)
-                      : "—"}
+                      : "-"}
                   </div>
                 </li>
               );
@@ -726,7 +856,7 @@ export function ExpenseForm({
 
       <div className="shrink-0 border-t border-border bg-surface p-4">
         <Button type="submit" className="w-full" disabled={saving}>
-          {saving ? "Saving…" : "Add expense"}
+          {saving ? "Saving…" : isEdit ? "Save changes" : "Add expense"}
         </Button>
       </div>
     </form>
@@ -897,7 +1027,7 @@ export function ExpenseForm({
                           undefined,
                           { hour: "numeric", minute: "2-digit" }
                         )
-                      : "—"}
+                      : "-"}
                     <ChevronDown
                       className={cn(
                         "h-4 w-4 text-muted transition-transform",
@@ -956,7 +1086,7 @@ export function ExpenseForm({
 
         <DialogContent className="flex max-h-[min(90vh,720px)] max-w-lg flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 border-b border-border px-4 py-3 pr-10">
-            <DialogTitle>Add expense</DialogTitle>
+            <DialogTitle>{isEdit ? "Edit expense" : "Add expense"}</DialogTitle>
             <DialogDescription className="sr-only">
               Amount, title, who paid, and how to split.
             </DialogDescription>

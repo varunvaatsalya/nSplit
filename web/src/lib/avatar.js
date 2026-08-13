@@ -35,7 +35,7 @@ export function nameParts(name) {
 
 /**
  * Candidate letter codes in priority order:
- * 1) Single letter (first char) — preferred when free
+ * 1) Single letter (first char) - preferred when free
  * 2) First + last word (multi-word names, e.g. Varun Kumar Gupta → VG)
  * 3) First two chars of first word (Anurag → AN)
  * 4) First + second word (3+ words)

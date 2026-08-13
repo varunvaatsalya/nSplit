@@ -498,7 +498,7 @@ export function GroupBalancePanel({ balance, currency = "INR" }) {
                 </ul>
               ) : (
                 <p className="py-6 text-center text-sm text-muted">
-                  All settled — nothing to transfer.
+                  All settled - nothing to transfer.
                 </p>
               )}
             </CardContent>

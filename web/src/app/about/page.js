@@ -12,7 +12,7 @@ export default function AboutPage() {
         <h1 className="text-3xl font-semibold tracking-tight">About</h1>
         <p className="mt-4 text-muted">
           Nsplit is a calm, modern expense-splitting product for groups that need
-          more flexibility than classic split apps — without the clutter.
+          more flexibility than classic split apps - without the clutter.
         </p>
       </main>
     </div>

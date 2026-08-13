@@ -1,5 +1,5 @@
 /**
- * Money helpers — all amounts in integer minor units (e.g. paise/cents).
+ * Money helpers - all amounts in integer minor units (e.g. paise/cents).
  */
 
 export function toMinor(major, fractionDigits = 2) {

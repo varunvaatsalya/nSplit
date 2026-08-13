@@ -14,7 +14,7 @@ export const SplitMethod = {
  */
 
 /**
- * Calculate expense splits. Pure domain — no React / DB.
+ * Calculate expense splits. Pure domain - no React / DB.
  *
  * @param {{
  *   method: string,

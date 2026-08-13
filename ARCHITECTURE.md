@@ -36,7 +36,7 @@ nsplit/
 │       ├── mutation-types.js
 │       └── idempotency.js
 │
-├── web/                             # Next.js — UI + API backend
+├── web/                             # Next.js - UI + API backend
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── (public)/            # marketing + auth pages
@@ -187,12 +187,12 @@ User 1──* OAuthAccount (future Google)
 - Extensible OAuth without redesign
 
 ### Flow
-1. **Register** — validate (Zod) → hash password (bcrypt) → create User → create Session → set cookie / return token
-2. **Login** — verify password → create Session → set cookie / return token
-3. **Logout** — revoke Session
-4. **Me** — resolve session → return user
-5. **Forgot password** — create `PasswordResetToken` (hashed), email link (dev: log token)
-6. **Reset password** — validate token → update hash → invalidate token + sessions
+1. **Register** - validate (Zod) → hash password (bcrypt) → create User → create Session → set cookie / return token
+2. **Login** - verify password → create Session → set cookie / return token
+3. **Logout** - revoke Session
+4. **Me** - resolve session → return user
+5. **Forgot password** - create `PasswordResetToken` (hashed), email link (dev: log token)
+6. **Reset password** - validate token → update hash → invalidate token + sessions
 
 ### Session transport
 | Client | Transport |
@@ -230,15 +230,15 @@ Every mutating API calls `assertGroupPermission` **before** DB writes.
 UI may hide actions; server is authoritative.
 
 ### Member add modes
-1. **Add without notification** — create `GroupMember` if user exists (ADMIN)
-2. **Invite/notify** — create `GroupInvitation` + `Notification`
-3. **Add existing user** — lookup by email → membership
+1. **Add without notification** - create `GroupMember` if user exists (ADMIN)
+2. **Invite/notify** - create `GroupInvitation` + `Notification`
+3. **Add existing user** - lookup by email → membership
 
 ---
 
 ## 6. Split calculation architecture
 
-Location: `shared/split/` — pure functions, no React.
+Location: `shared/split/` - pure functions, no React.
 
 ```text
 calculateSplit({
@@ -254,10 +254,10 @@ calculateSplit({
 ```
 
 ### Method rules
-- **EQUAL** — floor division + distribute remainder (±1) by stable memberId order
-- **EXACT / CUSTOM** — sum(inputs) must equal `totalMinor`
-- **PERCENTAGE** — sum(percents) === 100; convert to minor with largest-remainder
-- **SHARES** — amount ∝ shares; largest-remainder rounding
+- **EQUAL** - floor division + distribute remainder (±1) by stable memberId order
+- **EXACT / CUSTOM** - sum(inputs) must equal `totalMinor`
+- **PERCENTAGE** - sum(percents) === 100; convert to minor with largest-remainder
+- **SHARES** - amount ∝ shares; largest-remainder rounding
 
 ### Group defaults
 `GroupSettings.defaultSplitMethod` + `defaultSplitConfig` seed new expense forms.  
@@ -273,7 +273,7 @@ validatePayers({ totalMinor, payers: [{ memberId, amountMinor }] })
 
 ## 7. Balance calculation architecture
 
-Location: `shared/balance/` — pure; server wraps with DB load.
+Location: `shared/balance/` - pure; server wraps with DB load.
 
 ```text
 computeGroupBalances({

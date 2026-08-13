@@ -11,7 +11,7 @@ let dbPromise: Promise<SqlExecutor> | null = null;
 
 /**
  * Opens (or returns) the local SQLite database.
- * Requires `expo-sqlite` — install during mobile offline phase setup.
+ * Requires `expo-sqlite` - install during mobile offline phase setup.
  */
 export async function getDb(): Promise<SqlExecutor> {
   if (!dbPromise) {

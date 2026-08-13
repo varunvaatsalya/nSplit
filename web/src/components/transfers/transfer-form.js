@@ -17,7 +17,7 @@ function memberLabel(m) {
 }
 
 /**
- * Transfer create UI — embed inside Add Record, or standalone.
+ * Transfer create UI - embed inside Add Record, or standalone.
  */
 export function TransferForm({
   group,
