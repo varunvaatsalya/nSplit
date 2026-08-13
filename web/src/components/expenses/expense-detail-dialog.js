@@ -2,7 +2,6 @@
 
 import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -10,6 +9,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { UserAvatar } from "@/components/user-avatar";
 import { getExpenseEmoji } from "@/lib/expense-icons";
 import { cn } from "@/lib/utils";
 
@@ -24,16 +24,6 @@ function formatMinor(minor, currency = "INR") {
     style: "currency",
     currency,
   }).format((minor || 0) / 100);
-}
-
-function initials(name) {
-  const parts = String(name || "?")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!parts.length) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
 function memberById(members, id) {
@@ -163,15 +153,19 @@ export function ExpenseDetailDialog({
                 </div>
                 <ul className="space-y-2">
                   {payers.map((p) => {
+                    const m = memberById(members, p.memberId);
                     const name = memberName(members, p.memberId);
                     return (
                       <li
                         key={p.memberId}
                         className="flex items-center gap-3 text-sm"
                       >
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>{initials(name)}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          className="h-8 w-8"
+                          name={name}
+                          avatar={m?.avatar || m?.user?.avatar}
+                          seed={m?.userId || m?.id || p.memberId}
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium">{name}</div>
                           <div className="text-xs text-muted">
@@ -196,6 +190,7 @@ export function ExpenseDetailDialog({
                 </div>
                 <ul className="space-y-1">
                   {splits.map((s) => {
+                    const m = memberById(members, s.memberId);
                     const name = memberName(members, s.memberId);
                     const isYou = myMember && s.memberId === myMember.id;
                     return (
@@ -206,9 +201,12 @@ export function ExpenseDetailDialog({
                           isYou && "bg-primary/10"
                         )}
                       >
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>{initials(name)}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          className="h-8 w-8"
+                          name={name}
+                          avatar={m?.avatar || m?.user?.avatar}
+                          seed={m?.userId || m?.id || s.memberId}
+                        />
                         <div className="min-w-0 flex-1 truncate font-medium">
                           {isYou ? "You" : name}
                         </div>

@@ -41,7 +41,17 @@ export function serializeActivity(row, actor) {
           id: idOf(actor),
           name: actor.name,
           email: actor.email,
-          avatarUrl: actor.avatarUrl ?? null,
+          avatar: actor.avatar
+            ? {
+                url: actor.avatar.url ?? null,
+                letters: actor.avatar.letters ?? null,
+                bg: actor.avatar.bg ?? null,
+              }
+            : {
+                url: actor.avatarUrl ?? null,
+                letters: null,
+                bg: actor.avatarColor ?? null,
+              },
         }
       : null,
   };

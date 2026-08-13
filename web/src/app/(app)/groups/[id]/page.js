@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { History, Settings } from "lucide-react";
+import { format, isToday, isValid } from "date-fns";
 import { AddRecordModal } from "@/components/records/add-record-modal";
 import { GroupBalancePanel } from "@/components/groups/group-balance-panel";
 import { GroupActivityDialog } from "@/components/groups/group-activity-dialog";
 import { ExpenseDetailDialog } from "@/components/expenses/expense-detail-dialog";
+import { UserAvatar } from "@/components/user-avatar";
+import { AvatarGroup, AvatarGroupCount } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { getExpenseEmoji } from "@/lib/expense-icons";
 import { getGroupIcon } from "@/lib/group-options";
@@ -55,21 +58,9 @@ function groupExpensesByDate(expenses) {
 function formatRowTime(expense) {
   const raw = expense.expenseDate || expense.createdAt;
   const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return "";
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  const time = d.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  if (sameDay) return `Today ${time}`;
-  return `${d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  })} ${time}`;
+  if (!isValid(d)) return "";
+  const time = format(d, "h:mm a");
+  return time;
 }
 
 function relativeCreated(date) {
@@ -91,7 +82,13 @@ function payerLabel(expense, members) {
     const m = members.find((x) => x.id === payers[0].memberId);
     return m?.displayName || m?.user?.name || "Someone";
   }
-  return `${payers.length} people`;
+  return null;
+}
+
+function payerMembers(expense, members) {
+  return (expense.payers || [])
+    .map((p) => members.find((m) => m.id === p.memberId))
+    .filter(Boolean);
 }
 
 function creatorName(expense, members) {
@@ -236,7 +233,7 @@ export default function GroupDashboardPage() {
             className="rounded-full"
             asChild
           >
-            <Link href={`/groups/${group.id}/settings`} aria-label="Settings">
+            <Link href={`/groups/${id}/settings`} aria-label="Settings">
               <Settings className="h-4 w-4" />
             </Link>
           </Button>
@@ -284,10 +281,10 @@ export default function GroupDashboardPage() {
               Tap + to add an expense or transfer.
             </p>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {grouped.map((section) => (
                 <div key={section.key}>
-                  <h3 className="mb-3 text-[11px] font-semibold tracking-[0.08em] text-muted">
+                  <h3 className="mb-3 px-2 text-xs font-semibold tracking-[0.08em] text-muted">
                     {Number.isNaN(section.date.getTime())
                       ? "UNKNOWN DATE"
                       : dateHeaderLabel(section.date)}
@@ -295,6 +292,10 @@ export default function GroupDashboardPage() {
                   <ul className="space-y-2.5">
                     {section.items.map((expense) => {
                       const paidBy = payerLabel(expense, members);
+                      const payers = payerMembers(expense, members);
+                      const maxShown = 3;
+                      const shownPayers = payers.slice(0, maxShown);
+                      const extraPayers = Math.max(0, payers.length - maxShown);
                       const added = creatorName(expense, members);
                       const share = myShareLine(
                         expense,
@@ -306,7 +307,7 @@ export default function GroupDashboardPage() {
                           <button
                             type="button"
                             onClick={() => openExpense(expense.id)}
-                            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors hover:border-primary/25 hover:bg-soft/30"
+                            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors cursor-pointer hover:border-primary/25 hover:bg-soft/30"
                           >
                             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-soft text-lg">
                               {getExpenseEmoji(
@@ -318,8 +319,41 @@ export default function GroupDashboardPage() {
                               <div className="truncate font-semibold tracking-tight">
                                 {expense.title}
                               </div>
-                              <div className="truncate text-xs text-muted">
-                                Paid by {paidBy} · {formatRowTime(expense)}
+                              <div className="flex min-w-0 items-center gap-0.75 text-xs text-muted">
+                                <span className="shrink-0">Paid by</span>
+                                {payers.length > 1 ? (
+                                  <AvatarGroup className="-space-x-0.5 shrink-0">
+                                    {shownPayers.map((m) => {
+                                      const label =
+                                        m.displayName ||
+                                        m.user?.name ||
+                                        "Member";
+                                      return (
+                                        <UserAvatar
+                                          key={m.id}
+                                          className="h-5 w-5"
+                                          fallbackClassName="text-[8px]"
+                                          name={label}
+                                          avatar={m.avatar || m.user?.avatar}
+                                          seed={m.userId || m.id}
+
+                                        />
+                                      );
+                                    })}
+                                    {extraPayers > 0 ? (
+                                      <AvatarGroupCount className="h-5 w-5 text-[8px]">
+                                        +{extraPayers}
+                                      </AvatarGroupCount>
+                                    ) : null}
+                                  </AvatarGroup>
+                                ) : (
+                                  <span className="truncate font-semibold">
+                                    {paidBy || "Unknown"}
+                                  </span>
+                                )}
+                                <span className="shrink-0">
+                                  · {formatRowTime(expense)}
+                                </span>
                               </div>
                               {showAddedBy && added ? (
                                 <div className="truncate text-[11px] text-muted/80">

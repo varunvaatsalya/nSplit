@@ -9,6 +9,11 @@ import {
 import { created, fail, ok, zodError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { recordActivity } from "@/lib/activity";
+import {
+  allocateMemberAvatar,
+  collectGroupUsedAvatars,
+  ensureUserAvatar,
+} from "@/lib/avatar-assign";
 import { requireGroupPermission } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
 import { generateToken, hashToken } from "@/lib/auth/tokens";
@@ -33,7 +38,7 @@ export async function GET(_request, { params }) {
   const users = await User.find({
     _id: { $in: members.map((m) => m.userId).filter(Boolean) },
   })
-    .select("name email avatarUrl")
+    .select("name email avatar avatarUrl avatarColor")
     .lean();
   const userMap = new Map(users.map((u) => [String(u._id), u]));
 
@@ -86,9 +91,20 @@ export async function POST(request, { params }) {
     }
   }
 
-  const memberPermission = invite ? permission || "ADD" : "ADD";
+  if (linkedUser) await ensureUserAvatar(linkedUser);
 
-  // Reactivate soft-removed linked user
+  const memberPermission = invite ? permission || "ADD" : "ADD";
+  const active = activeMembers(group);
+  const linkedIds = active.map((m) => m.userId).filter(Boolean);
+  const existingUsers = linkedIds.length
+    ? await User.find({ _id: { $in: linkedIds } })
+        .select("name avatar avatarUrl avatarColor")
+        .lean()
+    : [];
+  const userMap = new Map(existingUsers.map((u) => [String(u._id), u]));
+  const used = collectGroupUsedAvatars(active, userMap);
+  const avatar = allocateMemberAvatar(name, used, linkedUser);
+
   if (linkedUser) {
     const previous = group.members.find(
       (m) => m.userId && String(m.userId) === String(linkedUser._id) && m.leftAt
@@ -98,6 +114,10 @@ export async function POST(request, { params }) {
       previous.permission = memberPermission;
       previous.displayName = name;
       previous.email = email || previous.email || linkedUser.email;
+      previous.avatar =
+        previous.avatar?.letters && previous.avatar?.bg
+          ? previous.avatar
+          : avatar;
       previous.joinedAt = new Date();
       await group.save();
 
@@ -119,6 +139,7 @@ export async function POST(request, { params }) {
     email: email || null,
     permission: memberPermission,
     displayName: name,
+    avatar,
     joinedAt: new Date(),
     leftAt: null,
   };

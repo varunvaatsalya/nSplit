@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { UserAvatar } from "@/components/user-avatar";
 
 const primaryNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -97,6 +98,12 @@ export function AppShell({ user, children }) {
             Nsplit
           </Link>
           <div className="flex items-center gap-2">
+            <UserAvatar
+              className="h-8 w-8"
+              name={user?.name}
+              avatar={user?.avatar}
+              seed={user?.id}
+            />
             <span className="max-w-[120px] truncate text-sm text-muted">
               {user?.name}
             </span>

@@ -58,7 +58,9 @@ export async function PATCH(request, { params }) {
   }
 
   const user = member.userId
-    ? await User.findById(member.userId).select("name email avatarUrl").lean()
+    ? await User.findById(member.userId)
+        .select("name email avatar avatarUrl avatarColor")
+        .lean()
     : null;
 
   return ok({ member: serializeMember(member, user) });

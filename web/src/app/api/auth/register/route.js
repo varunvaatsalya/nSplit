@@ -8,6 +8,7 @@ import {
   publicUser,
   setSessionCookie,
 } from "@/lib/auth/session";
+import { allocateUserAvatar } from "@/lib/avatar-assign";
 import { registerSchema } from "@/lib/validations/auth";
 
 export async function POST(request) {
@@ -31,7 +32,8 @@ export async function POST(request) {
 
   const passwordHash = await hashPassword(password);
   const headerStore = await headers();
-  const user = await User.create({ name, email, passwordHash });
+  const avatar = await allocateUserAvatar(name);
+  const user = await User.create({ name, email, passwordHash, avatar });
 
   const { token, expiresAt } = await createSession(user._id, {
     deviceId: body.deviceId,

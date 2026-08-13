@@ -1,6 +1,8 @@
 import { cookies, headers } from "next/headers";
 import { connectDb, idOf } from "@/lib/db";
 import { Session, User } from "@/models";
+import { ensureUserAvatar } from "@/lib/avatar-assign";
+import { publicAvatar } from "@/lib/avatar";
 import {
   SESSION_COOKIE,
   cookieOptions,
@@ -52,9 +54,11 @@ export async function getSessionUser() {
   }
 
   const user = await User.findById(session.userId)
-    .select("email name avatarUrl createdAt updatedAt")
+    .select("email name avatar avatarUrl avatarColor createdAt updatedAt")
     .lean();
   if (!user) return null;
+
+  await ensureUserAvatar(user);
 
   return {
     user: publicUser(user),
@@ -93,7 +97,7 @@ export function publicUser(user) {
     id: idOf(user),
     email: user.email,
     name: user.name,
-    avatarUrl: user.avatarUrl ?? null,
+    avatar: publicAvatar(user.avatar, user.name),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

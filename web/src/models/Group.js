@@ -8,12 +8,22 @@ import {
 
 const { Schema, models, model } = mongoose;
 
+const AvatarEmbedded = new Schema(
+  {
+    url: { type: String, default: null },
+    letters: { type: String, default: null, uppercase: true, trim: true },
+    bg: { type: String, default: null },
+  },
+  { _id: false }
+);
+
 const GroupMemberEmbedded = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     email: { type: String, default: null, lowercase: true, trim: true },
     permission: { type: String, enum: MemberPermission, default: "ADD" },
     displayName: { type: String, required: true, trim: true },
+    avatar: { type: AvatarEmbedded, default: () => ({}) },
     joinedAt: { type: Date, default: Date.now },
     leftAt: { type: Date, default: null },
   },
@@ -64,7 +74,11 @@ GroupSchema.index({ "members.email": 1 });
 
 applyIdTransform(GroupSchema);
 
-export const Group = models.Group || model("Group", GroupSchema);
+if (models.Group) {
+  delete models.Group;
+}
+
+export const Group = model("Group", GroupSchema);
 
 /** Active (non-left) members */
 export function activeMembers(group) {
@@ -82,11 +96,36 @@ export function findActiveMemberByUserId(group, userId) {
 }
 
 export function serializeMember(m, user = null) {
+  const avatar =
+    m.avatar?.letters && m.avatar?.bg
+      ? {
+          url: m.avatar.url ?? null,
+          letters: m.avatar.letters,
+          bg: m.avatar.bg,
+        }
+      : user?.avatar?.letters && user?.avatar?.bg
+        ? {
+            url: user.avatar.url ?? null,
+            letters: user.avatar.letters,
+            bg: user.avatar.bg,
+          }
+        : {
+            url: user?.avatar?.url ?? user?.avatarUrl ?? null,
+            letters: m.avatar?.letters || user?.avatar?.letters || null,
+            bg:
+              m.avatar?.bg ||
+              m.avatarColor ||
+              user?.avatar?.bg ||
+              user?.avatarColor ||
+              null,
+          };
+
   return {
     id: String(m._id || m.id),
     userId: m.userId ? String(m.userId) : null,
     email: m.email || null,
     displayName: m.displayName,
+    avatar,
     permission: m.permission,
     joinedAt: m.joinedAt,
     leftAt: m.leftAt || null,
@@ -95,7 +134,11 @@ export function serializeMember(m, user = null) {
           id: String(user._id || user.id),
           name: user.name,
           email: user.email,
-          avatarUrl: user.avatarUrl ?? null,
+          avatar: {
+            url: user.avatar?.url ?? user.avatarUrl ?? null,
+            letters: user.avatar?.letters ?? null,
+            bg: user.avatar?.bg ?? user.avatarColor ?? null,
+          },
         }
       : null,
   };

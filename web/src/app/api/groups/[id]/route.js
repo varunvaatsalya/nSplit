@@ -8,27 +8,34 @@ import {
 import { fail, ok, zodError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { recordActivity } from "@/lib/activity";
+import { backfillGroupMemberAvatars } from "@/lib/avatar-assign";
 import { requireGroupPermission } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
 import { updateGroupSchema } from "@/lib/validations/groups";
 
 async function loadGroup(id) {
-  const group = await Group.findById(id).lean();
+  let group = await Group.findById(id);
   if (!group) return null;
 
   const members = activeMembers(group);
   const users = await User.find({
     _id: { $in: members.map((m) => m.userId).filter(Boolean) },
   })
-    .select("name email avatarUrl")
+    .select("name email avatar avatarUrl avatarColor")
     .lean();
   const userMap = new Map(users.map((u) => [String(u._id), u]));
 
+  const dirty = await backfillGroupMemberAvatars(group, userMap);
+  if (dirty) {
+    await group.save();
+  }
+
+  const lean = group.toObject();
   return {
-    ...toJSON(group),
-    createdById: String(group.createdById),
-    settings: group.settings || null,
-    members: members.map((m) =>
+    ...toJSON(lean),
+    createdById: String(lean.createdById),
+    settings: lean.settings || null,
+    members: activeMembers(lean).map((m) =>
       serializeMember(m, m.userId ? userMap.get(String(m.userId)) : null)
     ),
     invitations: undefined,

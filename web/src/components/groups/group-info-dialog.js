@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { UserAvatar } from "@/components/user-avatar";
 
 const SPLIT_LABELS = {
   EQUAL: "Equally",
@@ -17,16 +18,6 @@ const SPLIT_LABELS = {
 
 function memberLabel(m) {
   return m.displayName || m.user?.name || "Member";
-}
-
-function initials(name) {
-  const parts = String(name || "?")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!parts.length) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
 export function GroupInfoDialog({ group, open, onOpenChange }) {
@@ -116,9 +107,11 @@ export function GroupInfoDialog({ group, open, onOpenChange }) {
                     key={m.id}
                     className="flex items-center gap-3 bg-surface px-3 py-2.5"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-soft text-xs font-semibold">
-                      {initials(label)}
-                    </span>
+                    <UserAvatar
+                      name={label}
+                      avatar={m.avatar || m.user?.avatar}
+                      seed={m.userId || m.id}
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{label}</div>
                       <div className="truncate text-xs text-muted">

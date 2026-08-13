@@ -8,6 +8,7 @@ import {
   publicUser,
   setSessionCookie,
 } from "@/lib/auth/session";
+import { ensureUserAvatar } from "@/lib/avatar-assign";
 import { loginSchema } from "@/lib/validations/auth";
 
 export async function POST(request) {
@@ -37,6 +38,8 @@ export async function POST(request) {
   });
 
   await setSessionCookie(token, expiresAt);
+
+  await ensureUserAvatar(user);
 
   return ok({
     user: publicUser(user),

@@ -12,6 +12,15 @@ const OAuthAccountEmbedded = new Schema(
   { _id: false }
 );
 
+const AvatarEmbedded = new Schema(
+  {
+    url: { type: String, default: null },
+    letters: { type: String, default: null, uppercase: true, trim: true },
+    bg: { type: String, default: null },
+  },
+  { _id: false }
+);
+
 const UserSchema = new Schema(
   {
     email: {
@@ -23,7 +32,7 @@ const UserSchema = new Schema(
     },
     name: { type: String, required: true, trim: true },
     passwordHash: { type: String, default: null },
-    avatarUrl: { type: String, default: null },
+    avatar: { type: AvatarEmbedded, default: () => ({}) },
     emailVerified: { type: Date, default: null },
     oauthAccounts: { type: [OAuthAccountEmbedded], default: [] },
   },
@@ -32,4 +41,8 @@ const UserSchema = new Schema(
 
 applyIdTransform(UserSchema);
 
-export const User = models.User || model("User", UserSchema);
+if (models.User) {
+  delete models.User;
+}
+
+export const User = model("User", UserSchema);

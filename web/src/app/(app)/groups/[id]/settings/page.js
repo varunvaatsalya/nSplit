@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronRight, Minus, Plus } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UserAvatar } from "@/components/user-avatar";
 import { getGroupIcon } from "@/lib/group-options";
 import { CURRENCIES } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
@@ -43,16 +43,6 @@ const METHODS = [
 
 function memberLabel(m) {
   return m.displayName || m.user?.name || "Member";
-}
-
-function initials(name) {
-  const parts = String(name || "?")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!parts.length) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
 function methodLabel(value) {
@@ -357,9 +347,11 @@ export default function GroupSettingsPage() {
                   key={m.id}
                   className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
                 >
-                  <Avatar>
-                    <AvatarFallback>{initials(label)}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    name={label}
+                    avatar={m.avatar || m.user?.avatar}
+                    seed={m.userId || m.id}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{label}</div>
                     <div className="truncate text-xs text-muted">

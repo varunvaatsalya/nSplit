@@ -29,7 +29,7 @@ export async function GET(request, { params }) {
   const actors = await User.find({
     _id: { $in: activities.map((a) => a.actorId) },
   })
-    .select("name email avatarUrl")
+    .select("name email avatar avatarUrl avatarColor")
     .lean();
   const actorMap = new Map(actors.map((u) => [String(u._id), u]));
 

@@ -2,6 +2,7 @@ import { connectDb, idOf } from "@/lib/db";
 import { User } from "@/models";
 import { fail, ok } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
+import { publicAvatar, coerceAvatar } from "@/lib/avatar";
 
 export async function GET(request) {
   const auth = await requireAuth();
@@ -13,7 +14,7 @@ export async function GET(request) {
 
   await connectDb();
   const user = await User.findOne({ email })
-    .select("name email avatarUrl")
+    .select("name email avatar avatarUrl avatarColor")
     .lean();
 
   return ok({
@@ -22,7 +23,7 @@ export async function GET(request) {
           id: idOf(user),
           name: user.name,
           email: user.email,
-          avatarUrl: user.avatarUrl ?? null,
+          avatar: publicAvatar(coerceAvatar(user, user.name), user.name),
         }
       : null,
   });

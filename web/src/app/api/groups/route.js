@@ -9,6 +9,10 @@ import {
 import { created, fail, ok, zodError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { recordActivity } from "@/lib/activity";
+import {
+  allocateMemberAvatar,
+  ensureUserAvatar,
+} from "@/lib/avatar-assign";
 import { createGroupSchema } from "@/lib/validations/groups";
 import { generateToken, hashToken } from "@/lib/auth/tokens";
 
@@ -75,12 +79,27 @@ export async function POST(request) {
   const result = await withTransaction(async (session) => {
     const opts = session ? { session } : {};
 
+    const creator = await User.findById(auth.user.id)
+      .session(session || null)
+      .lean();
+    if (creator) await ensureUserAvatar(creator);
+
+    const used = { letters: [], bgs: [] };
+    const creatorAvatar = allocateMemberAvatar(
+      auth.user.name,
+      used,
+      creator
+    );
+    used.letters.push(creatorAvatar.letters);
+    used.bgs.push(creatorAvatar.bg);
+
     const embeddedMembers = [
       {
         userId: auth.user.id,
         email: auth.user.email,
         permission: "ADMIN",
         displayName: auth.user.name,
+        avatar: creatorAvatar,
         joinedAt: new Date(),
         leftAt: null,
       },
@@ -97,14 +116,20 @@ export async function POST(request) {
         if (linkedUser && String(linkedUser._id) === String(auth.user.id)) {
           continue;
         }
+        if (linkedUser) await ensureUserAvatar(linkedUser);
       }
 
       const permission = member.invite ? member.permission || "ADD" : "ADD";
+      const avatar = allocateMemberAvatar(member.name, used, linkedUser);
+      used.letters.push(avatar.letters);
+      used.bgs.push(avatar.bg);
+
       embeddedMembers.push({
         userId: linkedUser?._id ?? null,
         email,
         permission,
         displayName: member.name,
+        avatar,
         joinedAt: new Date(),
         leftAt: null,
       });
