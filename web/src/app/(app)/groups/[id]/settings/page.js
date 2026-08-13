@@ -6,15 +6,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronRight, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -32,9 +26,17 @@ import {
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/user-avatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { getGroupIcon } from "@/lib/group-options";
-import { CURRENCIES } from "@/lib/group-options";
+import {
+  ManageMembersDialog,
+  permissionLabel,
+} from "@/components/groups/manage-members-dialog";
+import {
+  CURRENCIES,
+  GROUP_ICONS,
+  getGroupIcon,
+} from "@/lib/group-options";
 import { cn } from "@/lib/utils";
+import { Actions, can } from "@/shared/permissions";
 
 const METHODS = [
   { value: "EQUAL", label: "Equally" },
@@ -64,6 +66,86 @@ function defaultPartsMap(members, config) {
   return map;
 }
 
+function Pulse({ className }) {
+  return (
+    <span
+      className={cn("block animate-pulse rounded-md bg-muted-foreground/15", className)}
+    />
+  );
+}
+
+function SettingsPageSkeleton({ groupId }) {
+  return (
+    <div className="pb-16" aria-busy="true" aria-label="Loading settings">
+      <div className="mb-6 flex items-center gap-3">
+        <Button type="button" size="icon" variant="ghost" asChild>
+          <Link href={`/groups/${groupId}`} aria-label="Back">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+      </div>
+
+      <div className="space-y-5">
+        <Card>
+          <CardHeader>
+            <Pulse className="h-3 w-24" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-3">
+              <Pulse className="h-12 w-12 shrink-0 rounded-xl" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Pulse className="h-9 w-full rounded-lg" />
+                <Pulse className="h-14 w-full rounded-lg" />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Pulse className="h-8 w-24 rounded-lg" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <Pulse className="h-3 w-20" />
+          </CardHeader>
+          <CardContent className="space-y-1 p-2 pt-0">
+            <div className="flex items-center justify-between rounded-xl px-3 py-3">
+              <Pulse className="h-4 w-20" />
+              <Pulse className="h-4 w-28" />
+            </div>
+            <div className="flex items-center justify-between rounded-xl px-3 py-3">
+              <Pulse className="h-4 w-36" />
+              <Pulse className="h-4 w-16" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <Pulse className="h-3 w-16" />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
+              >
+                <Pulse className="h-9 w-9 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Pulse className="h-4 w-28" />
+                  <Pulse className="h-3 w-36" />
+                </div>
+                <Pulse className="h-5 w-12 rounded-full" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export default function GroupSettingsPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -71,8 +153,11 @@ export default function GroupSettingsPage() {
   const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState("users");
+  const [iconsOpen, setIconsOpen] = useState(false);
   const [currency, setCurrency] = useState("INR");
   const [savingDetails, setSavingDetails] = useState(false);
+  const [savingIcon, setSavingIcon] = useState(false);
 
   const [method, setMethod] = useState("EQUAL");
   const [splitOpen, setSplitOpen] = useState(false);
@@ -82,20 +167,18 @@ export default function GroupSettingsPage() {
 
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [members, setMembers] = useState([]);
-  const [addOpen, setAddOpen] = useState(false);
-  const [memberName, setMemberName] = useState("");
-  const [memberEmail, setMemberEmail] = useState("");
-  const [invite, setInvite] = useState(false);
-  const [permission, setPermission] = useState("ADD");
-  const [memberError, setMemberError] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [me, setMe] = useState(null);
+  const [manageOpen, setManageOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   async function load() {
-    const res = await fetch(`/api/groups/${id}`);
-    const json = await res.json();
-    if (!res.ok) {
+    const [gRes, meRes] = await Promise.all([
+      fetch(`/api/groups/${id}`),
+      fetch("/api/auth/me"),
+    ]);
+    const [json, meJson] = await Promise.all([gRes.json(), meRes.json()]);
+    if (!gRes.ok) {
       setError(json?.error?.message || "Failed to load");
       return;
     }
@@ -103,10 +186,12 @@ export default function GroupSettingsPage() {
     setGroup(g);
     setName(g.name || "");
     setDescription(g.description || "");
+    setIcon(g.icon || "users");
     setCurrency(g.currency || "INR");
     const m = g.settings?.defaultSplitMethod;
     setMethod(["EQUAL", "EXACT", "SHARES"].includes(m) ? m : "EQUAL");
     setMembers(g.members || []);
+    if (meRes.ok) setMe(meJson.data.user);
   }
 
   useEffect(() => {
@@ -126,6 +211,20 @@ export default function GroupSettingsPage() {
     return partsConfig.reduce((s, p) => s + (Number(p.value) || 1), 0) || 1;
   }, [method, partsConfig, members.length]);
 
+  const myPermission = useMemo(() => {
+    if (!me?.id) return null;
+    return (
+      members.find((m) => m.userId && String(m.userId) === String(me.id))
+        ?.permission || null
+    );
+  }, [members, me]);
+
+  const canManageMembers = can(myPermission, Actions.MANAGE_MEMBERS);
+  const canManageSettings = can(myPermission, Actions.MANAGE_SETTINGS);
+  const canDeleteGroup =
+    Boolean(me?.id && group?.createdById) &&
+    String(group.createdById) === String(me.id);
+
   async function saveDetails() {
     if (!group) return;
     setSavingDetails(true);
@@ -136,6 +235,7 @@ export default function GroupSettingsPage() {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
+          icon,
           currency,
         }),
       });
@@ -152,7 +252,9 @@ export default function GroupSettingsPage() {
 
   function openSplit() {
     setDraftMethod(method);
-    setDraftParts(defaultPartsMap(members, group?.settings?.defaultSplitConfig));
+    setDraftParts(
+      defaultPartsMap(members, group?.settings?.defaultSplitConfig),
+    );
     setSplitOpen(true);
   }
 
@@ -186,33 +288,28 @@ export default function GroupSettingsPage() {
     }
   }
 
-  async function addMember(e) {
-    e.preventDefault();
-    setAdding(true);
-    setMemberError("");
+  async function pickIcon(key) {
+    const prev = icon;
+    setIcon(key);
+    setIconsOpen(false);
+    if (!group || key === prev) return;
+    setSavingIcon(true);
     try {
-      const res = await fetch(`/api/groups/${id}/members`, {
-        method: "POST",
+      const res = await fetch(`/api/groups/${group.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: memberName.trim(),
-          email: memberEmail.trim() || null,
-          invite: Boolean(invite && memberEmail.trim()),
-          permission: invite ? permission : "ADD",
-        }),
+        body: JSON.stringify({ icon: key }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setMemberError(json?.error?.message || "Failed");
-        return;
+        setIcon(prev);
+        setError(json?.error?.message || "Failed to update icon");
       }
-      setAddOpen(false);
-      setMemberName("");
-      setMemberEmail("");
-      setInvite(false);
-      await load();
+    } catch {
+      setIcon(prev);
+      setError("Failed to update icon");
     } finally {
-      setAdding(false);
+      setSavingIcon(false);
     }
   }
 
@@ -234,9 +331,9 @@ export default function GroupSettingsPage() {
   }
 
   if (error && !group) return <p className="text-danger">{error}</p>;
-  if (!group) return <p className="text-sm text-muted">Loading…</p>;
+  if (!group) return <SettingsPageSkeleton groupId={id} />;
 
-  const iconMeta = getGroupIcon(group.icon);
+  const iconMeta = getGroupIcon(icon);
 
   return (
     <div className="pb-16">
@@ -258,33 +355,52 @@ export default function GroupSettingsPage() {
               Group details
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col items-center gap-2 py-2">
-              <span className="flex h-20 w-20 items-center justify-center rounded-full bg-soft text-3xl">
+          <CardContent className="space-y-3">
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={() => canManageSettings && setIconsOpen(true)}
+                disabled={!canManageSettings || savingIcon}
+                className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-soft text-2xl",
+                  canManageSettings &&
+                    "cursor-pointer hover:bg-muted-foreground/15",
+                  !canManageSettings && "cursor-default"
+                )}
+                aria-label="Change group icon"
+                title={canManageSettings ? "Change icon" : undefined}
+              >
                 {iconMeta.emoji}
-              </span>
-              <span className="text-xs text-muted">Group icon</span>
+              </button>
+              <div className="min-w-0 flex-1 space-y-2">
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Group name"
+                  disabled={!canManageSettings}
+                />
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="What is this group for?"
+                  className="min-h-14"
+                  disabled={!canManageSettings}
+                />
+              </div>
             </div>
-            <label className="block space-y-1.5 text-sm">
-              <span className="text-muted">Name</span>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label className="block space-y-1.5 text-sm">
-              <span className="text-muted">Description</span>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                placeholder="What is this group for?"
-              />
-            </label>
-            <Button
-              type="button"
-              onClick={saveDetails}
-              disabled={savingDetails || !name.trim()}
-            >
-              {savingDetails ? "Saving…" : "Save details"}
-            </Button>
+            {canManageSettings ? (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveDetails}
+                  disabled={savingDetails || !name.trim()}
+                >
+                  {savingDetails ? "Saving…" : "Save details"}
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -294,7 +410,7 @@ export default function GroupSettingsPage() {
               Preferences
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 p-2 pt-0">
+          <CardContent className="p-2">
             <button
               type="button"
               onClick={() => setCurrencyOpen(true)}
@@ -325,14 +441,16 @@ export default function GroupSettingsPage() {
             <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
               Members
             </CardTitle>
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto p-0 text-xs text-primary hover:text-primary/80 cursor-pointer"
-              onClick={() => setAddOpen(true)}
-            >
-              + Add Member
-            </Button>
+            {canManageMembers ? (
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto px-2 py-0 text-xs text-primary dark:text-primary-foreground hover:text-primary/80 cursor-pointer"
+                onClick={() => setManageOpen(true)}
+              >
+                Manage
+              </Button>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-2">
             {members.map((m) => {
@@ -360,16 +478,12 @@ export default function GroupSettingsPage() {
                     </div>
                   </div>
                   <Badge
-                    variant={
-                      m.permission === "ADMIN" ? "default" : "secondary"
-                    }
+                    variant={m.permission === "ADMIN" ? "default" : "secondary"}
                   >
-                    {m.permission === "ADMIN" ? "Admin" : "Member"}
+                    {permissionLabel(m.permission)}
                   </Badge>
                   <div className="hidden text-right text-[11px] text-muted sm:block">
-                    <div>
-                      {method === "SHARES" ? `${part} Part` : "Equal"}
-                    </div>
+                    <div>{method === "SHARES" ? `${part} Part` : "Equal"}</div>
                     <div>{pct}% Share</div>
                   </div>
                 </div>
@@ -378,24 +492,71 @@ export default function GroupSettingsPage() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-center pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-danger hover:bg-danger/10 hover:text-danger"
-            disabled={deleting}
-            onClick={() => setConfirmDeleteOpen(true)}
-          >
-            {deleting ? "Deleting…" : "Delete Group"}
-          </Button>
-        </div>
+        {canDeleteGroup ? (
+          <Card className="border-danger/30">
+            <CardHeader>
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-danger">
+                Danger zone
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted">
+                Permanently delete this group and all of its expenses. This
+                cannot be undone.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 border-danger text-danger hover:bg-danger/10 hover:text-danger"
+                disabled={deleting}
+                onClick={() => setConfirmDeleteOpen(true)}
+              >
+                Delete group
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
+
+      <Dialog open={iconsOpen} onOpenChange={setIconsOpen}>
+        <DialogContent className="flex max-h-[min(85vh,480px)] max-w-md flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-border px-4 py-3 pr-10">
+            <DialogTitle>Choose icon</DialogTitle>
+            <DialogDescription>Tap an emoji for this group.</DialogDescription>
+          </DialogHeader>
+          <div className="nsplit-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+              {GROUP_ICONS.map((item) => {
+                const selected = icon === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    title={item.label}
+                    onClick={() => pickIcon(item.key)}
+                    className={cn(
+                      "flex h-10 w-full items-center justify-center rounded-lg border text-xl transition-colors hover:bg-soft",
+                      selected
+                        ? "border-primary bg-soft"
+                        : "border-border bg-background"
+                    )}
+                  >
+                    {item.emoji}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={currencyOpen} onOpenChange={setCurrencyOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Currency</DialogTitle>
-            <DialogDescription>Default currency for this group.</DialogDescription>
+            <DialogDescription>
+              Default currency for this group.
+            </DialogDescription>
           </DialogHeader>
           <Select
             value={currency}
@@ -446,63 +607,24 @@ export default function GroupSettingsPage() {
                   "flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left text-sm",
                   draftMethod === m.value
                     ? "border-primary bg-primary/5"
-                    : "border-border hover:bg-soft"
+                    : "border-border hover:bg-soft",
                 )}
               >
                 <span className="font-medium">{m.label}</span>
                 {draftMethod === m.value ? (
-                  <span className="text-xs text-primary dark:text-primary-foreground">Selected</span>
+                  <span className="text-xs text-primary dark:text-primary-foreground">
+                    Selected
+                  </span>
                 ) : null}
               </button>
             ))}
           </div>
           {draftMethod === "SHARES" ? (
-            <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
-              {members.map((m) => {
-                const parts = draftParts[m.id] ?? 1;
-                return (
-                  <li
-                    key={m.id}
-                    className="flex items-center justify-between gap-3 px-3 py-2.5"
-                  >
-                    <span className="text-sm font-medium">
-                      {memberLabel(m)}
-                    </span>
-                    <div className="inline-flex items-center gap-1 rounded-md border border-border bg-soft px-1">
-                      <button
-                        type="button"
-                        disabled={parts <= 1}
-                        onClick={() =>
-                          setDraftParts((p) => ({
-                            ...p,
-                            [m.id]: Math.max(1, parts - 1),
-                          }))
-                        }
-                        className="p-1 text-muted disabled:opacity-40"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="min-w-8 text-center text-xs font-semibold">
-                        {parts}x
-                      </span>
-                      <button
-                        type="button"
-                        disabled={parts >= 99}
-                        onClick={() =>
-                          setDraftParts((p) => ({
-                            ...p,
-                            [m.id]: Math.min(99, parts + 1),
-                          }))
-                        }
-                        className="p-1 text-muted disabled:opacity-40"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+            <SharesEditor
+              members={members}
+              draftParts={draftParts}
+              setDraftParts={setDraftParts}
+            />
           ) : null}
           <DialogFooter>
             <Button
@@ -519,71 +641,95 @@ export default function GroupSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add member</DialogTitle>
-            <DialogDescription>
-              Name required · email optional
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={addMember} className="space-y-3">
-            <Input
-              required
-              value={memberName}
-              onChange={(e) => setMemberName(e.target.value)}
-              placeholder="Name / nickname"
-              autoFocus
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                type="email"
-                value={memberEmail}
-                onChange={(e) => {
-                  setMemberEmail(e.target.value);
-                  if (!e.target.value.trim()) setInvite(false);
-                }}
-                placeholder="Email (optional)"
-                className="min-w-0 flex-1"
-              />
-              <label className="flex items-center gap-1.5 text-xs text-muted">
-                <Checkbox
-                  checked={invite}
-                  disabled={!memberEmail.trim()}
-                  onCheckedChange={(v) => setInvite(Boolean(v))}
-                />
-                Invite
-              </label>
-            </div>
-            {memberError ? (
-              <p className="text-sm text-danger">{memberError}</p>
-            ) : null}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setAddOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={adding}>
-                {adding ? "Adding…" : "Add"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <ManageMembersDialog
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        groupId={id}
+        members={members}
+        currentUserId={me?.id}
+        onUpdated={async ({ removedSelf } = {}) => {
+          if (removedSelf) {
+            router.push("/groups");
+            return;
+          }
+          await load();
+        }}
+      />
 
       <ConfirmDialog
         open={confirmDeleteOpen}
         onOpenChange={setConfirmDeleteOpen}
-        title="Delete group?"
-        description={`“${group.name}” and its expenses will be permanently removed. This cannot be undone.`}
+        title="Delete this group?"
+        description={`“${group.name}” and all of its expenses will be permanently removed. This cannot be undone.`}
         confirmLabel="Delete group"
         cancelLabel="Cancel"
+        confirmPhrase="delete this group"
         loading={deleting}
         onConfirm={deleteGroup}
       />
     </div>
+  );
+}
+
+function SharesEditor({ members, draftParts, setDraftParts }) {
+  const totalParts =
+    members.reduce((sum, m) => sum + (Number(draftParts[m.id]) || 1), 0) || 1;
+
+  return (
+    <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
+      {members.map((m) => {
+        const parts = draftParts[m.id] ?? 1;
+        const pct = Math.round((parts / totalParts) * 100);
+        const label = memberLabel(m);
+        return (
+          <li
+            key={m.id}
+            className="flex items-center justify-between gap-3 px-3 py-2.5"
+          >
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {label}
+            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="w-11 text-right text-xs font-medium tabular-nums text-muted">
+                {pct}%
+              </span>
+              <div className="inline-flex items-center gap-1 rounded-md border border-border bg-soft px-1">
+                <button
+                  type="button"
+                  disabled={parts <= 1}
+                  onClick={() =>
+                    setDraftParts((p) => ({
+                      ...p,
+                      [m.id]: Math.max(1, parts - 1),
+                    }))
+                  }
+                  className="p-1 text-muted disabled:opacity-40"
+                  aria-label={`Decrease parts for ${label}`}
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-8 text-center text-xs font-semibold tabular-nums">
+                  {parts}x
+                </span>
+                <button
+                  type="button"
+                  disabled={parts >= 99}
+                  onClick={() =>
+                    setDraftParts((p) => ({
+                      ...p,
+                      [m.id]: Math.min(99, parts + 1),
+                    }))
+                  }
+                  className="p-1 text-muted disabled:opacity-40"
+                  aria-label={`Increase parts for ${label}`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

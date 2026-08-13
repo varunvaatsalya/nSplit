@@ -2,6 +2,7 @@ import { connectDb } from "@/lib/db";
 import {
   Group,
   User,
+  activeMembers,
   findActiveMemberById,
   serializeMember,
 } from "@/models";
@@ -39,6 +40,17 @@ export async function PATCH(request, { params }) {
 
   const member = findActiveMemberById(group, memberId);
   if (!member) return fail("Member not found", 404);
+
+  if (
+    parsed.data.permission !== undefined &&
+    parsed.data.permission !== "ADMIN" &&
+    member.permission === "ADMIN"
+  ) {
+    const admins = activeMembers(group).filter((m) => m.permission === "ADMIN");
+    if (admins.length <= 1) {
+      return fail("Group must have at least one admin", 400, "LAST_ADMIN");
+    }
+  }
 
   if (parsed.data.permission !== undefined) member.permission = parsed.data.permission;
   if (parsed.data.displayName !== undefined) member.displayName = parsed.data.displayName;
@@ -83,6 +95,13 @@ export async function DELETE(_request, { params }) {
 
   const member = findActiveMemberById(group, memberId);
   if (!member) return fail("Member not found", 404);
+
+  if (member.permission === "ADMIN") {
+    const admins = activeMembers(group).filter((m) => m.permission === "ADMIN");
+    if (admins.length <= 1) {
+      return fail("Cannot remove the last admin", 400, "LAST_ADMIN");
+    }
+  }
 
   member.leftAt = new Date();
   await group.save();

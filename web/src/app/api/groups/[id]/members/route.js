@@ -93,7 +93,7 @@ export async function POST(request, { params }) {
 
   if (linkedUser) await ensureUserAvatar(linkedUser);
 
-  const memberPermission = invite ? permission || "ADD" : "ADD";
+  const memberPermission = permission || "ADD";
   const active = activeMembers(group);
   const linkedIds = active.map((m) => m.userId).filter(Boolean);
   const existingUsers = linkedIds.length

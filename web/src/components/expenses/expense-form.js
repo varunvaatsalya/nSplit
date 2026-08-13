@@ -483,6 +483,24 @@ export function ExpenseForm({
     });
   }
 
+  function toggleAllIncluded() {
+    const ids = members.map((m) => m.id);
+    const allOn =
+      ids.length > 0 && ids.every((id) => includedIds.includes(id));
+    if (allOn) {
+      setIncludedIds([]);
+      return;
+    }
+    setIncludedIds(ids);
+    setPartInputs((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        if (!next[id]) next[id] = 1;
+      }
+      return next;
+    });
+  }
+
   function setParts(memberId, next) {
     const n = Math.max(1, Math.min(99, next));
     setPartInputs((prev) => ({ ...prev, [memberId]: n }));
@@ -746,7 +764,17 @@ export function ExpenseForm({
 
         <div className="overflow-hidden rounded-xl border border-border bg-background">
           <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-2">
-            <span className="text-xs font-medium text-muted">Split with</span>
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={
+                  members.length > 0 &&
+                  members.every((m) => includedIds.includes(m.id))
+                }
+                onCheckedChange={toggleAllIncluded}
+                aria-label="Select all members"
+              />
+              <span className="text-xs font-medium text-muted">Split with</span>
+            </label>
             <Select
               key={`split-method-${splitMethod}`}
               value={splitMethod}

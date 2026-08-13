@@ -44,7 +44,17 @@ export function GroupActivityDialog({ groupId, open, onOpenChange }) {
 
         <div className="nsplit-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
           {loading ? (
-            <p className="text-sm text-muted">Loading…</p>
+            <ul className="space-y-2" aria-busy="true" aria-label="Loading activity">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="rounded-lg border border-border bg-background px-3 py-2.5"
+                >
+                  <span className="block h-4 w-44 animate-pulse rounded-md bg-muted-foreground/15" />
+                  <span className="mt-2 block h-3 w-28 animate-pulse rounded-md bg-muted-foreground/10" />
+                </li>
+              ))}
+            </ul>
           ) : activities.length === 0 ? (
             <p className="text-sm text-muted">No activity yet.</p>
           ) : (

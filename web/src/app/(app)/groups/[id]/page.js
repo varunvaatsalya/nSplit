@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, History, Settings } from "lucide-react";
-import { format, isToday, isValid } from "date-fns";
+import { format, isValid } from "date-fns";
 import { AddRecordModal } from "@/components/records/add-record-modal";
 import { GroupBalancePanel } from "@/components/groups/group-balance-panel";
 import { GroupActivityDialog } from "@/components/groups/group-activity-dialog";
