@@ -328,7 +328,7 @@ export default function GroupSettingsPage() {
             <Button
               type="button"
               variant="link"
-              className="h-auto p-0 text-xs"
+              className="h-auto p-0 text-xs text-primary hover:text-primary/80 cursor-pointer"
               onClick={() => setAddOpen(true)}
             >
               + Add Member
@@ -451,7 +451,7 @@ export default function GroupSettingsPage() {
               >
                 <span className="font-medium">{m.label}</span>
                 {draftMethod === m.value ? (
-                  <span className="text-xs text-primary">Selected</span>
+                  <span className="text-xs text-primary dark:text-primary-foreground">Selected</span>
                 ) : null}
               </button>
             ))}

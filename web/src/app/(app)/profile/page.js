@@ -1,5 +1,6 @@
 import { getSessionUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { ThemeSelect } from "@/components/theme-select";
 import { UserAvatar } from "@/components/user-avatar";
 
 export default async function ProfilePage() {
@@ -31,6 +32,17 @@ export default async function ProfilePage() {
           <div className="font-medium">{session.user.email}</div>
         </div>
         <LogoutButton />
+      </div>
+
+      <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface p-5">
+        <div>
+          <h2 className="text-sm font-medium">Appearance</h2>
+          <p className="mt-1 text-sm text-muted">
+            Choose how Nsplit looks on this device. Defaults to your system
+            theme.
+          </p>
+        </div>
+        <ThemeSelect />
       </div>
     </div>
   );

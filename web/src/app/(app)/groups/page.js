@@ -30,6 +30,24 @@ import {
 } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
 
+function GroupsListSkeleton() {
+  return (
+    <ul className="space-y-3" aria-busy="true" aria-label="Loading groups">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <li key={i}>
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-4">
+            <span className="h-12 w-12 shrink-0 animate-pulse rounded-full bg-muted-foreground/15" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <span className="block h-5 w-40 animate-pulse rounded-md bg-muted-foreground/15" />
+              <span className="block h-4 w-24 animate-pulse rounded-md bg-muted-foreground/10" />
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function emptyMember() {
   return { name: "", email: "", invite: false, permission: "ADD" };
 }
@@ -344,7 +362,7 @@ export default function GroupsPage() {
                   onClick={() =>
                     setMembers((prev) => [...prev, emptyMember()])
                   }
-                  className="text-xs text-primary"
+                  className="text-sm text-primary hover:text-primary/80 cursor-pointer"
                 >
                   + Add
                 </button>
@@ -485,7 +503,7 @@ export default function GroupsPage() {
       </Dialog>
 
       {loading ? (
-        <p className="text-sm text-muted">Loading…</p>
+        <GroupsListSkeleton />
       ) : groups.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center">
           <p className="text-sm text-muted">No groups yet.</p>

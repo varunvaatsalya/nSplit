@@ -83,6 +83,30 @@ function creatorName(expense, members) {
   return m?.displayName || m?.user?.name || null;
 }
 
+function GroupPageSkeleton() {
+  return (
+    <div className="relative pb-24" aria-busy="true" aria-label="Loading group">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button type="button" size="icon" variant="ghost" asChild>
+            <Link href="/groups" aria-label="Back to groups">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <span className="flex h-12 aspect-square shrink-0 animate-pulse rounded-lg bg-muted-foreground/15" />
+          <div className="min-w-0 px-2">
+            <span className="block h-6 w-36 animate-pulse rounded-md bg-muted-foreground/15 sm:h-7 sm:w-48" />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="h-9 w-9 animate-pulse rounded-full bg-muted-foreground/15" />
+          <span className="h-9 w-9 animate-pulse rounded-full bg-muted-foreground/15" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function myShareLine(expense, myMemberId, currency) {
   if (!myMemberId) return null;
   const paid =
@@ -179,7 +203,7 @@ export default function GroupDashboardPage() {
   }
 
   if (error) return <p className="text-danger">{error}</p>;
-  if (!group) return <p className="text-sm text-muted">Loading…</p>;
+  if (!group) return <GroupPageSkeleton />;
 
   return (
     <div className="relative pb-24">
@@ -190,7 +214,7 @@ export default function GroupDashboardPage() {
               <ArrowLeft className="h-5 w-5" />
             </Link>
           </Button>
-          <span className="flex h-12 aspect-square shrink-0 items-center justify-center rounded-lg bg-primary/10 text-2xl">
+          <span className="flex h-12 aspect-square shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/20 text-2xl">
             {iconMeta.emoji}
           </span>
           <div className="min-w-0 px-2">
@@ -233,7 +257,7 @@ export default function GroupDashboardPage() {
             className={cn(
               "rounded-full px-4 py-1.5 text-sm font-medium cursor-pointer transition-colors",
               view === "expenses"
-                ? "bg-surface text-foreground shadow-sm"
+                ? "bg-surface text-foreground shadow-sm border border-border"
                 : "text-muted hover:text-foreground"
             )}
           >
@@ -245,7 +269,7 @@ export default function GroupDashboardPage() {
             className={cn(
               "rounded-full px-4 py-1.5 text-sm font-medium cursor-pointer transition-colors",
               view === "balance"
-                ? "bg-surface text-foreground shadow-sm"
+                ? "bg-surface text-foreground shadow-sm border border-border"
                 : "text-muted hover:text-foreground"
             )}
           >
@@ -292,7 +316,7 @@ export default function GroupDashboardPage() {
                           <button
                             type="button"
                             onClick={() => openExpense(expense.id)}
-                            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors cursor-pointer hover:border-primary/25 hover:bg-surface/10"
+                            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors cursor-pointer hover:border-primary/25 hover:bg-primary-foreground/50 dark:hover:bg-primary/10"
                           >
                             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted-foreground/10 text-lg">
                               {getExpenseEmoji(
