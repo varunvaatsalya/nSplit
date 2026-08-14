@@ -13,12 +13,13 @@ export function UserAvatar({
   className,
   fallbackClassName,
   seed,
+  title,
 }) {
   const letters = (avatar?.letters || "?").toUpperCase();
   const style = resolveAvatarStyle(avatar, seed || name || letters);
 
   return (
-    <Avatar className={className} title={name}>
+    <Avatar className={className} title={title || name}>
       {avatar?.url ? (
         <AvatarImage src={avatar.url} alt={name || "User"} />
       ) : null}

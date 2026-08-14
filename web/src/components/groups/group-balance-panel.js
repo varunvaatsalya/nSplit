@@ -28,6 +28,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { memberListLabel } from "@/lib/members";
 
 function formatMinor(minor, currency = "INR") {
   return new Intl.NumberFormat(undefined, {
@@ -64,7 +65,11 @@ const CATEGORY_COLORS = [
   "var(--danger)",
 ];
 
-export function GroupBalancePanel({ balance, currency = "INR" }) {
+export function GroupBalancePanel({
+  balance,
+  currency = "INR",
+  currentUserId = null,
+}) {
   const members = balance?.members || [];
   const categories = balance?.categories || [];
   const pairwise = balance?.pairwise || [];
@@ -75,24 +80,24 @@ export function GroupBalancePanel({ balance, currency = "INR" }) {
       [...members]
         .sort((a, b) => Math.abs(b.netMinor) - Math.abs(a.netMinor))
         .map((m) => ({
-          name: m.displayName || "Member",
+          name: memberListLabel(m, currentUserId),
           credit: m.netMinor > 0 ? toMajor(m.netMinor) : 0,
           debt: m.netMinor < 0 ? toMajor(Math.abs(m.netMinor)) : 0,
           netMinor: m.netMinor,
         })),
-    [members]
+    [members, currentUserId]
   );
 
   const flowData = useMemo(
     () =>
       members.map((m) => ({
-        name: m.displayName || "Member",
+        name: memberListLabel(m, currentUserId),
         paid: toMajor(m.paidMinor),
         owed: toMajor(m.owedMinor),
         transferredOut: toMajor(m.transferredOutMinor),
         transferredIn: toMajor(m.transferredInMinor),
       })),
-    [members]
+    [members, currentUserId]
   );
 
   const categoryData = useMemo(
@@ -258,7 +263,7 @@ export function GroupBalancePanel({ balance, currency = "INR" }) {
                     <div key={m._id} className="space-y-1.5">
                       <div className="flex items-center justify-between gap-2 text-sm">
                         <span className="truncate font-medium">
-                          {m.displayName}
+                          {memberListLabel(m, currentUserId)}
                         </span>
                         <span
                           className={cn(
@@ -366,7 +371,9 @@ export function GroupBalancePanel({ balance, currency = "INR" }) {
                     </div>
                   </div>
                   <div className="col-span-2 border-t border-border pt-2 sm:col-span-4">
-                    <span className="font-medium">{m.displayName}</span>
+                    <span className="font-medium">
+                      {memberListLabel(m, currentUserId)}
+                    </span>
                     <span
                       className={cn(
                         "ml-2 tabular-nums",
@@ -486,9 +493,23 @@ export function GroupBalancePanel({ balance, currency = "INR" }) {
                       className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-3 text-sm"
                     >
                       <div className="min-w-0">
-                        <span className="font-medium">{p.fromName}</span>
+                        <span className="font-medium">
+                          {memberListLabel(
+                            members.find((m) => m._id === p.from) || {
+                              displayName: p.fromName,
+                            },
+                            currentUserId,
+                          )}
+                        </span>
                         <span className="text-muted"> → </span>
-                        <span className="font-medium">{p.toName}</span>
+                        <span className="font-medium">
+                          {memberListLabel(
+                            members.find((m) => m._id === p.to) || {
+                              displayName: p.toName,
+                            },
+                            currentUserId,
+                          )}
+                        </span>
                       </div>
                       <div className="shrink-0 font-semibold tabular-nums">
                         {formatMinor(p.amountMinor, currency)}

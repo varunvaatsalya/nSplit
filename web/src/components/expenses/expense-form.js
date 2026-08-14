@@ -35,6 +35,7 @@ import {
   getExpenseEmoji,
 } from "@/lib/expense-icons";
 import { cn } from "@/lib/utils";
+import { sortMembersByName, memberListLabel } from "@/lib/members";
 
 const SPLIT_METHODS = [
   { value: "EQUAL", label: "Equally" },
@@ -174,10 +175,6 @@ function formatWhenLabel(date) {
   })} · ${time}`;
 }
 
-function memberLabel(m) {
-  return m.displayName || m.user?.name || "Member";
-}
-
 function distributePayerAmounts(totalMinor, payerIds) {
   if (!payerIds.length) return {};
   const base = Math.floor(totalMinor / payerIds.length);
@@ -204,12 +201,21 @@ export function ExpenseForm({
   active = false,
   onClose,
   expense = null,
+  currentUserId = null,
 }) {
   const isEdit = Boolean(expense?._id);
-  const members = group?.members || [];
+  const members = useMemo(
+    () => sortMembersByName(group?.members || []),
+    [group?.members],
+  );
   const currency = group?.currency || "INR";
   const defaultPayer =
-    members.find((m) => m.permission === "ADMIN") || members[0] || null;
+    members.find(
+      (m) =>
+        currentUserId && m.userId && String(m.userId) === String(currentUserId),
+    ) ||
+    members[0] ||
+    null;
 
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -465,10 +471,10 @@ export function ExpenseForm({
     if (!payerIds.length) return "Select payer";
     if (payerIds.length === 1) {
       const m = members.find((x) => x._id === payerIds[0]);
-      return m ? memberLabel(m) : "1 payer";
+      return m ? memberListLabel(m, currentUserId) : "1 payer";
     }
     return `${payerIds.length} people paid`;
-  }, [payerIds, members]);
+  }, [payerIds, members, currentUserId]);
 
   function openPayersModal() {
     setDraftPayerIds(
@@ -1028,7 +1034,7 @@ export function ExpenseForm({
                     onCheckedChange={() => toggleIncluded(m._id)}
                   />
                   <div className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {memberLabel(m)}
+                    {memberListLabel(m, currentUserId)}
                   </div>
                   <div className="flex h-7 min-w-30 shrink-0 items-center justify-end gap-2">
                     {splitMethod === "EXACT" ? (
@@ -1140,7 +1146,7 @@ export function ExpenseForm({
                     onCheckedChange={() => toggleDraftPayer(m._id)}
                   />
                   <span className="min-w-0 flex-1 truncate text-sm">
-                    {memberLabel(m)}
+                    {memberListLabel(m, currentUserId)}
                   </span>
                   {checked && draftPayerIds.length > 1 ? (
                     <Input

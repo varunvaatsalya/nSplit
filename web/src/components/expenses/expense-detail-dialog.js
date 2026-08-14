@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +15,12 @@ import { UserAvatar } from "@/components/user-avatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getExpenseEmoji } from "@/lib/expense-icons";
 import { cn } from "@/lib/utils";
+import {
+  compareMembersByName,
+  memberListLabel,
+  sortMembersByName,
+} from "@/lib/members";
+import { canMutateCreatedRecord } from "@/shared/permissions";
 
 const SPLIT_LABELS = {
   EQUAL: "Equally",
@@ -59,7 +65,10 @@ export function ExpenseDetailDialog({
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const expense = expenses[index] || null;
-  const members = group?.members || [];
+  const members = useMemo(
+    () => sortMembersByName(group?.members || []),
+    [group?.members],
+  );
   const currency = expense?.currency || group?.currency || "INR";
   const total = expenses.length;
   const canPrev = index > 0;
@@ -95,6 +104,18 @@ export function ExpenseDetailDialog({
 
   async function confirmDelete() {
     if (!expense || !group?._id || deleting) return;
+    const mine = members.find(
+      (m) => m.userId && String(m.userId) === String(currentUserId),
+    );
+    if (
+      !canMutateCreatedRecord(
+        mine?.permission,
+        expense.createdById,
+        currentUserId,
+      )
+    ) {
+      return;
+    }
     setDeleting(true);
     try {
       const res = await fetch(
@@ -112,8 +133,28 @@ export function ExpenseDetailDialog({
   if (!expense) return null;
 
   const emoji = getExpenseEmoji(expense.icon, expense.categoryKey);
-  const payers = expense.payers || [];
-  const splits = (expense.splits || []).filter((s) => (s.amountMinor || 0) > 0);
+  const payers = [...(expense.payers || [])].sort((a, b) =>
+    compareMembersByName(
+      memberById(members, a.memberId) || {
+        displayName: memberName(members, a.memberId),
+      },
+      memberById(members, b.memberId) || {
+        displayName: memberName(members, b.memberId),
+      },
+    ),
+  );
+  const splits = (expense.splits || [])
+    .filter((s) => (s.amountMinor || 0) > 0)
+    .sort((a, b) =>
+      compareMembersByName(
+        memberById(members, a.memberId) || {
+          displayName: memberName(members, a.memberId),
+        },
+        memberById(members, b.memberId) || {
+          displayName: memberName(members, b.memberId),
+        },
+      ),
+    );
   const creatorMember = members.find(
     (m) => m.userId && String(m.userId) === String(expense.createdById),
   );
@@ -122,6 +163,11 @@ export function ExpenseDetailDialog({
 
   const myMember = members.find(
     (m) => m.userId && String(m.userId) === String(currentUserId),
+  );
+  const canMutate = canMutateCreatedRecord(
+    myMember?.permission,
+    expense.createdById,
+    currentUserId,
   );
 
   return (
@@ -161,6 +207,7 @@ export function ExpenseDetailDialog({
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-2xl text-primary-foreground">
                   {emoji}
                 </div>
+                {canMutate ? (
                 <div className="flex gap-1">
                   <Button
                     type="button"
@@ -184,6 +231,7 @@ export function ExpenseDetailDialog({
                     <Trash2 className="h-4 w-4 text-danger" />
                   </Button>
                 </div>
+                ) : null}
               </div>
 
               <div className="px-5 pb-4 pt-3">
@@ -208,7 +256,10 @@ export function ExpenseDetailDialog({
                   <ul className="space-y-2">
                     {payers.map((p) => {
                       const m = memberById(members, p.memberId);
-                      const name = memberName(members, p.memberId);
+                      const name = memberListLabel(
+                        m || { displayName: memberName(members, p.memberId) },
+                        currentUserId,
+                      );
                       return (
                         <li
                           key={p.memberId}
@@ -247,7 +298,10 @@ export function ExpenseDetailDialog({
                   <ul className="space-y-1">
                     {splits.map((s) => {
                       const m = memberById(members, s.memberId);
-                      const name = memberName(members, s.memberId);
+                      const name = memberListLabel(
+                        m || { displayName: memberName(members, s.memberId) },
+                        currentUserId,
+                      );
                       const isYou = myMember && s.memberId === myMember._id;
                       return (
                         <li
@@ -261,12 +315,12 @@ export function ExpenseDetailDialog({
                             seed={m?.userId || m?._id || s.memberId}
                           />
                           <div className="min-w-0 flex-1 truncate font-medium">
-                            {name} {isYou ? <span className="text-[11px]">(You)</span> : ""}
+                            {name}
                           </div>
                           <div
                             className={cn(
                               "tabular-nums font-medium",
-                              isYou && "text-primary",
+                              isYou && "text-primary dark:text-primary-foreground",
                             )}
                           >
                             {formatMinor(s.amountMinor, currency)}

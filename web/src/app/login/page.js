@@ -29,7 +29,8 @@ function LoginForm() {
         setError(json?.error?.message || "Login failed");
         return;
       }
-      router.push(next);
+      const pending = json.data?.invitations?.pending > 0;
+      router.push(!searchParams.get("next") && pending ? "/notifications" : next);
       router.refresh();
     } catch {
       setError("Something went wrong");

@@ -1,6 +1,12 @@
 import Link from "next/link";
+import { getSessionUser } from "@/lib/auth/session";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await getSessionUser();
+  const isLoggedIn = Boolean(session?.user);
+  const ctaHref = isLoggedIn ? "/groups" : "/login";
+  const ctaLabel = isLoggedIn ? "Go to groups" : "Log in";
+
   return (
     <div className="min-h-screen bg-background">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
@@ -17,14 +23,11 @@ export default function HomePage() {
           <Link href="/about" className="hover:text-foreground">
             About
           </Link>
-          <Link href="/login" className="hover:text-foreground">
-            Log in
-          </Link>
           <Link
-            href="/signup"
+            href={ctaHref}
             className="rounded-lg bg-primary px-3.5 py-2 font-medium text-primary-foreground"
           >
-            Sign up
+            {ctaLabel}
           </Link>
         </nav>
       </header>
@@ -41,10 +44,10 @@ export default function HomePage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              href="/signup"
+              href={ctaHref}
               className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground"
             >
-              Get started
+              {isLoggedIn ? "Go to groups" : "Get started"}
             </Link>
             <Link
               href="/features"

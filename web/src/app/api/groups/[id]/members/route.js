@@ -1,7 +1,6 @@
 import { connectDb } from "@/lib/db";
 import {
   Group,
-  Notification,
   User,
   activeMembers,
   serializeMember,
@@ -16,8 +15,14 @@ import {
 } from "@/lib/avatar-assign";
 import { requireGroupPermission } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
-import { generateToken, hashToken } from "@/lib/auth/tokens";
 import { addMemberSchema } from "@/lib/validations/groups";
+import {
+  buildInvitation,
+  expireStaleInvitations,
+  memberInvitePayload,
+  notifyInvitation,
+} from "@/lib/invitations";
+import { sortGroupMembersInPlace } from "@/lib/members";
 
 export async function GET(_request, { params }) {
   const auth = await requireAuth();
@@ -33,10 +38,12 @@ export async function GET(_request, { params }) {
   const groupId = membership.groupId;
 
   await connectDb();
-  const group = await Group.findById(groupId).lean();
+  const group = await Group.findById(groupId);
   if (!group) return fail("Group not found", 404);
+  if (expireStaleInvitations(group)) await group.save();
+  const lean = group.toObject();
 
-  const members = activeMembers(group);
+  const members = activeMembers(lean);
   const users = await User.find({
     _id: { $in: members.map((m) => m.userId).filter(Boolean) },
   })
@@ -45,9 +52,10 @@ export async function GET(_request, { params }) {
   const userMap = new Map(users.map((u) => [String(u._id), u]));
 
   return ok({
-    members: members.map((m) =>
-      serializeMember(m, m.userId ? userMap.get(String(m.userId)) : null)
-    ),
+    members: members.map((m) => ({
+      ...serializeMember(m, m.userId ? userMap.get(String(m.userId)) : null),
+      invite: memberInvitePayload(lean, m),
+    })),
   });
 }
 
@@ -123,6 +131,7 @@ export async function POST(request, { params }) {
           ? previous.avatar
           : avatar;
       previous.joinedAt = new Date();
+      sortGroupMembersInPlace(group);
       await group.save();
 
       await recordActivity({
@@ -138,8 +147,9 @@ export async function POST(request, { params }) {
     }
   }
 
+  const grantAccessNow = Boolean(linkedUser) && !invite;
   const memberDoc = {
-    userId: linkedUser?._id ?? null,
+    userId: grantAccessNow ? linkedUser._id : null,
     email: email || null,
     permission: memberPermission,
     displayName: name,
@@ -149,22 +159,26 @@ export async function POST(request, { params }) {
   };
 
   group.members.push(memberDoc);
+  const addedId = group.members[group.members.length - 1]._id;
 
   if (invite && email) {
-    group.invitations.push({
-      email,
-      invitedById: auth.user._id,
-      recipientId: linkedUser?._id ?? null,
-      permission: memberPermission,
-      status: "PENDING",
-      tokenHash: hashToken(generateToken()),
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
-      createdAt: new Date(),
-    });
+    group.invitations.push(
+      buildInvitation({
+        email,
+        invitedById: auth.user._id,
+        recipientId: linkedUser?._id ?? null,
+        permission: memberPermission,
+      })
+    );
   }
 
+  sortGroupMembersInPlace(group);
   await group.save();
-  const saved = group.members[group.members.length - 1];
+  const saved = group.members.id(addedId);
+  const savedInvite =
+    invite && email
+      ? group.invitations[group.invitations.length - 1]
+      : null;
 
   await recordActivity({
     groupId,
@@ -180,15 +194,31 @@ export async function POST(request, { params }) {
     },
   });
 
-  if (invite && email && linkedUser) {
-    await Notification.create({
-      userId: linkedUser._id,
-      type: "INVITATION",
-      title: "Group invitation",
-      body: `${auth.user.name} invited you to a group`,
-      data: { groupId },
+  if (invite && email) {
+    await recordActivity({
+      groupId,
+      actorId: auth.user._id,
+      action: "INVITATION_SENT",
+      entityType: "invitation",
+      entityId: savedInvite?._id,
+      metadata: { email, memberId: String(saved._id) },
     });
   }
 
-  return created({ member: serializeMember(saved, linkedUser) });
+  if (invite && email && linkedUser && savedInvite) {
+    await notifyInvitation({
+      userId: linkedUser._id,
+      invitedByName: auth.user.name,
+      group,
+      invitation: savedInvite,
+      status: "PENDING",
+    });
+  }
+
+  return created({
+    member: {
+      ...serializeMember(saved, grantAccessNow ? linkedUser : null),
+      invite: memberInvitePayload(group, saved),
+    },
+  });
 }

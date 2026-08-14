@@ -3,7 +3,7 @@ import { Expense } from "@/models";
 import { fail, ok, zodError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
 import { recordActivity } from "@/lib/activity";
-import { requireGroupPermission } from "@/lib/permissions";
+import { requireGroupPermission, assertCanMutateCreatedRecord } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
 import { calculateSplit, validatePayers } from "@/shared/split/index.js";
 import { updateExpenseSchema } from "@/lib/validations/records";
@@ -39,7 +39,11 @@ export async function PATCH(request, { params }) {
   const { id: code, expenseId } = await params;
   let membership;
   try {
-    membership = await requireGroupPermission(auth.user._id, code, Actions.EDIT_EXPENSE);
+    membership = await requireGroupPermission(
+      auth.user._id,
+      code,
+      Actions.ADD_EXPENSE
+    );
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
@@ -62,6 +66,16 @@ export async function PATCH(request, { params }) {
     deletedAt: null,
   }).lean();
   if (!existing) return fail("Expense not found", 404);
+
+  try {
+    assertCanMutateCreatedRecord(
+      membership,
+      existing.createdById,
+      auth.user._id
+    );
+  } catch (e) {
+    return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
+  }
 
   if (
     parsed.data.baseVersion != null &&
@@ -168,7 +182,11 @@ export async function DELETE(_request, { params }) {
   const { id: code, expenseId } = await params;
   let membership;
   try {
-    membership = await requireGroupPermission(auth.user._id, code, Actions.DELETE_EXPENSE);
+    membership = await requireGroupPermission(
+      auth.user._id,
+      code,
+      Actions.ADD_EXPENSE
+    );
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
@@ -181,6 +199,16 @@ export async function DELETE(_request, { params }) {
     deletedAt: null,
   }).lean();
   if (!existing) return fail("Expense not found", 404);
+
+  try {
+    assertCanMutateCreatedRecord(
+      membership,
+      existing.createdById,
+      auth.user._id
+    );
+  } catch (e) {
+    return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
+  }
 
   await withTransaction(async (session) => {
     const opts = session ? { session } : {};

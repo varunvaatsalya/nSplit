@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/user-avatar";
+import { memberListLabel, sortMembersByName } from "@/lib/members";
 
 const SPLIT_LABELS = {
   EQUAL: "Equally",
@@ -16,15 +17,11 @@ const SPLIT_LABELS = {
   SHARES: "As parts",
 };
 
-function memberLabel(m) {
-  return m.displayName || m.user?.name || "Member";
-}
-
-export function GroupInfoDialog({ group, open, onOpenChange }) {
+export function GroupInfoDialog({ group, open, onOpenChange, currentUserId }) {
   if (!group) return null;
 
   const iconMeta = getGroupIcon(group.icon);
-  const members = group.members || [];
+  const members = sortMembersByName(group.members || []);
   const splitMethod =
     SPLIT_LABELS[group.settings?.defaultSplitMethod] || "Equally";
   const partsConfig = Array.isArray(group.settings?.defaultSplitConfig)
@@ -100,7 +97,7 @@ export function GroupInfoDialog({ group, open, onOpenChange }) {
             </div>
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
               {members.map((m) => {
-                const label = memberLabel(m);
+                const label = memberListLabel(m, currentUserId);
                 const part = partsConfig.find((p) => p.memberId === m._id);
                 return (
                   <li

@@ -27,7 +27,9 @@ export default function SignupPage() {
         setError(json?.error?.message || "Signup failed");
         return;
       }
-      router.push("/groups");
+      router.push(
+        json.data?.invitations?.pending > 0 ? "/notifications" : "/groups"
+      );
       router.refresh();
     } catch {
       setError("Something went wrong");

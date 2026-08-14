@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronDown, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,12 +27,9 @@ import {
 import { EmojiPicker } from "@/components/emoji-picker";
 import { suggestEmojiFromText } from "@/lib/emoji-icons";
 import { cn } from "@/lib/utils";
+import { memberListLabel, sortMembersByName } from "@/lib/members";
 
 const DEFAULT_TRANSFER_EMOJI = "💸";
-
-function memberLabel(m) {
-  return m.displayName || m.user?.name || "Member";
-}
 
 function toLocalDateValue(date) {
   const d = new Date(date);
@@ -79,8 +76,12 @@ export function TransferForm({
   onClose,
   embedded = false,
   active = false,
+  currentUserId = null,
 }) {
-  const members = group?.members || [];
+  const members = useMemo(
+    () => sortMembersByName(group?.members || []),
+    [group?.members],
+  );
   const currency = group?.currency || "INR";
 
   const [title, setTitle] = useState("");
@@ -280,14 +281,16 @@ export function TransferForm({
                       From
                     </span>
                     <span className="font-medium">
-                      {fromMember ? memberLabel(fromMember) : "Select"}
+                      {fromMember
+                        ? memberListLabel(fromMember, currentUserId)
+                        : "Select"}
                     </span>
                   </span>
                 </SelectTrigger>
                 <SelectContent>
                   {members.map((m) => (
                     <SelectItem key={m._id} value={m._id}>
-                      {memberLabel(m)}
+                      {memberListLabel(m, currentUserId)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -334,7 +337,7 @@ export function TransferForm({
               <SelectContent>
                 {toOptions.map((m) => (
                   <SelectItem key={m._id} value={m._id}>
-                    {memberLabel(m)}
+                    {memberListLabel(m, currentUserId)}
                   </SelectItem>
                 ))}
               </SelectContent>

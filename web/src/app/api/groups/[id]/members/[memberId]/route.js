@@ -12,6 +12,8 @@ import { recordActivity } from "@/lib/activity";
 import { requireGroupPermission } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
 import { updateMemberSchema } from "@/lib/validations/groups";
+import { revokePendingInvitesForEmail } from "@/lib/invitations";
+import { sortGroupMembersInPlace } from "@/lib/members";
 
 export async function PATCH(request, { params }) {
   const auth = await requireAuth();
@@ -57,6 +59,10 @@ export async function PATCH(request, { params }) {
   if (parsed.data.permission !== undefined) member.permission = parsed.data.permission;
   if (parsed.data.displayName !== undefined) member.displayName = parsed.data.displayName;
   if (parsed.data.email !== undefined) member.email = parsed.data.email;
+
+  if (parsed.data.displayName !== undefined) {
+    sortGroupMembersInPlace(group);
+  }
 
   await group.save();
 
@@ -108,6 +114,7 @@ export async function DELETE(_request, { params }) {
   }
 
   member.leftAt = new Date();
+  revokePendingInvitesForEmail(group, member.email);
   await group.save();
 
   await recordActivity({

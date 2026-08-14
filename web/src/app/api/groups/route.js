@@ -1,7 +1,6 @@
 import { connectDb, toJSON, withTransaction } from "@/lib/db";
 import {
   Group,
-  Notification,
   User,
   activeMembers,
   serializeMember,
@@ -14,8 +13,13 @@ import {
   ensureUserAvatar,
 } from "@/lib/avatar-assign";
 import { createGroupSchema } from "@/lib/validations/groups";
-import { generateToken, hashToken } from "@/lib/auth/tokens";
 import { createGroupCode } from "@/lib/group-id";
+import {
+  buildInvitation,
+  memberInvitePayload,
+  notifyInvitation,
+} from "@/lib/invitations";
+import { compareMembersByName } from "@/lib/members";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -130,7 +134,7 @@ export async function POST(request) {
       used.bgs.push(avatar.bg);
 
       embeddedMembers.push({
-        userId: linkedUser?._id ?? null,
+        userId: member.invite ? null : linkedUser?._id ?? null,
         email,
         permission,
         displayName: member.name,
@@ -141,18 +145,18 @@ export async function POST(request) {
 
       if (member.invite && email) {
         invitations.push({
-          email,
-          invitedById: auth.user._id,
-          recipientId: linkedUser?._id ?? null,
-          permission,
-          status: "PENDING",
-          tokenHash: hashToken(generateToken()),
-          expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
-          createdAt: new Date(),
+          ...buildInvitation({
+            email,
+            invitedById: auth.user._id,
+            recipientId: linkedUser?._id ?? null,
+            permission,
+          }),
           _notifyUserId: linkedUser?._id || null,
         });
       }
     }
+
+    embeddedMembers.sort(compareMembersByName);
 
     let createdGroup;
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -184,21 +188,28 @@ export async function POST(request) {
       }
     }
 
-    for (const inv of invitations) {
-      if (inv._notifyUserId) {
-        await Notification.create(
-          [
-            {
-              userId: inv._notifyUserId,
-              type: "INVITATION",
-              title: "Group invitation",
-              body: `${auth.user.name} invited you to “${name}”`,
-              data: { groupId: String(createdGroup._id), code: createdGroup.code },
-            },
-          ],
-          opts
-        );
-      }
+    if (!createdGroup) throw new Error("Could not create group");
+
+    for (const savedInv of createdGroup.invitations || []) {
+      const source = invitations.find((inv) => inv.email === savedInv.email);
+      await recordActivity({
+        session,
+        groupId: createdGroup._id,
+        actorId: auth.user._id,
+        action: "INVITATION_SENT",
+        entityType: "invitation",
+        entityId: savedInv._id,
+        metadata: { email: savedInv.email },
+      });
+      if (!source?._notifyUserId) continue;
+      await notifyInvitation({
+        userId: source._notifyUserId,
+        invitedByName: auth.user.name,
+        group: createdGroup,
+        invitation: savedInv,
+        status: "PENDING",
+        session,
+      });
     }
 
     await recordActivity({
@@ -223,7 +234,10 @@ export async function POST(request) {
   return created({
     group: {
       ...json,
-      members: activeMembers(result).map((m) => serializeMember(m)),
+      members: activeMembers(result).map((m) => ({
+        ...serializeMember(m),
+        invite: memberInvitePayload(result, m),
+      })),
       invitations: undefined,
     },
   });

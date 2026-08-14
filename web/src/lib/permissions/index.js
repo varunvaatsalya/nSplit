@@ -1,6 +1,6 @@
 import { connectDb } from "@/lib/db";
 import { Group, findActiveMemberByUserId } from "@/models";
-import { can, assertCan } from "@/shared/permissions/index.js";
+import { can, assertCan, canMutateCreatedRecord } from "@/shared/permissions/index.js";
 
 export async function getActiveMembership(userId, groupCode) {
   await connectDb();
@@ -33,4 +33,16 @@ export async function requireGroupPermission(userId, groupId, action) {
   return membership;
 }
 
-export { can };
+export function assertCanMutateCreatedRecord(membership, createdById, userId) {
+  if (canMutateCreatedRecord(membership?.permission, createdById, userId)) {
+    return membership;
+  }
+  const err = new Error(
+    "Only the creator or a group admin can change this record"
+  );
+  err.code = "FORBIDDEN";
+  err.status = 403;
+  throw err;
+}
+
+export { can, canMutateCreatedRecord };

@@ -37,16 +37,13 @@ import {
 } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
 import { Actions, can } from "@/shared/permissions";
+import { memberListLabel, sortMembersByName } from "@/lib/members";
 
 const METHODS = [
   { value: "EQUAL", label: "Equally" },
   { value: "EXACT", label: "As amount" },
   { value: "SHARES", label: "As parts" },
 ];
-
-function memberLabel(m) {
-  return m.displayName || m.user?.name || "Member";
-}
 
 function methodLabel(value) {
   return METHODS.find((m) => m.value === value)?.label || "Equally";
@@ -190,7 +187,7 @@ export default function GroupSettingsPage() {
     setCurrency(g.currency || "INR");
     const m = g.settings?.defaultSplitMethod;
     setMethod(["EQUAL", "EXACT", "SHARES"].includes(m) ? m : "EQUAL");
-    setMembers(g.members || []);
+    setMembers(sortMembersByName(g.members || []));
     if (meRes.ok) setMe(meJson.data.user);
   }
 
@@ -218,6 +215,11 @@ export default function GroupSettingsPage() {
         ?.permission || null
     );
   }, [members, me]);
+
+  const sortedMembers = useMemo(
+    () => sortMembersByName(members),
+    [members],
+  );
 
   const canManageMembers = can(myPermission, Actions.MANAGE_MEMBERS);
   const canManageSettings = can(myPermission, Actions.MANAGE_SETTINGS);
@@ -453,8 +455,8 @@ export default function GroupSettingsPage() {
             ) : null}
           </CardHeader>
           <CardContent className="space-y-2">
-            {members.map((m) => {
-              const label = memberLabel(m);
+            {sortedMembers.map((m) => {
+              const label = memberListLabel(m, me?._id);
               const part =
                 partsConfig.find((p) => p.memberId === m._id)?.value || 1;
               const pct =
@@ -597,7 +599,8 @@ export default function GroupSettingsPage() {
           </div>
           {draftMethod === "SHARES" ? (
             <SharesEditor
-              members={members}
+              members={sortedMembers}
+              currentUserId={me?._id}
               draftParts={draftParts}
               setDraftParts={setDraftParts}
             />
@@ -647,7 +650,7 @@ export default function GroupSettingsPage() {
   );
 }
 
-function SharesEditor({ members, draftParts, setDraftParts }) {
+function SharesEditor({ members, currentUserId, draftParts, setDraftParts }) {
   const totalParts =
     members.reduce((sum, m) => sum + (Number(draftParts[m._id]) || 1), 0) || 1;
 
@@ -656,7 +659,7 @@ function SharesEditor({ members, draftParts, setDraftParts }) {
       {members.map((m) => {
         const parts = draftParts[m._id] ?? 1;
         const pct = Math.round((parts / totalParts) * 100);
-        const label = memberLabel(m);
+        const label = memberListLabel(m, currentUserId);
         return (
           <li
             key={m._id}

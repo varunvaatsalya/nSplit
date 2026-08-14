@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/session";
 import { ensureUserAvatar } from "@/lib/avatar-assign";
 import { loginSchema } from "@/lib/validations/auth";
+import { syncInvitationsForUser } from "@/lib/invitations";
 
 export async function POST(request) {
   let body;
@@ -41,9 +42,12 @@ export async function POST(request) {
 
   await ensureUserAvatar(user);
 
+  const invitations = await syncInvitationsForUser(user);
+
   return ok({
     user: publicUser(user),
     token,
     expiresAt,
+    invitations,
   });
 }

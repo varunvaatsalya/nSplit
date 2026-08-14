@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { sortMembersByName, memberListLabel } from "@/lib/members";
 
 const METHODS = [
   { value: "EQUAL", label: "Equally" },
@@ -52,7 +53,13 @@ function defaultPartsMap(members, config) {
   return map;
 }
 
-export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
+export function GroupSettingsDialog({
+  group,
+  open,
+  onOpenChange,
+  onUpdated,
+  currentUserId = null,
+}) {
   const router = useRouter();
   const [members, setMembers] = useState([]);
   const [method, setMethod] = useState("EQUAL");
@@ -90,7 +97,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
     const m = group.settings?.defaultSplitMethod;
     const nextMethod = ["EQUAL", "EXACT", "SHARES"].includes(m) ? m : "EQUAL";
     setMethod(nextMethod);
-    setMembers(group.members || []);
+    setMembers(sortMembersByName(group.members || []));
     setSplitError("");
     setMemberError("");
     setDeleteError("");
@@ -182,9 +189,9 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
       setInvite(false);
       setPermission("ADD");
       setAddOpen(false);
-      if (json.data?.members) setMembers(json.data.members);
+      if (json.data?.members) setMembers(sortMembersByName(json.data.members));
       else if (json.data?.member) {
-        setMembers((prev) => [...prev, json.data.member]);
+        setMembers((prev) => sortMembersByName([...prev, json.data.member]));
       }
       onUpdated?.();
     } finally {
@@ -229,7 +236,9 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
       }
       if (json.data?.member) {
         setMembers((prev) =>
-          prev.map((m) => (m._id === editing._id ? json.data.member : m))
+          sortMembersByName(
+            prev.map((m) => (m._id === editing._id ? json.data.member : m)),
+          ),
         );
       }
       setEditOpen(false);
@@ -403,7 +412,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
                         className="flex items-center gap-3 px-3 py-2.5"
                       >
                         <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                          {memberLabel(m)}
+                          {memberListLabel(m, currentUserId)}
                         </span>
                         <div className="inline-flex items-center gap-1 rounded-md border border-border bg-soft px-1 py-0.5">
                           <button
@@ -474,7 +483,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">
-                      {memberLabel(m)}
+                      {memberListLabel(m, currentUserId)}
                     </div>
                     <div className="truncate text-xs text-muted">
                       {m.email || m.user?.email || "No email"}

@@ -13,6 +13,10 @@ import { backfillGroupMemberAvatars } from "@/lib/avatar-assign";
 import { requireGroupPermission } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
 import { updateGroupSchema } from "@/lib/validations/groups";
+import {
+  expireStaleInvitations,
+  memberInvitePayload,
+} from "@/lib/invitations";
 
 async function loadGroup(code) {
   let group = await findGroupByCode(code);
@@ -26,8 +30,9 @@ async function loadGroup(code) {
     .lean();
   const userMap = new Map(users.map((u) => [String(u._id), u]));
 
-  const dirty = await backfillGroupMemberAvatars(group, userMap);
-  if (dirty) {
+  const dirtyAvatars = await backfillGroupMemberAvatars(group, userMap);
+  const dirtyInvites = expireStaleInvitations(group);
+  if (dirtyAvatars || dirtyInvites) {
     await group.save();
   }
 
@@ -47,9 +52,10 @@ async function loadGroup(code) {
         : null,
       simplifyDebts: Boolean(settings.simplifyDebts),
     },
-    members: activeMembers(lean).map((m) =>
-      serializeMember(m, m.userId ? userMap.get(String(m.userId)) : null)
-    ),
+    members: activeMembers(lean).map((m) => ({
+      ...serializeMember(m, m.userId ? userMap.get(String(m.userId)) : null),
+      invite: memberInvitePayload(lean, m),
+    })),
     invitations: undefined,
   };
 }

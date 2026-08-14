@@ -31,6 +31,8 @@ export function AddRecordModal({
   onCreated,
   editExpense = null,
   onEditClose,
+  currentUserId = null,
+  canAdd = true,
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("expense");
@@ -49,7 +51,7 @@ export function AddRecordModal({
 
   useEffect(() => {
     function onKeyDown(e) {
-      if (open || isEdit) return;
+      if (open || isEdit || !canAdd) return;
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() !== ADD_HOTKEY) return;
       if (isTypingTarget(e.target)) return;
@@ -58,7 +60,7 @@ export function AddRecordModal({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, isEdit]);
+  }, [open, isEdit, canAdd]);
 
   function handleOpenChange(next) {
     setOpen(next);
@@ -73,6 +75,7 @@ export function AddRecordModal({
 
   return (
     <>
+      {canAdd ? (
       <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40">
         <div className="mx-auto flex max-w-3xl justify-end px-4 sm:px-6">
           <div className="group/fab pointer-events-auto relative">
@@ -111,6 +114,7 @@ export function AddRecordModal({
           </div>
         </div>
       </div>
+      ) : null}
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="flex max-h-[min(90vh,720px)] max-w-lg flex-col gap-0 overflow-hidden p-0">
@@ -172,6 +176,7 @@ export function AddRecordModal({
               expense={editExpense}
               embedded
               active={open && (tab === "expense" || isEdit)}
+              currentUserId={currentUserId}
               onClose={() => handleOpenChange(false)}
               onCreated={handleSaved}
               onUpdated={handleSaved}
@@ -181,6 +186,7 @@ export function AddRecordModal({
               group={group}
               embedded
               active={open && tab === "transfer"}
+              currentUserId={currentUserId}
               onClose={() => handleOpenChange(false)}
               onCreated={handleSaved}
             />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Mail, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
+import { memberListLabel, sortMembersByName } from "@/lib/members";
 
 export const PERMISSION_OPTIONS = [
   { value: "VIEW_ONLY", label: "View only" },
@@ -40,6 +41,22 @@ export function permissionLabel(value) {
 
 function memberLabel(m) {
   return m.displayName || m.user?.name || "Member";
+}
+
+function inviteStatusLabel(member) {
+  if (member.userId) return null;
+  const status = member.invite?.status;
+  if (status === "PENDING") return "Invite pending";
+  if (status === "EXPIRED") return "Invite expired";
+  if (status === "DECLINED") return "Invite declined";
+  if (status === "REVOKED") return "Invite cancelled";
+  return "Guest";
+}
+
+function canSendInvite(member) {
+  if (member.userId) return false;
+  if (!(member.email || member.user?.email)) return false;
+  return member.invite?.status !== "ACCEPTED";
 }
 
 function adminCount(members) {
@@ -63,6 +80,10 @@ export function ManageMembersDialog({
   currentUserId,
   onUpdated,
 }) {
+  const sortedMembers = useMemo(
+    () => sortMembersByName(members),
+    [members],
+  );
   const [mode, setMode] = useState(null);
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState("");
@@ -180,6 +201,25 @@ export function ManageMembersDialog({
     }
   }
 
+  async function resendInvite(member) {
+    setBusyId(member._id);
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/groups/${groupId}/members/${member._id}/resend-invite`,
+        { method: "POST" }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error?.message || "Failed to send invite");
+        return;
+      }
+      await onUpdated?.();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function removeMember() {
     if (!removing) return;
     setBusyId(removing._id);
@@ -221,8 +261,8 @@ export function ManageMembersDialog({
           </DialogHeader>
 
           <div className="nsplit-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
-            {members.map((m) => {
-              const label = memberLabel(m);
+            {sortedMembers.map((m) => {
+              const label = memberListLabel(m, currentUserId);
               const isLastAdmin = lastAdminId === m._id;
               const busy = busyId === m._id;
               const selected = editing?._id === m._id;
@@ -244,12 +284,30 @@ export function ManageMembersDialog({
                     <div className="truncate text-sm font-medium">{label}</div>
                     <div className="truncate text-xs text-muted">
                       {m.email || m.user?.email || "No email"}
-                      {!m.userId ? " · guest" : ""}
+                      {inviteStatusLabel(m) ? ` · ${inviteStatusLabel(m)}` : ""}
                       {" · "}
                       {permissionLabel(m.permission)}
                     </div>
                   </div>
                   <div className="flex items-center">
+                    {canSendInvite(m) ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0 text-muted hover:text-foreground"
+                        disabled={busy}
+                        onClick={() => resendInvite(m)}
+                        aria-label={`Send invite to ${label}`}
+                        title={
+                          m.invite?.status === "PENDING"
+                            ? "Resend invite"
+                            : "Send invite"
+                        }
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                    ) : null}
                     {m.permission === "ADMIN" ? null : (
                       <Button
                         type="button"

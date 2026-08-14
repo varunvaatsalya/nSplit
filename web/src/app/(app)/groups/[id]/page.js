@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { getExpenseEmoji } from "@/lib/expense-icons";
 import { getGroupIcon } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
+import { sortMembersByName } from "@/lib/members";
+import { Actions, can, canMutateCreatedRecord } from "@/shared/permissions";
 
 function formatMinor(minor, currency = "INR") {
   return new Intl.NumberFormat(undefined, {
@@ -76,11 +78,13 @@ function payerMembers(expense, members) {
     .filter(Boolean);
 }
 
-function creatorName(expense, members) {
-  const m = members.find(
-    (x) => x.userId && String(x.userId) === String(expense.createdById)
+function creatorMember(expense, members) {
+  if (!expense?.createdById) return null;
+  return (
+    members.find(
+      (x) => x.userId && String(x.userId) === String(expense.createdById)
+    ) || null
   );
-  return m?.displayName || m?.user?.name || null;
 }
 
 function GroupPageSkeleton() {
@@ -170,7 +174,10 @@ export default function GroupDashboardPage() {
       return;
     }
     setError("");
-    setGroup(gJson.data.group);
+    setGroup({
+      ...gJson.data.group,
+      members: sortMembersByName(gJson.data.group?.members || []),
+    });
     if (bRes.ok) setBalance(bJson.data);
     if (meRes.ok) setMe(meJson.data.user);
   }
@@ -235,17 +242,11 @@ export default function GroupDashboardPage() {
   const iconMeta = getGroupIcon(group?.icon);
   const members = group?.members || [];
 
-  const showAddedBy = useMemo(() => {
-    const ids = new Set(
-      expenses.map((e) => String(e.createdById || "")).filter(Boolean)
-    );
-    return ids.size > 1;
-  }, [expenses]);
-
   const myMember = useMemo(() => {
     if (!me?._id) return null;
     return members.find((m) => m.userId && String(m.userId) === String(me._id));
   }, [members, me]);
+  const canAdd = can(myMember?.permission, Actions.ADD_EXPENSE);
 
   function openExpense(expenseId) {
     const idx = flatExpenses.findIndex((e) => e._id === expenseId);
@@ -334,6 +335,7 @@ export default function GroupDashboardPage() {
         <GroupBalancePanel
           balance={balance}
           currency={group.currency || "INR"}
+          currentUserId={me?._id}
         />
       ) : (
         <section>
@@ -372,7 +374,11 @@ export default function GroupDashboardPage() {
                       const maxShown = 3;
                       const shownPayers = payers.slice(0, maxShown);
                       const extraPayers = Math.max(0, payers.length - maxShown);
-                      const added = creatorName(expense, members);
+                      const creator = creatorMember(expense, members);
+                      const showCreatorAvatar =
+                        Boolean(creator) &&
+                        me?._id &&
+                        String(creator.userId) !== String(me._id);
                       const share = myShareLine(
                         expense,
                         myMember?._id,
@@ -430,12 +436,23 @@ export default function GroupDashboardPage() {
                                   · {formatRowTime(expense)}
                                 </span>
                               </div>
-                              {showAddedBy && added ? (
-                                <div className="truncate text-[11px] text-muted/80">
-                                  Added by {added}
-                                </div>
-                              ) : null}
                             </div>
+                            {showCreatorAvatar ? (
+                                <UserAvatar
+                                  className="h-7 w-7 ring-2 ring-surface"
+                                  fallbackClassName="text-[10px]"
+                                  name={
+                                    creator.displayName ||
+                                    creator.user?.name ||
+                                    "Member"
+                                  }
+                                  avatar={
+                                    creator.avatar || creator.user?.avatar
+                                  }
+                                  seed={creator.userId || creator._id}
+                                  title={`Added by ${creator.displayName || creator.user?.name || "Member"}`}
+                                />
+                              ) : null}
                             <div className="shrink-0 text-right">
                               <div className="text-sm font-semibold tabular-nums">
                                 {formatMinor(
@@ -477,6 +494,8 @@ export default function GroupDashboardPage() {
 
       <AddRecordModal
         group={group}
+        currentUserId={me?._id}
+        canAdd={canAdd}
         onCreated={reload}
         editExpense={editExpense}
         onEditClose={() => setEditExpense(null)}
@@ -497,6 +516,15 @@ export default function GroupDashboardPage() {
         group={group}
         currentUserId={me?._id}
         onEdit={(expense) => {
+          if (
+            !canMutateCreatedRecord(
+              myMember?.permission,
+              expense.createdById,
+              me?._id,
+            )
+          ) {
+            return;
+          }
           setDetailOpen(false);
           setEditExpense(expense);
         }}
