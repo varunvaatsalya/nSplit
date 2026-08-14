@@ -55,6 +55,8 @@ export const createIncomeSchema = z.object({
 });
 
 export const createTransferSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  icon: z.string().trim().max(64).optional().nullable(),
   fromMemberId: z.string().min(1),
   toMemberId: z.string().min(1),
   amountMinor: z.number().int().positive(),

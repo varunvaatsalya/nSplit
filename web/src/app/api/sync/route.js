@@ -181,7 +181,9 @@ async function applyMutation({ mutation, user, deviceId }) {
             toMemberId: payload.toMemberId,
             amountMinor: payload.amountMinor,
             currency: payload.currency || group.currency,
-            note: payload.note ?? null,
+            title: payload.title ?? null,
+            icon: payload.icon ?? null,
+            note: payload.note ?? payload.title ?? null,
             createdById: user._id,
             clientMutationId: mutation.mutationId,
             transferDate: payload.transferDate
@@ -200,6 +202,7 @@ async function applyMutation({ mutation, user, deviceId }) {
         entityType: "transfer",
         entityId: row._id,
         metadata: {
+          title: row.title,
           amountMinor: row.amountMinor,
           fromMemberId: String(row.fromMemberId),
           toMemberId: String(row.toMemberId),

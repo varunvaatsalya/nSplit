@@ -1030,7 +1030,7 @@ export function ExpenseForm({
                   <div className="min-w-0 flex-1 truncate text-sm font-medium">
                     {memberLabel(m)}
                   </div>
-                  <div className="flex h-7 min-w-[7.5rem] shrink-0 items-center justify-end gap-2">
+                  <div className="flex h-7 min-w-30 shrink-0 items-center justify-end gap-2">
                     {splitMethod === "EXACT" ? (
                       <Input
                         key={`exact-${m._id}-${shakeKey}`}

@@ -59,7 +59,17 @@ const GROUP_ALIASES = [
   },
   {
     emoji: "💸",
-    keywords: ["money", "budget", "expense", "split", "bills"],
+    keywords: [
+      "money",
+      "budget",
+      "expense",
+      "split",
+      "bills",
+      "transfer",
+      "settle",
+      "settlement",
+      "paid",
+    ],
   },
 ];
 

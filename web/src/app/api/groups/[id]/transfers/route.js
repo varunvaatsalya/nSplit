@@ -84,7 +84,9 @@ export async function POST(request, { params }) {
           toMemberId: parsed.data.toMemberId,
           amountMinor: parsed.data.amountMinor,
           currency: parsed.data.currency || group.currency,
-          note: parsed.data.note ?? null,
+          title: parsed.data.title,
+          icon: parsed.data.icon ?? null,
+          note: parsed.data.note ?? parsed.data.title,
           createdById: auth.user._id,
           clientMutationId: parsed.data.clientMutationId ?? undefined,
           transferDate: parsed.data.transferDate
@@ -103,6 +105,7 @@ export async function POST(request, { params }) {
       entityType: "transfer",
       entityId: row._id,
       metadata: {
+        title: row.title,
         amountMinor: row.amountMinor,
         fromMemberId: String(row.fromMemberId),
         toMemberId: String(row.toMemberId),

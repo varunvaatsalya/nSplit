@@ -10,6 +10,8 @@ const TransferSchema = new Schema(
     amountMinor: { type: Number, required: true, min: 1 },
     currency: { type: String, required: true },
     note: { type: String, default: null },
+    title: { type: String, default: null },
+    icon: { type: String, default: null },
     createdById: { type: Schema.Types.ObjectId, ref: "User", required: true },
     clientMutationId: { type: String, unique: true, sparse: true },
     version: { type: Number, default: 1 },
