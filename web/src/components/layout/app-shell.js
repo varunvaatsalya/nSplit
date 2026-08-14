@@ -31,7 +31,7 @@ export function AppShell({ user, children }) {
                 className="h-9 w-9"
                 name={user?.name}
                 avatar={user?.avatar}
-                seed={user?.id}
+                seed={user?._id}
               />
             </Link>
           </div>

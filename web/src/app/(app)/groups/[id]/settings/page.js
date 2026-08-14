@@ -30,9 +30,9 @@ import {
   ManageMembersDialog,
   permissionLabel,
 } from "@/components/groups/manage-members-dialog";
+import { EmojiPicker } from "@/components/emoji-picker";
 import {
   CURRENCIES,
-  GROUP_ICONS,
   getGroupIcon,
 } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
@@ -54,7 +54,7 @@ function methodLabel(value) {
 
 function defaultPartsMap(members, config) {
   const map = {};
-  for (const m of members) map[m.id] = 1;
+  for (const m of members) map[m._id] = 1;
   if (Array.isArray(config)) {
     for (const row of config) {
       if (row?.memberId && map[row.memberId] != null) {
@@ -212,9 +212,9 @@ export default function GroupSettingsPage() {
   }, [method, partsConfig, members.length]);
 
   const myPermission = useMemo(() => {
-    if (!me?.id) return null;
+    if (!me?._id) return null;
     return (
-      members.find((m) => m.userId && String(m.userId) === String(me.id))
+      members.find((m) => m.userId && String(m.userId) === String(me._id))
         ?.permission || null
     );
   }, [members, me]);
@@ -222,14 +222,14 @@ export default function GroupSettingsPage() {
   const canManageMembers = can(myPermission, Actions.MANAGE_MEMBERS);
   const canManageSettings = can(myPermission, Actions.MANAGE_SETTINGS);
   const canDeleteGroup =
-    Boolean(me?.id && group?.createdById) &&
-    String(group.createdById) === String(me.id);
+    Boolean(me?._id && group?.createdById) &&
+    String(group.createdById) === String(me._id);
 
   async function saveDetails() {
     if (!group) return;
     setSavingDetails(true);
     try {
-      const res = await fetch(`/api/groups/${group.id}`, {
+      const res = await fetch(`/api/groups/${group.code}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -269,8 +269,8 @@ export default function GroupSettingsPage() {
           defaultSplitConfig:
             draftMethod === "SHARES"
               ? members.map((m) => ({
-                  memberId: m.id,
-                  value: Number(draftParts[m.id] || 1),
+                  memberId: m._id,
+                  value: Number(draftParts[m._id] || 1),
                 }))
               : null,
         }),
@@ -288,17 +288,17 @@ export default function GroupSettingsPage() {
     }
   }
 
-  async function pickIcon(key) {
+  async function pickIcon(item) {
+    const next = item.emoji;
     const prev = icon;
-    setIcon(key);
-    setIconsOpen(false);
-    if (!group || key === prev) return;
+    setIcon(next);
+    if (!group || next === prev) return;
     setSavingIcon(true);
     try {
-      const res = await fetch(`/api/groups/${group.id}`, {
+      const res = await fetch(`/api/groups/${group.code}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ icon: key }),
+        body: JSON.stringify({ icon: next }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -456,20 +456,20 @@ export default function GroupSettingsPage() {
             {members.map((m) => {
               const label = memberLabel(m);
               const part =
-                partsConfig.find((p) => p.memberId === m.id)?.value || 1;
+                partsConfig.find((p) => p.memberId === m._id)?.value || 1;
               const pct =
                 method === "SHARES"
                   ? Math.round((Number(part) / totalParts) * 100)
                   : Math.round(100 / Math.max(members.length, 1));
               return (
                 <div
-                  key={m.id}
+                  key={m._id}
                   className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
                 >
                   <UserAvatar
                     name={label}
                     avatar={m.avatar || m.user?.avatar}
-                    seed={m.userId || m.id}
+                    seed={m.userId || m._id}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{label}</div>
@@ -518,37 +518,13 @@ export default function GroupSettingsPage() {
         ) : null}
       </div>
 
-      <Dialog open={iconsOpen} onOpenChange={setIconsOpen}>
-        <DialogContent className="flex max-h-[min(85vh,480px)] max-w-md flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 border-b border-border px-4 py-3 pr-10">
-            <DialogTitle>Choose icon</DialogTitle>
-            <DialogDescription>Tap an emoji for this group.</DialogDescription>
-          </DialogHeader>
-          <div className="nsplit-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
-              {GROUP_ICONS.map((item) => {
-                const selected = icon === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    title={item.label}
-                    onClick={() => pickIcon(item.key)}
-                    className={cn(
-                      "flex h-10 w-full items-center justify-center rounded-lg border text-xl transition-colors hover:bg-soft",
-                      selected
-                        ? "border-primary bg-soft"
-                        : "border-border bg-background"
-                    )}
-                  >
-                    {item.emoji}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EmojiPicker
+        open={iconsOpen}
+        onOpenChange={setIconsOpen}
+        value={getGroupIcon(icon).emoji}
+        onSelect={pickIcon}
+        description="Tap an emoji for this group."
+      />
 
       <Dialog open={currencyOpen} onOpenChange={setCurrencyOpen}>
         <DialogContent>
@@ -646,7 +622,7 @@ export default function GroupSettingsPage() {
         onOpenChange={setManageOpen}
         groupId={id}
         members={members}
-        currentUserId={me?.id}
+        currentUserId={me?._id}
         onUpdated={async ({ removedSelf } = {}) => {
           if (removedSelf) {
             router.push("/groups");
@@ -673,17 +649,17 @@ export default function GroupSettingsPage() {
 
 function SharesEditor({ members, draftParts, setDraftParts }) {
   const totalParts =
-    members.reduce((sum, m) => sum + (Number(draftParts[m.id]) || 1), 0) || 1;
+    members.reduce((sum, m) => sum + (Number(draftParts[m._id]) || 1), 0) || 1;
 
   return (
     <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
       {members.map((m) => {
-        const parts = draftParts[m.id] ?? 1;
+        const parts = draftParts[m._id] ?? 1;
         const pct = Math.round((parts / totalParts) * 100);
         const label = memberLabel(m);
         return (
           <li
-            key={m.id}
+            key={m._id}
             className="flex items-center justify-between gap-3 px-3 py-2.5"
           >
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -700,7 +676,7 @@ function SharesEditor({ members, draftParts, setDraftParts }) {
                   onClick={() =>
                     setDraftParts((p) => ({
                       ...p,
-                      [m.id]: Math.max(1, parts - 1),
+                      [m._id]: Math.max(1, parts - 1),
                     }))
                   }
                   className="p-1 text-muted disabled:opacity-40"
@@ -717,7 +693,7 @@ function SharesEditor({ members, draftParts, setDraftParts }) {
                   onClick={() =>
                     setDraftParts((p) => ({
                       ...p,
-                      [m.id]: Math.min(99, parts + 1),
+                      [m._id]: Math.min(99, parts + 1),
                     }))
                   }
                   className="p-1 text-muted disabled:opacity-40"

@@ -1,4 +1,4 @@
-import { connectDb, idOf } from "@/lib/db";
+import { connectDb } from "@/lib/db";
 import { Activity } from "@/models";
 
 export async function recordActivity({
@@ -28,7 +28,7 @@ export async function recordActivity({
 
 export function serializeActivity(row, actor) {
   return {
-    id: idOf(row),
+    _id: String(row._id),
     groupId: String(row.groupId),
     actorId: String(row.actorId),
     action: row.action,
@@ -38,7 +38,7 @@ export function serializeActivity(row, actor) {
     createdAt: row.createdAt,
     actor: actor
       ? {
-          id: idOf(actor),
+          _id: String(actor._id),
           name: actor.name,
           email: actor.email,
           avatar: actor.avatar

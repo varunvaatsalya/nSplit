@@ -23,12 +23,14 @@ export async function GET(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_MEMBERS);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.VIEW_MEMBERS);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   await connectDb();
   const group = await Group.findById(groupId).lean();
@@ -53,12 +55,14 @@ export async function POST(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.MANAGE_MEMBERS);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.MANAGE_MEMBERS);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   let body;
   try {
@@ -123,7 +127,7 @@ export async function POST(request, { params }) {
 
       await recordActivity({
         groupId,
-        actorId: auth.user.id,
+        actorId: auth.user._id,
         action: "MEMBER_ADDED",
         entityType: "member",
         entityId: previous._id,
@@ -149,7 +153,7 @@ export async function POST(request, { params }) {
   if (invite && email) {
     group.invitations.push({
       email,
-      invitedById: auth.user.id,
+      invitedById: auth.user._id,
       recipientId: linkedUser?._id ?? null,
       permission: memberPermission,
       status: "PENDING",
@@ -164,7 +168,7 @@ export async function POST(request, { params }) {
 
   await recordActivity({
     groupId,
-    actorId: auth.user.id,
+    actorId: auth.user._id,
     action: "MEMBER_ADDED",
     entityType: "member",
     entityId: saved._id,

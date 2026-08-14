@@ -28,9 +28,9 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { calculateSplit } from "@/shared/split/index.js";
-import { suggestCategoryFromTitle } from "@/shared/categories/index.js";
+import { EmojiPicker } from "@/components/emoji-picker";
+import { suggestEmojiFromText } from "@/lib/emoji-icons";
 import {
-  EXPENSE_ICON_SECTIONS,
   categoryKeyForEmoji,
   getExpenseEmoji,
 } from "@/lib/expense-icons";
@@ -46,6 +46,7 @@ const EMPTY_FIELD_ERRORS = {
   amount: false,
   title: false,
   paidBy: false,
+  included: false,
   exactIds: [],
   payerIds: [],
 };
@@ -84,8 +85,57 @@ function formatMinor(minor, currency = "INR") {
   return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format((minor || 0) / 100);
+  }).format((Number(minor) || 0) / 100);
+}
+
+function parseMajorToMinor(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.round(n * 100);
+}
+
+function minorToExactInput(minor) {
+  if (!minor || minor <= 0) return "0";
+  return (minor / 100).toString();
+}
+
+function exactMapFromTotal(memberIds, totalMinor) {
+  const dist = distributePayerAmounts(Math.max(0, totalMinor || 0), memberIds);
+  const map = {};
+  for (const id of memberIds) map[id] = minorToExactInput(dist[id] || 0);
+  return map;
+}
+
+function includedFromExactMap(memberIds, exactMap) {
+  return memberIds.filter((id) => parseMajorToMinor(exactMap[id]) > 0);
+}
+
+function waterfallExact(memberIds, editedId, typedMinor, totalMinor, prevInputs) {
+  const idx = memberIds.indexOf(editedId);
+  const next = { ...prevInputs };
+  if (idx < 0) {
+    next[editedId] = minorToExactInput(typedMinor);
+    return next;
+  }
+
+  let before = 0;
+  for (let i = 0; i < idx; i += 1) {
+    before += parseMajorToMinor(next[memberIds[i]]);
+  }
+  const maxThis = Math.max(0, totalMinor - before);
+  const thisMinor = Math.min(Math.max(0, typedMinor), maxThis);
+  next[editedId] = minorToExactInput(thisMinor);
+
+  const remaining = totalMinor - before - thisMinor;
+  const afterIds = memberIds.slice(idx + 1);
+  if (!afterIds.length) return next;
+  const dist = distributePayerAmounts(remaining, afterIds);
+  for (const id of afterIds) {
+    next[id] = minorToExactInput(dist[id] || 0);
+  }
+  return next;
 }
 
 function toLocalDateValue(date) {
@@ -155,7 +205,7 @@ export function ExpenseForm({
   onClose,
   expense = null,
 }) {
-  const isEdit = Boolean(expense?.id);
+  const isEdit = Boolean(expense?._id);
   const members = group?.members || [];
   const currency = group?.currency || "INR";
   const defaultPayer =
@@ -182,6 +232,7 @@ export function ExpenseForm({
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState(EMPTY_FIELD_ERRORS);
   const [shakeKey, setShakeKey] = useState(0);
+  const [amountTouched, setAmountTouched] = useState(false);
 
   const [payersOpen, setPayersOpen] = useState(false);
   const [whenOpen, setWhenOpen] = useState(false);
@@ -193,18 +244,17 @@ export function ExpenseForm({
   const [payerFieldErrors, setPayerFieldErrors] = useState([]);
   const [payerShakeKey, setPayerShakeKey] = useState(0);
 
-  function applyTitleSuggestion(nextTitle, { force = false } = {}) {
-    if (iconManual && !force) return;
-    const suggested = suggestCategoryFromTitle(nextTitle);
-    setCategoryKey(suggested.key);
+  function applyTitleSuggestion(nextTitle) {
+    if (iconManual) return;
+    const suggested = suggestEmojiFromText(nextTitle);
+    setCategoryKey(suggested.categoryKey || "other");
     setIcon(suggested.emoji);
   }
 
-  function pickIcon(emoji, nextCategoryKey) {
-    setIcon(emoji);
-    setCategoryKey(nextCategoryKey || categoryKeyForEmoji(emoji));
+  function pickIcon(item) {
+    setIcon(item.emoji);
+    setCategoryKey(item.categoryKey || categoryKeyForEmoji(item.emoji));
     setIconManual(true);
-    setIconsOpen(false);
   }
 
   function bumpShake() {
@@ -216,13 +266,13 @@ export function ExpenseForm({
   }
 
   function resetForm() {
-    const ids = members.map((m) => m.id);
+    const ids = members.map((m) => m._id);
     setAmount("");
     setTitle("");
     setDescription("");
     setShowDesc(false);
-    const fallback = suggestCategoryFromTitle("");
-    setCategoryKey(fallback.key);
+    const fallback = suggestEmojiFromText("");
+    setCategoryKey(fallback.categoryKey || "other");
     setIcon(fallback.emoji);
     setIconManual(false);
     setExactInputs({});
@@ -231,9 +281,10 @@ export function ExpenseForm({
     setPartInputs(parts);
     setExpenseAt(new Date());
     setIncludedIds(ids);
+    setAmountTouched(false);
     setFieldErrors(EMPTY_FIELD_ERRORS);
     if (defaultPayer) {
-      setPayerIds([defaultPayer.id]);
+      setPayerIds([defaultPayer._id]);
       setPayerAmounts({});
     } else {
       setPayerIds([]);
@@ -242,7 +293,7 @@ export function ExpenseForm({
   }
 
   function hydrateFromExpense(exp) {
-    const memberIds = new Set(members.map((m) => m.id));
+    const memberIds = new Set(members.map((m) => m._id));
     const amountMajor = ((exp.amountMinor || 0) / 100).toString();
     setAmount(amountMajor);
     setTitle(exp.title || "");
@@ -265,10 +316,11 @@ export function ExpenseForm({
       .map((s) => String(s.memberId));
     const nextIncluded = included.length ? included : fallbackIncluded;
     setIncludedIds(
-      nextIncluded.length ? nextIncluded : members.map((m) => m.id),
+      nextIncluded.length ? nextIncluded : members.map((m) => m._id),
     );
 
     const exact = {};
+    for (const m of members) exact[m._id] = "0";
     const { parts: defaultShareParts } = resolveGroupSplitDefaults(
       {
         settings: {
@@ -276,7 +328,7 @@ export function ExpenseForm({
           defaultSplitConfig: group?.settings?.defaultSplitConfig,
         },
       },
-      members.map((m) => m.id),
+      members.map((m) => m._id),
     );
     const parts = { ...defaultShareParts };
     for (const s of exp.splits || []) {
@@ -292,6 +344,9 @@ export function ExpenseForm({
         }
       }
     }
+    for (const m of members) {
+      if (!nextIncluded.includes(m._id)) parts[m._id] = 0;
+    }
     setExactInputs(exact);
     setPartInputs(parts);
 
@@ -304,7 +359,7 @@ export function ExpenseForm({
       for (const p of payers) amounts[String(p.memberId)] = p.amountMinor || 0;
       setPayerAmounts(amounts);
     } else if (defaultPayer) {
-      setPayerIds([defaultPayer.id]);
+      setPayerIds([defaultPayer._id]);
       setPayerAmounts({});
     } else {
       setPayerIds([]);
@@ -313,6 +368,7 @@ export function ExpenseForm({
 
     const when = exp.expenseDate || exp.createdAt;
     setExpenseAt(when ? new Date(when) : new Date());
+    setAmountTouched(true);
     setFieldErrors(EMPTY_FIELD_ERRORS);
   }
 
@@ -326,15 +382,15 @@ export function ExpenseForm({
   useEffect(() => {
     const isActive = embedded ? active : open;
     if (!isActive || !members.length) return;
-    if (expense?.id) hydrateFromExpense(expense);
+    if (expense?._id) hydrateFromExpense(expense);
     else resetForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     embedded,
     active,
     open,
-    group?.id,
-    expense?.id,
+    group?._id,
+    expense?._id,
     defaultSplitMethod,
     defaultSplitConfigKey,
     members.length,
@@ -408,7 +464,7 @@ export function ExpenseForm({
   const payerSummary = useMemo(() => {
     if (!payerIds.length) return "Select payer";
     if (payerIds.length === 1) {
-      const m = members.find((x) => x.id === payerIds[0]);
+      const m = members.find((x) => x._id === payerIds[0]);
       return m ? memberLabel(m) : "1 payer";
     }
     return `${payerIds.length} people paid`;
@@ -416,7 +472,7 @@ export function ExpenseForm({
 
   function openPayersModal() {
     setDraftPayerIds(
-      payerIds.length ? payerIds : defaultPayer ? [defaultPayer.id] : [],
+      payerIds.length ? payerIds : defaultPayer ? [defaultPayer._id] : [],
     );
     setDraftPayerAmounts({ ...resolvedPayerAmounts });
     setPayerFieldErrors([]);
@@ -472,46 +528,114 @@ export function ExpenseForm({
     setWhenOpen(false);
   }
 
+  function applyEqualExact(totalMinor) {
+    const ids = members.map((m) => m._id);
+    if (!ids.length) return;
+    if (!totalMinor || totalMinor <= 0) {
+      const zeros = {};
+      for (const id of ids) zeros[id] = "0";
+      setExactInputs(zeros);
+      setIncludedIds([]);
+      return;
+    }
+    const next = exactMapFromTotal(ids, totalMinor);
+    setExactInputs(next);
+    setIncludedIds(includedFromExactMap(ids, next));
+  }
+
   function toggleIncluded(memberId) {
-    setIncludedIds((prev) => {
-      if (prev.includes(memberId)) {
-        if (prev.length === 1) return prev;
-        return prev.filter((id) => id !== memberId);
+    setFieldErrors((prev) => ({ ...prev, included: false }));
+    const ids = members.map((m) => m._id);
+    const isOn = includedIds.includes(memberId);
+
+    if (splitMethod === "SHARES") {
+      if (isOn) {
+        setPartInputs((p) => ({ ...p, [memberId]: 0 }));
+        setIncludedIds((prev) => prev.filter((id) => id !== memberId));
+      } else {
+        setPartInputs((p) => ({
+          ...p,
+          [memberId]: p[memberId] > 0 ? p[memberId] : 1,
+        }));
+        setIncludedIds((prev) =>
+          prev.includes(memberId) ? prev : [...prev, memberId],
+        );
       }
-      setPartInputs((p) => ({ ...p, [memberId]: p[memberId] || 1 }));
-      return [...prev, memberId];
-    });
+      return;
+    }
+
+    if (splitMethod === "EXACT") {
+      if (isOn) {
+        const next = { ...exactInputs, [memberId]: "0" };
+        const remainingIds = includedIds.filter((id) => id !== memberId);
+        if (amountTouched && amountMinor > 0 && remainingIds.length) {
+          const dist = distributePayerAmounts(amountMinor, remainingIds);
+          for (const id of ids) {
+            next[id] =
+              id === memberId ? "0" : minorToExactInput(dist[id] || 0);
+          }
+        }
+        setExactInputs(next);
+        setIncludedIds(includedFromExactMap(ids, next));
+      } else if (amountTouched && amountMinor > 0) {
+        const othersSum = ids
+          .filter((id) => id !== memberId)
+          .reduce((s, id) => s + parseMajorToMinor(exactInputs[id]), 0);
+        const leftover = Math.max(0, amountMinor - othersSum);
+        let next = { ...exactInputs };
+        if (leftover > 0) {
+          next[memberId] = minorToExactInput(leftover);
+        } else {
+          const nowIds = [...new Set([...includedIds, memberId])];
+          next = exactMapFromTotal(nowIds, amountMinor);
+          for (const id of ids) {
+            if (!nowIds.includes(id)) next[id] = "0";
+          }
+        }
+        setExactInputs(next);
+        setIncludedIds(includedFromExactMap(ids, next));
+      } else {
+        setIncludedIds((prev) =>
+          prev.includes(memberId) ? prev : [...prev, memberId],
+        );
+      }
+      return;
+    }
+
+    setIncludedIds((prev) =>
+      isOn ? prev.filter((id) => id !== memberId) : [...prev, memberId],
+    );
   }
 
   function toggleAllIncluded() {
-    const ids = members.map((m) => m.id);
+    setFieldErrors((prev) => ({ ...prev, included: false }));
+    const ids = members.map((m) => m._id);
     const allOn =
       ids.length > 0 && ids.every((id) => includedIds.includes(id));
     if (allOn) {
       setIncludedIds([]);
+      if (splitMethod === "SHARES") {
+        setPartInputs((prev) => {
+          const next = { ...prev };
+          for (const id of ids) next[id] = 0;
+          return next;
+        });
+      }
+      if (splitMethod === "EXACT") {
+        const zeros = {};
+        for (const id of ids) zeros[id] = "0";
+        setExactInputs(zeros);
+      }
       return;
     }
+
+    if (splitMethod === "EXACT" && amountTouched && amountMinor > 0) {
+      applyEqualExact(amountMinor);
+      return;
+    }
+
     setIncludedIds(ids);
-    setPartInputs((prev) => {
-      const next = { ...prev };
-      for (const id of ids) {
-        if (!next[id]) next[id] = 1;
-      }
-      return next;
-    });
-  }
-
-  function setParts(memberId, next) {
-    const n = Math.max(1, Math.min(99, next));
-    setPartInputs((prev) => ({ ...prev, [memberId]: n }));
-  }
-
-  function onSplitMethodChange(value) {
-    const method = normalizeSplitMethod(value);
-    setSplitMethod(method);
-    setFieldErrors((prev) => ({ ...prev, exactIds: [] }));
-    if (method === "SHARES") {
-      const ids = includedIds.length ? includedIds : members.map((m) => m.id);
+    if (splitMethod === "SHARES") {
       const { parts } = resolveGroupSplitDefaults(
         {
           settings: {
@@ -525,9 +649,86 @@ export function ExpenseForm({
         const next = { ...parts };
         for (const id of ids) {
           if (prev[id] >= 1) next[id] = prev[id];
+          if (!next[id]) next[id] = 1;
         }
         return next;
       });
+    }
+  }
+
+  function setParts(memberId, nextValue) {
+    setFieldErrors((prev) => ({ ...prev, included: false }));
+    const n = Math.max(0, Math.min(99, nextValue));
+    setPartInputs((prev) => ({ ...prev, [memberId]: n }));
+    setIncludedIds((prev) => {
+      if (n <= 0) return prev.filter((id) => id !== memberId);
+      if (prev.includes(memberId)) return prev;
+      return [...prev, memberId];
+    });
+  }
+
+  function onExactAmountChange(memberId, raw) {
+    const ids = members.map((m) => m._id);
+    const typedMinor = parseMajorToMinor(raw);
+
+    if (!amountTouched || !amountMinor) {
+      const next = { ...exactInputs, [memberId]: raw };
+      setExactInputs(next);
+      setIncludedIds(includedFromExactMap(ids, next));
+      const sum = ids.reduce(
+        (s, id) => s + parseMajorToMinor(id === memberId ? raw : next[id]),
+        0,
+      );
+      if (sum > 0) setAmount((sum / 100).toString());
+      return;
+    }
+
+    const next = waterfallExact(
+      ids,
+      memberId,
+      typedMinor,
+      amountMinor,
+      exactInputs,
+    );
+    const maxThis =
+      amountMinor -
+      ids
+        .slice(0, ids.indexOf(memberId))
+        .reduce((s, id) => s + parseMajorToMinor(exactInputs[id]), 0);
+    const clamped = typedMinor > Math.max(0, maxThis);
+    next[memberId] = clamped ? minorToExactInput(Math.max(0, maxThis)) : raw || "0";
+    setExactInputs(next);
+    setIncludedIds(includedFromExactMap(ids, next));
+  }
+
+  function onSplitMethodChange(value) {
+    const method = normalizeSplitMethod(value);
+    setSplitMethod(method);
+    setFieldErrors((prev) => ({ ...prev, exactIds: [], included: false }));
+    const ids = members.map((m) => m._id);
+    if (method === "SHARES") {
+      const activeIds = includedIds.length ? includedIds : ids;
+      const { parts } = resolveGroupSplitDefaults(
+        {
+          settings: {
+            defaultSplitMethod: "SHARES",
+            defaultSplitConfig: group?.settings?.defaultSplitConfig,
+          },
+        },
+        activeIds,
+      );
+      setPartInputs((prev) => {
+        const next = { ...parts };
+        for (const id of ids) {
+          if (!includedIds.includes(id) && includedIds.length) next[id] = 0;
+          else if (prev[id] >= 1) next[id] = prev[id];
+          else if (next[id] == null) next[id] = 1;
+        }
+        return next;
+      });
+    }
+    if (method === "EXACT" && amountMinor > 0) {
+      applyEqualExact(amountMinor);
     }
   }
 
@@ -536,6 +737,7 @@ export function ExpenseForm({
       amount: false,
       title: false,
       paidBy: false,
+      included: false,
       exactIds: [],
       payerIds: [],
     };
@@ -557,6 +759,7 @@ export function ExpenseForm({
       ok = false;
     }
     if (!includedIds.length) {
+      next.included = true;
       ok = false;
     }
     if (splitMethod === "EXACT" && amountMinor > 0 && includedIds.length) {
@@ -596,22 +799,22 @@ export function ExpenseForm({
         expenseDate: expenseAt.toISOString(),
         payers,
         participants: members.map((m) => ({
-          memberId: m.id,
-          included: includedIds.includes(m.id),
-          inputValue: !includedIds.includes(m.id)
+          memberId: m._id,
+          included: includedIds.includes(m._id),
+          inputValue: !includedIds.includes(m._id)
             ? null
             : splitMethod === "EQUAL"
               ? null
               : splitMethod === "SHARES"
-                ? Number(partInputs[m.id] || 1)
-                : Math.round(Number(exactInputs[m.id] || 0) * 100),
+                ? Number(partInputs[m._id] || 1)
+                : Math.round(Number(exactInputs[m._id] || 0) * 100),
         })),
       };
 
       const res = await fetch(
         isEdit
-          ? `/api/groups/${group.id}/expenses/${expense.id}`
-          : `/api/groups/${group.id}/expenses`,
+          ? `/api/groups/${group.code}/expenses/${expense._id}`
+          : `/api/groups/${group.code}/expenses`,
         {
           method: isEdit ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -650,8 +853,16 @@ export function ExpenseForm({
             placeholder="0.00"
             value={amount}
             onChange={(e) => {
-              setAmount(e.target.value);
+              const next = e.target.value;
+              setAmount(next);
+              setAmountTouched(true);
               setFieldErrors((prev) => ({ ...prev, amount: false }));
+              if (splitMethod === "EXACT") {
+                const n = Number(next);
+                const minor =
+                  Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+                applyEqualExact(minor);
+              }
             }}
             className={cn(
               "h-14 border bg-soft text-center text-3xl font-semibold tracking-tight shadow-none focus-visible:ring-1",
@@ -693,7 +904,7 @@ export function ExpenseForm({
             <button
               type="button"
               onClick={() => setShowDesc(true)}
-              className="text-sm text-primary hover:text-primary/80 cursor-pointer"
+              className="text-sm text-primary dark:text-primary-foreground/70 hover:text-primary/80 dark:hover:text-primary-foreground cursor-pointer"
             >
               + Add description
             </button>
@@ -762,13 +973,19 @@ export function ExpenseForm({
           </button>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border bg-background">
+        <div
+          key={`split-${shakeKey}`}
+          className={cn(
+            "overflow-hidden rounded-xl border border-border bg-background",
+            fieldErrors.included && "border-danger animate-nsplit-shake",
+          )}
+        >
           <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border bg-background px-3 py-2">
             <label className="flex items-center gap-2">
               <Checkbox
                 checked={
                   members.length > 0 &&
-                  members.every((m) => includedIds.includes(m.id))
+                  members.every((m) => includedIds.includes(m._id))
                 }
                 onCheckedChange={toggleAllIncluded}
                 aria-label="Select all members"
@@ -800,57 +1017,58 @@ export function ExpenseForm({
 
           <ul className="divide-y divide-border">
             {members.map((m) => {
-              const included = includedIds.includes(m.id);
-              const share = included ? splitByMember[m.id] : 0;
-              const parts = partInputs[m.id] ?? 1;
-              const exactInvalid = fieldErrors.exactIds.includes(m.id);
+              const included = includedIds.includes(m._id);
+              const share = included ? splitByMember[m._id] : 0;
+              const parts = partInputs[m._id] ?? 0;
+              const exactInvalid = fieldErrors.exactIds.includes(m._id);
               return (
-                <li key={m.id} className="flex items-center gap-3 px-3 py-2.5">
+                <li key={m._id} className="flex items-center gap-3 px-3 py-2.5">
                   <Checkbox
                     checked={included}
-                    onCheckedChange={() => toggleIncluded(m.id)}
+                    onCheckedChange={() => toggleIncluded(m._id)}
                   />
                   <div className="min-w-0 flex-1 truncate text-sm font-medium">
                     {memberLabel(m)}
                   </div>
-                  <div>
+                  <div className="flex h-7 min-w-[7.5rem] shrink-0 items-center justify-end gap-2">
                     {splitMethod === "EXACT" ? (
                       <Input
-                        key={`exact-${m.id}-${shakeKey}`}
+                        key={`exact-${m._id}-${shakeKey}`}
                         className={cn(
-                          "w-20 h-7 text-xs text-end",
+                          "h-7 w-20 text-end text-xs",
                           exactInvalid &&
                             "border-danger focus-visible:ring-danger animate-nsplit-shake",
                         )}
                         inputMode="decimal"
-                        placeholder={" 0.00"}
-                        value={exactInputs[m.id] ?? ""}
+                        placeholder="0.00"
+                        value={exactInputs[m._id] ?? "0"}
                         onChange={(e) => {
-                          setExactInputs((prev) => ({
-                            ...prev,
-                            [m.id]: e.target.value,
-                          }));
+                          onExactAmountChange(m._id, e.target.value);
                           setFieldErrors((prev) => ({
                             ...prev,
-                            exactIds: prev.exactIds.filter((id) => id !== m.id),
+                            exactIds: prev.exactIds.filter((id) => id !== m._id),
+                            included: false,
                           }));
                         }}
                       />
                     ) : null}
 
-                    {included && splitMethod === "SHARES" ? (
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium tabular-nums">
-                          {amountMinor && included
-                            ? formatMinor(share ?? 0, currency)
-                            : "0.00"}
+                    {splitMethod === "SHARES" ? (
+                      <>
+                        <div
+                          className={cn(
+                            "text-sm font-medium tabular-nums",
+                            included ? "text-foreground" : "text-muted",
+                          )}
+                        >
+                          {formatMinor(share ?? 0, currency)}
                         </div>
-                        <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-border bg-soft px-1 py-0.5">
+                        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-soft px-1 py-0.5">
                           <button
                             type="button"
                             className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
-                            disabled={parts <= 1}
-                            onClick={() => setParts(m.id, parts - 1)}
+                            disabled={parts <= 0}
+                            onClick={() => setParts(m._id, parts - 1)}
                             aria-label="Decrease parts"
                           >
                             <Minus className="h-3.5 w-3.5" />
@@ -862,25 +1080,23 @@ export function ExpenseForm({
                             type="button"
                             className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
                             disabled={parts >= 99}
-                            onClick={() => setParts(m.id, parts + 1)}
+                            onClick={() => setParts(m._id, parts + 1)}
                             aria-label="Increase parts"
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                      </div>
+                      </>
                     ) : null}
 
                     {splitMethod === "EQUAL" ? (
                       <div
                         className={cn(
-                          "shrink-0 text-sm font-medium tabular-nums",
+                          "text-sm font-medium tabular-nums",
                           included ? "text-foreground" : "text-muted",
                         )}
                       >
-                        {amountMinor && included
-                          ? formatMinor(share ?? 0, currency)
-                          : "0.00"}
+                        {formatMinor(share ?? 0, currency)}
                       </div>
                     ) : null}
                   </div>
@@ -912,23 +1128,23 @@ export function ExpenseForm({
 
           <ul className="nsplit-scroll max-h-72 space-y-1 overflow-y-auto">
             {members.map((m) => {
-              const checked = draftPayerIds.includes(m.id);
-              const amountInvalid = payerFieldErrors.includes(m.id);
+              const checked = draftPayerIds.includes(m._id);
+              const amountInvalid = payerFieldErrors.includes(m._id);
               return (
                 <li
-                  key={m.id}
+                  key={m._id}
                   className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-soft"
                 >
                   <Checkbox
                     checked={checked}
-                    onCheckedChange={() => toggleDraftPayer(m.id)}
+                    onCheckedChange={() => toggleDraftPayer(m._id)}
                   />
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {memberLabel(m)}
                   </span>
                   {checked && draftPayerIds.length > 1 ? (
                     <Input
-                      key={`payer-amt-${m.id}-${payerShakeKey}`}
+                      key={`payer-amt-${m._id}-${payerShakeKey}`}
                       className={cn(
                         "h-8 w-24 text-right text-xs",
                         amountInvalid &&
@@ -936,20 +1152,20 @@ export function ExpenseForm({
                       )}
                       inputMode="decimal"
                       value={
-                        draftPayerAmounts[m.id] != null
-                          ? (draftPayerAmounts[m.id] / 100).toString()
+                        draftPayerAmounts[m._id] != null
+                          ? (draftPayerAmounts[m._id] / 100).toString()
                           : ""
                       }
                       onChange={(e) => {
                         const major = Number(e.target.value);
                         setDraftPayerAmounts((prev) => ({
                           ...prev,
-                          [m.id]: Number.isFinite(major)
+                          [m._id]: Number.isFinite(major)
                             ? Math.round(major * 100)
                             : 0,
                         }));
                         setPayerFieldErrors((prev) =>
-                          prev.filter((id) => id !== m.id),
+                          prev.filter((id) => id !== m._id),
                         );
                       }}
                     />
@@ -978,62 +1194,13 @@ export function ExpenseForm({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={iconsOpen} onOpenChange={setIconsOpen}>
-        <DialogContent className="flex max-h-[min(85vh,560px)] max-w-md flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 border-b border-border px-4 py-3 pr-10">
-            <DialogTitle>Choose icon</DialogTitle>
-            <DialogDescription>
-              Tap an emoji for this expense.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="nsplit-scroll min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-3">
-            {EXPENSE_ICON_SECTIONS.map((section) => (
-              <div key={section.label}>
-                <div className="mb-2 text-xs font-medium text-muted">
-                  {section.label}
-                </div>
-                <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
-                  {section.icons.map((item) => {
-                    const selected = icon === item.emoji;
-                    return (
-                      <button
-                        key={`${section.label}-${item.emoji}-${item.categoryKey || ""}`}
-                        type="button"
-                        title={item.label}
-                        onClick={() => pickIcon(item.emoji, item.categoryKey)}
-                        className={cn(
-                          "flex h-10 w-full items-center justify-center rounded-lg border text-xl transition-colors hover:bg-soft",
-                          selected
-                            ? "border-primary bg-soft"
-                            : "border-border bg-background",
-                        )}
-                      >
-                        {item.emoji}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="shrink-0 border-t border-border p-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setIconManual(false);
-                applyTitleSuggestion(title, { force: true });
-                setIconsOpen(false);
-              }}
-            >
-              Auto from title
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EmojiPicker
+        open={iconsOpen}
+        onOpenChange={setIconsOpen}
+        value={icon}
+        onSelect={pickIcon}
+        description="Tap an emoji for this expense."
+      />
 
       <Dialog open={whenOpen} onOpenChange={setWhenOpen}>
         <DialogContent>

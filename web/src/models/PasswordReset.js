@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { applyIdTransform } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -12,8 +11,6 @@ const PasswordResetSchema = new Schema(
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
-
-applyIdTransform(PasswordResetSchema);
 
 export const PasswordReset =
   models.PasswordReset || model("PasswordReset", PasswordResetSchema);

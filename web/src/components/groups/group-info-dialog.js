@@ -101,16 +101,16 @@ export function GroupInfoDialog({ group, open, onOpenChange }) {
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
               {members.map((m) => {
                 const label = memberLabel(m);
-                const part = partsConfig.find((p) => p.memberId === m.id);
+                const part = partsConfig.find((p) => p.memberId === m._id);
                 return (
                   <li
-                    key={m.id}
+                    key={m._id}
                     className="flex items-center gap-3 bg-surface px-3 py-2.5"
                   >
                     <UserAvatar
                       name={label}
                       avatar={m.avatar || m.user?.avatar}
-                      seed={m.userId || m.id}
+                      seed={m.userId || m._id}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{label}</div>

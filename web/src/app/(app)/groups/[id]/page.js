@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, History, Settings } from "lucide-react";
 import { format, isValid } from "date-fns";
 import { AddRecordModal } from "@/components/records/add-record-modal";
@@ -64,7 +64,7 @@ function payerLabel(expense, members) {
   const payers = expense.payers || [];
   if (!payers.length) return "Unknown";
   if (payers.length === 1) {
-    const m = members.find((x) => x.id === payers[0].memberId);
+    const m = members.find((x) => x._id === payers[0].memberId);
     return m?.displayName || m?.user?.name || "Someone";
   }
   return null;
@@ -72,7 +72,7 @@ function payerLabel(expense, members) {
 
 function payerMembers(expense, members) {
   return (expense.payers || [])
-    .map((p) => members.find((m) => m.id === p.memberId))
+    .map((p) => members.find((m) => m._id === p.memberId))
     .filter(Boolean);
 }
 
@@ -132,6 +132,8 @@ function myShareLine(expense, myMemberId, currency) {
   return { text: "Settled for you", tone: "muted" };
 }
 
+const PAGE_SIZE = 20;
+
 export default function GroupDashboardPage() {
   const { id } = useParams();
   const [group, setGroup] = useState(null);
@@ -144,18 +146,23 @@ export default function GroupDashboardPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
   const [editExpense, setEditExpense] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [expensesReady, setExpensesReady] = useState(false);
+  const cursorRef = useRef(null);
+  const hasMoreRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const sentinelRef = useRef(null);
 
-  async function load() {
-    const [gRes, bRes, eRes, meRes] = await Promise.all([
+  async function loadMeta() {
+    const [gRes, bRes, meRes] = await Promise.all([
       fetch(`/api/groups/${id}`),
       fetch(`/api/groups/${id}/balance`),
-      fetch(`/api/groups/${id}/expenses`),
       fetch("/api/auth/me"),
     ]);
-    const [gJson, bJson, eJson, meJson] = await Promise.all([
+    const [gJson, bJson, meJson] = await Promise.all([
       gRes.json(),
       bRes.json(),
-      eRes.json(),
       meRes.json(),
     ]);
     if (!gRes.ok) {
@@ -165,14 +172,59 @@ export default function GroupDashboardPage() {
     setError("");
     setGroup(gJson.data.group);
     if (bRes.ok) setBalance(bJson.data);
-    if (eRes.ok) setExpenses(eJson.data.expenses || []);
     if (meRes.ok) setMe(meJson.data.user);
   }
 
+  async function loadExpensePage({ reset = false } = {}) {
+    if (!reset && (loadingMoreRef.current || !hasMoreRef.current)) return;
+    loadingMoreRef.current = true;
+    if (reset) {
+      cursorRef.current = null;
+      setExpensesReady(false);
+    } else {
+      setLoadingMore(true);
+    }
+    try {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+      if (!reset && cursorRef.current) params.set("cursor", cursorRef.current);
+      const res = await fetch(`/api/groups/${id}/expenses?${params}`);
+      const json = await res.json();
+      if (!res.ok) return;
+      const page = json.data.expenses || [];
+      setExpenses((prev) => (reset ? page : [...prev, ...page]));
+      cursorRef.current = json.data.nextCursor || null;
+      hasMoreRef.current = Boolean(json.data.hasMore);
+      setHasMore(hasMoreRef.current);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+      if (reset) setExpensesReady(true);
+    }
+  }
+
+  async function reload() {
+    await Promise.all([loadMeta(), loadExpensePage({ reset: true })]);
+  }
+
   useEffect(() => {
-    load();
+    reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    if (view !== "expenses" || !hasMore) return;
+    const node = sentinelRef.current;
+    if (!node) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadExpensePage();
+      },
+      { rootMargin: "240px" }
+    );
+    obs.observe(node);
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, hasMore, id, expenses.length]);
 
   const flatExpenses = useMemo(() => {
     const sections = groupExpensesByDate(expenses);
@@ -191,12 +243,12 @@ export default function GroupDashboardPage() {
   }, [expenses]);
 
   const myMember = useMemo(() => {
-    if (!me?.id) return null;
-    return members.find((m) => m.userId && String(m.userId) === String(me.id));
+    if (!me?._id) return null;
+    return members.find((m) => m.userId && String(m.userId) === String(me._id));
   }, [members, me]);
 
   function openExpense(expenseId) {
-    const idx = flatExpenses.findIndex((e) => e.id === expenseId);
+    const idx = flatExpenses.findIndex((e) => e._id === expenseId);
     if (idx < 0) return;
     setDetailIndex(idx);
     setDetailOpen(true);
@@ -285,7 +337,22 @@ export default function GroupDashboardPage() {
         />
       ) : (
         <section>
-          {grouped.length === 0 ? (
+          {!expensesReady ? (
+            <ul className="space-y-2.5" aria-busy="true" aria-label="Loading expenses">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3"
+                >
+                  <span className="h-11 w-11 shrink-0 animate-pulse rounded-xl bg-muted-foreground/15" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <span className="block h-4 w-40 animate-pulse rounded-md bg-muted-foreground/15" />
+                    <span className="block h-3 w-24 animate-pulse rounded-md bg-muted-foreground/10" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : grouped.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-border bg-surface px-4 py-12 text-center text-sm text-muted">
               Tap + to add an expense or transfer.
             </p>
@@ -308,14 +375,14 @@ export default function GroupDashboardPage() {
                       const added = creatorName(expense, members);
                       const share = myShareLine(
                         expense,
-                        myMember?.id,
+                        myMember?._id,
                         expense.currency || group.currency
                       );
                       return (
-                        <li key={expense.id}>
+                        <li key={expense._id}>
                           <button
                             type="button"
-                            onClick={() => openExpense(expense.id)}
+                            onClick={() => openExpense(expense._id)}
                             className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface px-3.5 py-3 text-left transition-colors cursor-pointer hover:border-primary/25 hover:bg-primary-foreground/50 dark:hover:bg-primary/10"
                           >
                             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted-foreground/10 text-lg">
@@ -339,13 +406,12 @@ export default function GroupDashboardPage() {
                                         "Member";
                                       return (
                                         <UserAvatar
-                                          key={m.id}
+                                          key={m._id}
                                           className="h-5 w-5 ring-transparent"
                                           fallbackClassName="text-[8px]"
                                           name={label}
                                           avatar={m.avatar || m.user?.avatar}
-                                          seed={m.userId || m.id}
-
+                                          seed={m.userId || m._id}
                                         />
                                       );
                                     })}
@@ -398,6 +464,12 @@ export default function GroupDashboardPage() {
                   </ul>
                 </div>
               ))}
+              <div ref={sentinelRef} className="h-8" />
+              {loadingMore ? (
+                <p className="pb-2 text-center text-xs text-muted">
+                  Loading more…
+                </p>
+              ) : null}
             </div>
           )}
         </section>
@@ -405,13 +477,13 @@ export default function GroupDashboardPage() {
 
       <AddRecordModal
         group={group}
-        onCreated={load}
+        onCreated={reload}
         editExpense={editExpense}
         onEditClose={() => setEditExpense(null)}
       />
 
       <GroupActivityDialog
-        groupId={group.id}
+        groupId={id}
         open={activityOpen}
         onOpenChange={setActivityOpen}
       />
@@ -423,7 +495,7 @@ export default function GroupDashboardPage() {
         index={detailIndex}
         onIndexChange={setDetailIndex}
         group={group}
-        currentUserId={me?.id}
+        currentUserId={me?._id}
         onEdit={(expense) => {
           setDetailOpen(false);
           setEditExpense(expense);
@@ -435,7 +507,7 @@ export default function GroupDashboardPage() {
           } else if (detailIndex >= remaining) {
             setDetailIndex(remaining - 1);
           }
-          load();
+          reload();
         }}
       />
     </div>

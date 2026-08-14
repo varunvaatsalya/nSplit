@@ -61,7 +61,7 @@ export function GroupActivityDialog({ groupId, open, onOpenChange }) {
             <ul className="space-y-2">
               {activities.map((a) => (
                 <li
-                  key={a.id}
+                  key={a._id}
                   className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
                 >
                   <span className="font-medium">{a.actor?.name}</span>{" "}

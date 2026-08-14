@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { connectDb, idOf } from "@/lib/db";
+import { connectDb } from "@/lib/db";
 import { User } from "@/models";
 import { created, fail, zodError } from "@/lib/api-response";
 import { hashPassword } from "@/lib/auth/password";
@@ -44,7 +44,7 @@ export async function POST(request) {
   await setSessionCookie(token, expiresAt);
 
   return created({
-    user: publicUser({ ...user.toObject(), _id: user._id }),
+    user: publicUser(user),
     token,
     expiresAt,
   });

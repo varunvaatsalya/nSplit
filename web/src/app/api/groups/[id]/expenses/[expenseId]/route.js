@@ -13,12 +13,14 @@ export async function GET(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId, expenseId } = await params;
+  const { id: code, expenseId } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_EXPENSES);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.VIEW_EXPENSES);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   await connectDb();
   const expense = await Expense.findOne({
@@ -34,12 +36,14 @@ export async function PATCH(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId, expenseId } = await params;
+  const { id: code, expenseId } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.EDIT_EXPENSE);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.EDIT_EXPENSE);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   let body;
   try {
@@ -141,7 +145,7 @@ export async function PATCH(request, { params }) {
       await recordActivity({
         session,
         groupId,
-        actorId: auth.user.id,
+        actorId: auth.user._id,
         action: "EXPENSE_UPDATED",
         entityType: "expense",
         entityId: expenseId,
@@ -161,12 +165,14 @@ export async function DELETE(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId, expenseId } = await params;
+  const { id: code, expenseId } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.DELETE_EXPENSE);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.DELETE_EXPENSE);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   await connectDb();
   const existing = await Expense.findOne({
@@ -186,7 +192,7 @@ export async function DELETE(_request, { params }) {
     await recordActivity({
       session,
       groupId,
-      actorId: auth.user.id,
+      actorId: auth.user._id,
       action: "EXPENSE_DELETED",
       entityType: "expense",
       entityId: expenseId,

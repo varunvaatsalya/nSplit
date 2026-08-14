@@ -22,12 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  CURRENCIES,
-  GROUP_ICONS,
-  getGroupIcon,
-  suggestGroupIconFromName,
-} from "@/lib/group-options";
+import { EmojiPicker } from "@/components/emoji-picker";
+import { DEFAULT_GROUP_EMOJI, suggestEmojiFromText } from "@/lib/emoji-icons";
+import { CURRENCIES, getGroupIcon } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
 
 function GroupsListSkeleton() {
@@ -64,7 +61,7 @@ function contactMatchesRow(member, contact) {
 
 function isContactTaken(members, contact, exceptIndex) {
   return members.some(
-    (m, i) => i !== exceptIndex && contactMatchesRow(m, contact)
+    (m, i) => i !== exceptIndex && contactMatchesRow(m, contact),
   );
 }
 
@@ -84,91 +81,11 @@ function filterContactSuggestions(contacts, members, index, query) {
     .slice(0, 6);
 }
 
-function MemberSuggestField({
-  value,
-  onChange,
-  onPick,
-  suggestions,
-  open,
-  onOpenChange,
-  placeholder,
-  type = "text",
-  className,
-  inputMode,
-}) {
-  const blurTimer = useRef(null);
-  const show = open && suggestions.length > 0;
-
-  useEffect(() => {
-    return () => {
-      if (blurTimer.current) clearTimeout(blurTimer.current);
-    };
-  }, []);
-
-  return (
-    <div className={cn("relative min-w-0", className)}>
-      <Input
-        type={type}
-        inputMode={inputMode}
-        value={value}
-        placeholder={placeholder}
-        autoComplete="off"
-        onChange={(e) => {
-          onChange(e.target.value);
-          onOpenChange(true);
-        }}
-        onFocus={() => onOpenChange(true)}
-        onBlur={() => {
-          blurTimer.current = setTimeout(() => onOpenChange(false), 120);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onOpenChange(false);
-        }}
-      />
-      {show ? (
-        <ul className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
-          {suggestions.map((contact) => (
-            <li key={contact.id}>
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm hover:bg-soft"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onPick(contact);
-                  onOpenChange(false);
-                }}
-              >
-                <UserAvatar
-                  className="h-7 w-7"
-                  fallbackClassName="text-[10px]"
-                  name={contact.name}
-                  avatar={contact.avatar}
-                  seed={contact.userId || contact.email || contact.name}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">
-                    {contact.name}
-                  </span>
-                  {contact.email ? (
-                    <span className="block truncate text-xs text-muted">
-                      {contact.email}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [name, setName] = useState("");
-  const [icon, setIcon] = useState("users");
+  const [icon, setIcon] = useState(DEFAULT_GROUP_EMOJI);
   const [iconManual, setIconManual] = useState(false);
   const [iconsOpen, setIconsOpen] = useState(false);
   const [currency, setCurrency] = useState("INR");
@@ -198,20 +115,21 @@ export default function GroupsPage() {
     loadContacts();
   }, []);
 
-  function applyNameSuggestion(nextName, { force = false } = {}) {
-    if (iconManual && !force) return;
-    setIcon(suggestGroupIconFromName(nextName).key);
+  function applyNameSuggestion(nextName) {
+    if (iconManual) return;
+    setIcon(
+      suggestEmojiFromText(nextName, { emoji: DEFAULT_GROUP_EMOJI }).emoji,
+    );
   }
 
-  function pickIcon(key) {
-    setIcon(key);
+  function pickIcon(item) {
+    setIcon(item.emoji);
     setIconManual(true);
-    setIconsOpen(false);
   }
 
   function updateMember(index, patch) {
     setMembers((prev) =>
-      prev.map((m, i) => (i === index ? { ...m, ...patch } : m))
+      prev.map((m, i) => (i === index ? { ...m, ...patch } : m)),
     );
   }
 
@@ -239,7 +157,7 @@ export default function GroupsPage() {
 
   function resetForm() {
     setName("");
-    setIcon("users");
+    setIcon(DEFAULT_GROUP_EMOJI);
     setIconManual(false);
     setIconsOpen(false);
     setCurrency("INR");
@@ -297,7 +215,11 @@ export default function GroupsPage() {
             Manage your shared expenses and collaborative budgets.
           </p>
         </div>
-        <Button type="button" onClick={() => setShowForm(true)}>
+        <Button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className={"cursor-pointer"}
+        >
           <Plus className="h-4 w-4" />
           New group
         </Button>
@@ -359,10 +281,8 @@ export default function GroupsPage() {
                 <span className="text-sm font-medium">Members</span>
                 <button
                   type="button"
-                  onClick={() =>
-                    setMembers((prev) => [...prev, emptyMember()])
-                  }
-                  className="text-sm text-primary hover:text-primary/80 cursor-pointer"
+                  onClick={() => setMembers((prev) => [...prev, emptyMember()])}
+                  className="text-sm text-primary dark:text-primary-foreground hover:text-primary/80 cursor-pointer"
                 >
                   + Add
                 </button>
@@ -452,55 +372,13 @@ export default function GroupsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={iconsOpen} onOpenChange={setIconsOpen}>
-        <DialogContent className="flex max-h-[min(85vh,480px)] max-w-md flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="shrink-0 border-b border-border px-4 py-3 pr-10">
-            <DialogTitle>Choose icon</DialogTitle>
-            <DialogDescription>
-              Tap an emoji for this group.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="nsplit-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-            <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
-              {GROUP_ICONS.map((item) => {
-                const selected = icon === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    title={item.label}
-                    onClick={() => pickIcon(item.key)}
-                    className={cn(
-                      "flex h-10 w-full items-center justify-center rounded-lg border text-xl transition-colors hover:bg-soft",
-                      selected
-                        ? "border-primary bg-soft"
-                        : "border-border bg-background"
-                    )}
-                  >
-                    {item.emoji}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="shrink-0 border-t border-border p-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setIconManual(false);
-                applyNameSuggestion(name, { force: true });
-                setIconsOpen(false);
-              }}
-            >
-              Auto from name
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EmojiPicker
+        open={iconsOpen}
+        onOpenChange={setIconsOpen}
+        value={getGroupIcon(icon).emoji}
+        onSelect={pickIcon}
+        description="Tap an emoji for this group."
+      />
 
       {loading ? (
         <GroupsListSkeleton />
@@ -521,9 +399,9 @@ export default function GroupsPage() {
           {groups.map((g) => {
             const iconMeta = getGroupIcon(g.icon);
             return (
-              <li key={g.id}>
+              <li key={g._id}>
                 <Link
-                  href={`/groups/${g.id}`}
+                  href={`/groups/${g.code}`}
                   className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-4 transition-colors hover:border-primary/30 hover:bg-soft/40"
                 >
                   <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-soft text-xl">
@@ -544,6 +422,86 @@ export default function GroupsPage() {
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+function MemberSuggestField({
+  value,
+  onChange,
+  onPick,
+  suggestions,
+  open,
+  onOpenChange,
+  placeholder,
+  type = "text",
+  className,
+  inputMode,
+}) {
+  const blurTimer = useRef(null);
+  const show = open && suggestions.length > 0;
+
+  useEffect(() => {
+    return () => {
+      if (blurTimer.current) clearTimeout(blurTimer.current);
+    };
+  }, []);
+
+  return (
+    <div className={cn("relative min-w-0", className)}>
+      <Input
+        type={type}
+        inputMode={inputMode}
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        onChange={(e) => {
+          onChange(e.target.value);
+          onOpenChange(true);
+        }}
+        onFocus={() => onOpenChange(true)}
+        onBlur={() => {
+          blurTimer.current = setTimeout(() => onOpenChange(false), 120);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onOpenChange(false);
+        }}
+      />
+      {show ? (
+        <ul className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
+          {suggestions.map((contact) => (
+            <li key={contact.id}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm hover:bg-soft"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPick(contact);
+                  onOpenChange(false);
+                }}
+              >
+                <UserAvatar
+                  className="h-7 w-7"
+                  fallbackClassName="text-[10px]"
+                  name={contact.name}
+                  avatar={contact.avatar}
+                  seed={contact.userId || contact.email || contact.name}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">
+                    {contact.name}
+                  </span>
+                  {contact.email ? (
+                    <span className="block truncate text-xs text-muted">
+                      {contact.email}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { connectDb, idOf, toJSON, withTransaction } from "@/lib/db";
+import { connectDb, toJSON, withTransaction } from "@/lib/db";
 import {
   Group,
   Notification,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/avatar-assign";
 import { createGroupSchema } from "@/lib/validations/groups";
 import { generateToken, hashToken } from "@/lib/auth/tokens";
+import { createGroupCode } from "@/lib/group-id";
 
 export async function GET() {
   const auth = await requireAuth();
@@ -22,7 +23,7 @@ export async function GET() {
 
   await connectDb();
   const groups = await Group.find({
-    members: { $elemMatch: { userId: auth.user.id, leftAt: null } },
+    members: { $elemMatch: { userId: auth.user._id, leftAt: null } },
   })
     .sort({ updatedAt: -1 })
     .lean();
@@ -30,15 +31,19 @@ export async function GET() {
   return ok({
     groups: groups.map((g) => {
       const mine = activeMembers(g).find(
-        (m) => m.userId && String(m.userId) === String(auth.user.id)
+        (m) => m.userId && String(m.userId) === String(auth.user._id)
       );
       return {
         ...toJSON(g),
         memberCount: activeMembers(g).length,
         myPermission: mine?.permission || null,
-        myMembershipId: mine ? idOf(mine) : null,
+        myMembershipId: mine ? String(mine._id) : null,
         members: undefined,
         invitations: undefined,
+        settings: undefined,
+        createdById: undefined,
+        createdAt: undefined,
+        updatedAt: undefined,
       };
     }),
   });
@@ -79,7 +84,7 @@ export async function POST(request) {
   const result = await withTransaction(async (session) => {
     const opts = session ? { session } : {};
 
-    const creator = await User.findById(auth.user.id)
+    const creator = await User.findById(auth.user._id)
       .session(session || null)
       .lean();
     if (creator) await ensureUserAvatar(creator);
@@ -95,7 +100,7 @@ export async function POST(request) {
 
     const embeddedMembers = [
       {
-        userId: auth.user.id,
+        userId: auth.user._id,
         email: auth.user.email,
         permission: "ADMIN",
         displayName: auth.user.name,
@@ -113,7 +118,7 @@ export async function POST(request) {
         linkedUser = await User.findOne({ email })
           .session(session || null)
           .lean();
-        if (linkedUser && String(linkedUser._id) === String(auth.user.id)) {
+        if (linkedUser && String(linkedUser._id) === String(auth.user._id)) {
           continue;
         }
         if (linkedUser) await ensureUserAvatar(linkedUser);
@@ -137,7 +142,7 @@ export async function POST(request) {
       if (member.invite && email) {
         invitations.push({
           email,
-          invitedById: auth.user.id,
+          invitedById: auth.user._id,
           recipientId: linkedUser?._id ?? null,
           permission,
           status: "PENDING",
@@ -149,25 +154,35 @@ export async function POST(request) {
       }
     }
 
-    const [createdGroup] = await Group.create(
-      [
-        {
-          name,
-          description: description ?? null,
-          icon: icon || "users",
-          imageUrl: imageUrl ?? null,
-          currency: currency || "INR",
-          createdById: auth.user.id,
-          settings: {
-            defaultSplitMethod: defaultSplitMethod || "EQUAL",
-            defaultSplitConfig: defaultSplitConfig ?? null,
-          },
-          members: embeddedMembers,
-          invitations: invitations.map(({ _notifyUserId, ...inv }) => inv),
-        },
-      ],
-      opts
-    );
+    let createdGroup;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try {
+        [createdGroup] = await Group.create(
+          [
+            {
+              code: createGroupCode(),
+              name,
+              description: description ?? null,
+              icon: icon || "users",
+              imageUrl: imageUrl ?? null,
+              currency: currency || "INR",
+              createdById: auth.user._id,
+              settings: {
+                defaultSplitMethod: defaultSplitMethod || "EQUAL",
+                defaultSplitConfig: defaultSplitConfig ?? null,
+              },
+              members: embeddedMembers,
+              invitations: invitations.map(({ _notifyUserId, ...inv }) => inv),
+            },
+          ],
+          opts
+        );
+        break;
+      } catch (e) {
+        if (e?.code === 11000 && attempt < 7) continue;
+        throw e;
+      }
+    }
 
     for (const inv of invitations) {
       if (inv._notifyUserId) {
@@ -178,7 +193,7 @@ export async function POST(request) {
               type: "INVITATION",
               title: "Group invitation",
               body: `${auth.user.name} invited you to “${name}”`,
-              data: { groupId: String(createdGroup._id) },
+              data: { groupId: String(createdGroup._id), code: createdGroup.code },
             },
           ],
           opts
@@ -189,7 +204,7 @@ export async function POST(request) {
     await recordActivity({
       session,
       groupId: createdGroup._id,
-      actorId: auth.user.id,
+      actorId: auth.user._id,
       action: "GROUP_CREATED",
       entityType: "group",
       entityId: createdGroup._id,

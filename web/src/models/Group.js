@@ -3,8 +3,8 @@ import {
   InvitationStatus,
   MemberPermission,
   SplitMethod,
-  applyIdTransform,
 } from "./_utils.js";
+import { createGroupCode } from "@/lib/group-id.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -46,6 +46,13 @@ const GroupInvitationEmbedded = new Schema(
 
 const GroupSchema = new Schema(
   {
+    code: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      default: createGroupCode,
+    },
     name: { type: String, required: true, trim: true },
     description: { type: String, default: null },
     icon: { type: String, default: "users" },
@@ -72,13 +79,15 @@ const GroupSchema = new Schema(
 GroupSchema.index({ "members.userId": 1 });
 GroupSchema.index({ "members.email": 1 });
 
-applyIdTransform(GroupSchema);
-
 if (models.Group) {
   delete models.Group;
 }
 
 export const Group = model("Group", GroupSchema);
+
+export function findGroupByCode(code) {
+  return Group.findOne({ code });
+}
 
 /** Active (non-left) members */
 export function activeMembers(group) {
@@ -121,7 +130,7 @@ export function serializeMember(m, user = null) {
           };
 
   return {
-    id: String(m._id || m.id),
+    _id: String(m._id),
     userId: m.userId ? String(m.userId) : null,
     email: m.email || null,
     displayName: m.displayName,
@@ -131,7 +140,7 @@ export function serializeMember(m, user = null) {
     leftAt: m.leftAt || null,
     user: user
       ? {
-          id: String(user._id || user.id),
+          _id: String(user._id),
           name: user.name,
           email: user.email,
           avatar: {

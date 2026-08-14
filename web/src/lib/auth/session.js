@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { connectDb, idOf } from "@/lib/db";
+import { connectDb } from "@/lib/db";
 import { Session, User } from "@/models";
 import { ensureUserAvatar } from "@/lib/avatar-assign";
 import { publicAvatar } from "@/lib/avatar";
@@ -62,7 +62,12 @@ export async function getSessionUser() {
 
   return {
     user: publicUser(user),
-    session: { ...session, id: idOf(session) },
+    session: {
+      _id: String(session._id),
+      userId: String(session.userId),
+      deviceId: session.deviceId,
+      expiresAt: session.expiresAt,
+    },
     token,
   };
 }
@@ -94,7 +99,7 @@ export async function clearSessionCookie() {
 export function publicUser(user) {
   if (!user) return null;
   return {
-    id: idOf(user),
+    _id: String(user._id),
     email: user.email,
     name: user.name,
     avatar: publicAvatar(user.avatar, user.name),

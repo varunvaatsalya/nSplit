@@ -20,12 +20,14 @@ export async function GET(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_EXPENSES);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.VIEW_EXPENSES);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   await connectDb();
   const transfers = await Transfer.find({ groupId, deletedAt: null })
@@ -38,12 +40,14 @@ export async function POST(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.ADD_TRANSFER);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.ADD_TRANSFER);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   let body;
   try {
@@ -81,7 +85,7 @@ export async function POST(request, { params }) {
           amountMinor: parsed.data.amountMinor,
           currency: parsed.data.currency || group.currency,
           note: parsed.data.note ?? null,
-          createdById: auth.user.id,
+          createdById: auth.user._id,
           clientMutationId: parsed.data.clientMutationId ?? undefined,
           transferDate: parsed.data.transferDate
             ? new Date(parsed.data.transferDate)
@@ -94,7 +98,7 @@ export async function POST(request, { params }) {
     await recordActivity({
       session,
       groupId,
-      actorId: auth.user.id,
+      actorId: auth.user._id,
       action: "TRANSFER_CREATED",
       entityType: "transfer",
       entityId: row._id,
@@ -110,7 +114,7 @@ export async function POST(request, { params }) {
         [
           {
             mutationId: parsed.data.clientMutationId,
-            userId: auth.user.id,
+            userId: auth.user._id,
             type: "transfer.create",
             entity: "transfer",
             entityId: String(row._id),

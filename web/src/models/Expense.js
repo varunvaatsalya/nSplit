@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { SplitMethod, applyIdTransform } from "./_utils.js";
+import { SplitMethod } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -63,6 +63,9 @@ const ExpenseSchema = new Schema(
 );
 
 ExpenseSchema.index({ groupId: 1, deletedAt: 1, expenseDate: -1 });
-applyIdTransform(ExpenseSchema);
 
-export const Expense = models.Expense || model("Expense", ExpenseSchema);
+if (models.Expense) {
+  delete models.Expense;
+}
+
+export const Expense = model("Expense", ExpenseSchema);

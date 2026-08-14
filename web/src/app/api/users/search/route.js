@@ -1,4 +1,4 @@
-import { connectDb, idOf } from "@/lib/db";
+import { connectDb } from "@/lib/db";
 import { User } from "@/models";
 import { fail, ok } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
@@ -20,7 +20,7 @@ export async function GET(request) {
   return ok({
     user: user
       ? {
-          id: idOf(user),
+          _id: String(user._id),
           name: user.name,
           email: user.email,
           avatar: publicAvatar(coerceAvatar(user, user.name), user.name),

@@ -1,17 +1,18 @@
-import { connectDb, idOf } from "@/lib/db";
+import { connectDb } from "@/lib/db";
 import { Group, findActiveMemberByUserId } from "@/models";
 import { can, assertCan } from "@/shared/permissions/index.js";
 
-export async function getActiveMembership(userId, groupId) {
+export async function getActiveMembership(userId, groupCode) {
   await connectDb();
-  const group = await Group.findById(groupId).lean();
+  const group = await Group.findOne({ code: groupCode }).lean();
   if (!group) return null;
   const membership = findActiveMemberByUserId(group, userId);
   if (!membership) return null;
   return {
     ...membership,
-    id: idOf(membership),
+    _id: String(membership._id),
     groupId: String(group._id),
+    code: group.code,
   };
 }
 

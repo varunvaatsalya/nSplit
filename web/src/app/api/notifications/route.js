@@ -8,7 +8,7 @@ export async function GET() {
   if (auth.error) return auth.error;
 
   await connectDb();
-  const notifications = await Notification.find({ userId: auth.user.id })
+  const notifications = await Notification.find({ userId: auth.user._id })
     .sort({ createdAt: -1 })
     .limit(100)
     .lean();

@@ -16,7 +16,7 @@ export default async function ProfilePage() {
             fallbackClassName="text-base"
             name={session.user.name}
             avatar={session.user.avatar}
-            seed={session.user.id}
+            seed={session.user._id}
           />
           <div className="min-w-0">
             <div className="truncate font-medium">{session.user.name}</div>

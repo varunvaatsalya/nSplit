@@ -14,12 +14,12 @@ export async function GET() {
 
   await connectDb();
   const groups = await Group.find({
-    members: { $elemMatch: { userId: auth.user.id, leftAt: null } },
+    members: { $elemMatch: { userId: auth.user._id, leftAt: null } },
   })
     .select("members")
     .lean();
 
-  const meId = String(auth.user.id);
+  const meId = String(auth.user._id);
   const meEmail = String(auth.user.email || "")
     .trim()
     .toLowerCase();

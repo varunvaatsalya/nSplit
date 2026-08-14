@@ -255,7 +255,7 @@ export function GroupBalancePanel({ balance, currency = "INR" }) {
                     (Math.abs(m.netMinor) / maxAbsNet) * 100
                   );
                   return (
-                    <div key={m.id} className="space-y-1.5">
+                    <div key={m._id} className="space-y-1.5">
                       <div className="flex items-center justify-between gap-2 text-sm">
                         <span className="truncate font-medium">
                           {m.displayName}
@@ -339,7 +339,7 @@ export function GroupBalancePanel({ balance, currency = "INR" }) {
 
           <div className="space-y-2">
             {members.map((m) => (
-              <Card key={m.id}>
+              <Card key={m._id}>
                 <CardContent className="grid grid-cols-2 gap-2 py-3 text-xs sm:grid-cols-4">
                   <div>
                     <div className="text-muted">Paid</div>

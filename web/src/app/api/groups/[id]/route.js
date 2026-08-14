@@ -1,8 +1,9 @@
-import { connectDb, idOf, toJSON, withTransaction } from "@/lib/db";
+import { connectDb, toJSON, withTransaction } from "@/lib/db";
 import {
   Group,
   User,
   activeMembers,
+  findGroupByCode,
   serializeMember,
 } from "@/models";
 import { fail, ok, zodError } from "@/lib/api-response";
@@ -13,8 +14,8 @@ import { requireGroupPermission } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
 import { updateGroupSchema } from "@/lib/validations/groups";
 
-async function loadGroup(id) {
-  let group = await Group.findById(id);
+async function loadGroup(code) {
+  let group = await findGroupByCode(code);
   if (!group) return null;
 
   const members = activeMembers(group);
@@ -57,15 +58,15 @@ export async function GET(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id } = await params;
+  const { id: code } = await params;
   try {
-    await requireGroupPermission(auth.user.id, id, Actions.VIEW_GROUP);
+    await requireGroupPermission(auth.user._id, code, Actions.VIEW_GROUP);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
 
   await connectDb();
-  const group = await loadGroup(id);
+  const group = await loadGroup(code);
   if (!group) return fail("Group not found", 404);
   return ok({ group });
 }
@@ -74,9 +75,14 @@ export async function PATCH(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, id, Actions.MANAGE_SETTINGS);
+    membership = await requireGroupPermission(
+      auth.user._id,
+      code,
+      Actions.MANAGE_SETTINGS
+    );
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
@@ -105,39 +111,39 @@ export async function PATCH(request, { params }) {
 
   await withTransaction(async (session) => {
     const opts = session ? { session } : {};
-    await Group.updateOne({ _id: id }, { $set, $inc: { version: 1 } }, opts);
+    await Group.updateOne({ _id: membership.groupId }, { $set, $inc: { version: 1 } }, opts);
     await recordActivity({
       session,
-      groupId: id,
-      actorId: auth.user.id,
+      groupId: membership.groupId,
+      actorId: auth.user._id,
       action: "GROUP_UPDATED",
       entityType: "group",
-      entityId: id,
+      entityId: membership.groupId,
       metadata: $set,
     });
   });
 
-  return ok({ group: await loadGroup(id) });
+  return ok({ group: await loadGroup(code) });
 }
 
 export async function DELETE(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id } = await params;
+  const { id: code } = await params;
   try {
-    await requireGroupPermission(auth.user.id, id, Actions.MANAGE_SETTINGS);
+    await requireGroupPermission(auth.user._id, code, Actions.MANAGE_SETTINGS);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
 
   await connectDb();
-  const group = await Group.findById(id).lean();
+  const group = await findGroupByCode(code).lean();
   if (!group) return fail("Group not found", 404);
-  if (String(group.createdById) !== String(auth.user.id)) {
+  if (String(group.createdById) !== String(auth.user._id)) {
     return fail("Only the group creator can delete the group", 403);
   }
 
-  await Group.deleteOne({ _id: id });
+  await Group.deleteOne({ _id: group._id });
   return ok({ success: true });
 }

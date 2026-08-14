@@ -11,20 +11,21 @@ export async function GET(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_GROUP);
+    await requireGroupPermission(auth.user._id, code, Actions.VIEW_GROUP);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
 
   await connectDb();
-  const group = await Group.findById(groupId).lean();
+  const group = await Group.findOne({ code }).lean();
   if (!group?.settings) return fail("Settings not found", 404);
 
   return ok({
     settings: {
-      groupId,
+      groupId: String(group._id),
+      code: group.code,
       ...group.settings,
       updatedAt: group.updatedAt,
     },
@@ -35,12 +36,14 @@ export async function PATCH(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.MANAGE_SETTINGS);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.MANAGE_SETTINGS);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   let body;
   try {
@@ -64,7 +67,7 @@ export async function PATCH(request, { params }) {
     await recordActivity({
       session,
       groupId,
-      actorId: auth.user.id,
+      actorId: auth.user._id,
       action: "SETTINGS_CHANGED",
       entityType: "settings",
       entityId: groupId,

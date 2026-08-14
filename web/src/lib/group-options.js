@@ -1,3 +1,5 @@
+import { getEmojiByValue, suggestEmojiFromText } from "./emoji-icons.js";
+
 export const GROUP_ICONS = [
   {
     key: "users",
@@ -84,22 +86,32 @@ export const GROUP_ICONS = [
 
 const DEFAULT_ICON = GROUP_ICONS[0];
 
-export function getGroupIcon(key) {
-  return GROUP_ICONS.find((i) => i.key === key) || DEFAULT_ICON;
+export function getGroupIcon(keyOrEmoji) {
+  if (!keyOrEmoji) return DEFAULT_ICON;
+  const byKey = GROUP_ICONS.find((i) => i.key === keyOrEmoji);
+  if (byKey) return byKey;
+  const byEmoji = GROUP_ICONS.find((i) => i.emoji === keyOrEmoji);
+  if (byEmoji) return byEmoji;
+  if (/\p{Extended_Pictographic}/u.test(String(keyOrEmoji))) {
+    const catalog = getEmojiByValue(keyOrEmoji);
+    return {
+      key: keyOrEmoji,
+      label: catalog.label || "Icon",
+      emoji: keyOrEmoji,
+      keywords: catalog.keywords || [],
+    };
+  }
+  return DEFAULT_ICON;
 }
 
 export function suggestGroupIconFromName(name = "") {
-  const normalized = String(name).trim().toLowerCase();
-  if (!normalized) return { ...DEFAULT_ICON };
-
-  for (const icon of GROUP_ICONS) {
-    for (const keyword of icon.keywords || []) {
-      if (normalized.includes(keyword)) {
-        return { ...icon };
-      }
-    }
-  }
-  return { ...DEFAULT_ICON };
+  const suggested = suggestEmojiFromText(name, DEFAULT_ICON);
+  return {
+    key: suggested.emoji,
+    label: suggested.label,
+    emoji: suggested.emoji,
+    keywords: suggested.keywords || [],
+  };
 }
 
 export const CURRENCIES = [

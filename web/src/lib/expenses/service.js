@@ -57,7 +57,7 @@ export async function buildExpenseCreateData({ group, userId, input, session = n
   const fresh =
     group.members != null
       ? group
-      : await Group.findById(group.id || group._id)
+      : await Group.findById(group._id)
           .session(session || null)
           .lean();
   const memberIds = new Set(activeMembers(fresh).map((m) => String(m._id)));
@@ -92,7 +92,7 @@ export async function buildExpenseCreateData({ group, userId, input, session = n
   const [expense] = await Expense.create(
     [
       {
-        groupId: group.id || group._id,
+        groupId: group._id,
         title: input.title,
         description: input.description ?? null,
         amountMinor: input.amountMinor,

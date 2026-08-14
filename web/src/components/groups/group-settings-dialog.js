@@ -40,7 +40,7 @@ function methodLabel(value) {
 
 function defaultPartsMap(members, config) {
   const map = {};
-  for (const m of members) map[m.id] = 1;
+  for (const m of members) map[m._id] = 1;
   if (Array.isArray(config)) {
     for (const row of config) {
       if (row?.memberId && map[row.memberId] != null) {
@@ -124,7 +124,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
   }
 
   async function saveSplit() {
-    if (!group?.id) return;
+    if (!group?._id) return;
     setSavingSplit(true);
     setSplitError("");
     try {
@@ -133,12 +133,12 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
         defaultSplitConfig:
           draftMethod === "SHARES"
             ? members.map((m) => ({
-                memberId: m.id,
-                value: Number(draftParts[m.id] || 1),
+                memberId: m._id,
+                value: Number(draftParts[m._id] || 1),
               }))
             : null,
       };
-      const res = await fetch(`/api/groups/${group.id}/settings`, {
+      const res = await fetch(`/api/groups/${group.code}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -158,11 +158,11 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
 
   async function addMember(e) {
     e.preventDefault();
-    if (!group?.id) return;
+    if (!group?._id) return;
     setAddingMember(true);
     setMemberError("");
     try {
-      const res = await fetch(`/api/groups/${group.id}/members`, {
+      const res = await fetch(`/api/groups/${group.code}/members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -206,12 +206,12 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
 
   async function saveEdit(e) {
     e.preventDefault();
-    if (!group?.id || !editing) return;
+    if (!group?._id || !editing) return;
     setSavingEdit(true);
     setEditError("");
     try {
       const res = await fetch(
-        `/api/groups/${group.id}/members/${editing.id}`,
+        `/api/groups/${group.code}/members/${editing._id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -229,7 +229,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
       }
       if (json.data?.member) {
         setMembers((prev) =>
-          prev.map((m) => (m.id === editing.id ? json.data.member : m))
+          prev.map((m) => (m._id === editing._id ? json.data.member : m))
         );
       }
       setEditOpen(false);
@@ -242,7 +242,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
 
   async function removeMember() {
     const member = editing;
-    if (!group?.id || !member) return;
+    if (!group?._id || !member) return;
     if (member.permission === "ADMIN") {
       setEditError("Cannot remove the admin");
       return;
@@ -251,7 +251,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
     setEditError("");
     try {
       const res = await fetch(
-        `/api/groups/${group.id}/members/${member.id}`,
+        `/api/groups/${group.code}/members/${member._id}`,
         { method: "DELETE" }
       );
       const json = await res.json();
@@ -260,7 +260,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
         setConfirmRemoveMemberOpen(false);
         return;
       }
-      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      setMembers((prev) => prev.filter((m) => m._id !== member._id));
       setConfirmRemoveMemberOpen(false);
       setEditOpen(false);
       setEditing(null);
@@ -271,11 +271,11 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
   }
 
   async function deleteGroup() {
-    if (!group?.id) return;
+    if (!group?._id) return;
     setDeleting(true);
     setDeleteError("");
     try {
-      const res = await fetch(`/api/groups/${group.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/groups/${group.code}`, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) {
         setDeleteError(json?.error?.message || "Failed to delete");
@@ -396,10 +396,10 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
                 </div>
                 <ul className="divide-y divide-border">
                   {members.map((m) => {
-                    const parts = draftParts[m.id] ?? 1;
+                    const parts = draftParts[m._id] ?? 1;
                     return (
                       <li
-                        key={m.id}
+                        key={m._id}
                         className="flex items-center gap-3 px-3 py-2.5"
                       >
                         <span className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -410,7 +410,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
                             type="button"
                             className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
                             disabled={parts <= 1}
-                            onClick={() => setPart(m.id, parts - 1)}
+                            onClick={() => setPart(m._id, parts - 1)}
                             aria-label="Decrease parts"
                           >
                             <Minus className="h-3.5 w-3.5" />
@@ -422,7 +422,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
                             type="button"
                             className="rounded p-0.5 text-muted hover:text-foreground disabled:opacity-40"
                             disabled={parts >= 99}
-                            onClick={() => setPart(m.id, parts + 1)}
+                            onClick={() => setPart(m._id, parts + 1)}
                             aria-label="Increase parts"
                           >
                             <Plus className="h-3.5 w-3.5" />
@@ -469,7 +469,7 @@ export function GroupSettingsDialog({ group, open, onOpenChange, onUpdated }) {
             <ul className="space-y-2">
               {members.map((m) => (
                 <li
-                  key={m.id}
+                  key={m._id}
                   className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2.5"
                 >
                   <div className="min-w-0 flex-1">

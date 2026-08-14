@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { NotificationType, applyIdTransform } from "./_utils.js";
+import { NotificationType } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -16,7 +16,6 @@ const NotificationSchema = new Schema(
 );
 
 NotificationSchema.index({ userId: 1, readAt: 1, createdAt: -1 });
-applyIdTransform(NotificationSchema);
 
 export const Notification =
   models.Notification || model("Notification", NotificationSchema);

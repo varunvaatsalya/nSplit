@@ -38,6 +38,11 @@ export const CATEGORIES = [
       "market",
       "kirana",
       "vegetables",
+      "vegetable",
+      "veggie",
+      "veggies",
+      "vege",
+      "veg",
       "sabzi",
     ],
   },
@@ -76,6 +81,9 @@ export const CATEGORIES = [
       "vacation",
       "holiday",
       "booking",
+      "goa",
+      "manali",
+      "tour",
     ],
   },
   {
@@ -89,7 +97,6 @@ export const CATEGORIES = [
       "netflix",
       "concert",
       "game",
-      "party",
       "spotify",
       "show",
     ],
@@ -114,7 +121,18 @@ export const CATEGORIES = [
     label: "Rent & Housing",
     icon: "home",
     emoji: "🏠",
-    keywords: ["rent", "housing", "apartment", "maintenance", "pg", "deposit"],
+    keywords: [
+      "rent",
+      "housing",
+      "apartment",
+      "maintenance",
+      "pg",
+      "deposit",
+      "home",
+      "house",
+      "flat",
+      "roommates",
+    ],
   },
   {
     key: "utilities",
@@ -183,15 +201,37 @@ export function suggestCategoryFromTitle(title = "") {
   const normalized = String(title).trim().toLowerCase();
   if (!normalized) return { ...DEFAULT };
 
+  const collapsed = normalized.replace(/[^a-z0-9]+/g, "");
+  const tokens = normalized.split(/[^a-z0-9]+/).filter((t) => t.length >= 2);
+  const queries = [...new Set([normalized, collapsed, ...tokens])];
+
+  let best = DEFAULT;
+  let bestScore = 0;
+
   for (const category of CATEGORIES) {
     if (category.key === "other") continue;
-    for (const keyword of category.keywords) {
-      if (normalized.includes(keyword)) {
-        return { ...category };
+    const terms = [category.label, category.key, ...(category.keywords || [])];
+    let score = 0;
+    for (const q of queries) {
+      for (const term of terms) {
+        const k = String(term).toLowerCase().trim();
+        if (!q || q.length < 2 || !k) continue;
+        let next = 0;
+        if (k === q) next = 100;
+        else if (k.startsWith(q)) next = 80 + Math.min(q.length, 15);
+        else if (q.length >= 3 && k.includes(q)) next = 55;
+        else if (k.length >= 3 && q.includes(k)) next = 45;
+        if (next > score) score = next;
       }
     }
+    if (score > bestScore) {
+      bestScore = score;
+      best = category;
+    }
   }
-  return { ...DEFAULT };
+
+  if (bestScore < 40) return { ...DEFAULT };
+  return { ...best };
 }
 
 export function getCategoryByKey(key) {

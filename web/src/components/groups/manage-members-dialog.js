@@ -85,7 +85,7 @@ export function ManageMembersDialog({
 
   const lastAdminId = useMemo(() => {
     if (adminCount(members) !== 1) return null;
-    return members.find((m) => m.permission === "ADMIN")?.id || null;
+    return members.find((m) => m.permission === "ADMIN")?._id || null;
   }, [members]);
 
   function closePanel() {
@@ -163,7 +163,7 @@ export function ManageMembersDialog({
         email: email.trim() || null,
         permission,
       };
-      const res = await fetch(`/api/groups/${groupId}/members/${editing.id}`, {
+      const res = await fetch(`/api/groups/${groupId}/members/${editing._id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -182,10 +182,10 @@ export function ManageMembersDialog({
 
   async function removeMember() {
     if (!removing) return;
-    setBusyId(removing.id);
+    setBusyId(removing._id);
     setError("");
     try {
-      const res = await fetch(`/api/groups/${groupId}/members/${removing.id}`, {
+      const res = await fetch(`/api/groups/${groupId}/members/${removing._id}`, {
         method: "DELETE",
       });
       const json = await res.json();
@@ -198,7 +198,7 @@ export function ManageMembersDialog({
         currentUserId &&
         removing.userId &&
         String(removing.userId) === String(currentUserId);
-      if (editing?.id === removing.id) closePanel();
+      if (editing?._id === removing._id) closePanel();
       setRemoving(null);
       if (removedSelf) {
         onOpenChange?.(false);
@@ -223,12 +223,12 @@ export function ManageMembersDialog({
           <div className="nsplit-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
             {members.map((m) => {
               const label = memberLabel(m);
-              const isLastAdmin = lastAdminId === m.id;
-              const busy = busyId === m.id;
-              const selected = editing?.id === m.id;
+              const isLastAdmin = lastAdminId === m._id;
+              const busy = busyId === m._id;
+              const selected = editing?._id === m._id;
               return (
                 <div
-                  key={m.id}
+                  key={m._id}
                   className={cn(
                     "flex items-center gap-2 rounded-xl border px-3 py-2.5",
                     selected ? "border-primary bg-primary/5" : "border-border",
@@ -238,7 +238,7 @@ export function ManageMembersDialog({
                     className="h-9 w-9"
                     name={label}
                     avatar={m.avatar || m.user?.avatar}
-                    seed={m.userId || m.id}
+                    seed={m.userId || m._id}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{label}</div>
@@ -383,7 +383,7 @@ export function ManageMembersDialog({
         }
         confirmLabel="Remove"
         cancelLabel="Cancel"
-        loading={Boolean(removing && busyId === removing.id)}
+        loading={Boolean(removing && busyId === removing._id)}
         onConfirm={removeMember}
       />
     </>

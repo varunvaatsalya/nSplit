@@ -9,7 +9,7 @@ export default async function AppLayout({ children }) {
   return (
     <AppShell
       user={{
-        id: String(session.user.id || session.user._id),
+        _id: String(session.user._id),
         name: session.user.name,
         email: session.user.email,
         avatar: session.user.avatar ?? null,

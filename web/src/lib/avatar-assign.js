@@ -46,7 +46,7 @@ export async function ensureUserAvatar(user) {
     return publicAvatar(user.avatar, user.name);
   }
 
-  const used = await loadUsedUserAvatars(user._id || user.id);
+  const used = await loadUsedUserAvatars(user._id);
   // Don't collide with ourselves if we somehow already hold letters
   const selfLetters = current.letters;
   const letters =
@@ -68,7 +68,7 @@ export async function ensureUserAvatar(user) {
   };
 
   await User.updateOne(
-    { _id: user._id || user.id },
+    { _id: user._id },
     {
       $set: { avatar },
       $unset: { avatarUrl: 1, avatarColor: 1 },

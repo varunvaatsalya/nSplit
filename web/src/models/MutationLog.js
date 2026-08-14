@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { MutationStatus, applyIdTransform } from "./_utils.js";
+import { MutationStatus } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -22,7 +22,6 @@ const MutationLogSchema = new Schema(
 );
 
 MutationLogSchema.index({ userId: 1, processedAt: -1 });
-applyIdTransform(MutationLogSchema);
 
 export const MutationLog =
   models.MutationLog || model("MutationLog", MutationLogSchema);

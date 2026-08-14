@@ -8,35 +8,76 @@ import { Actions } from "@/shared/permissions/index.js";
 import { createExpenseSchema } from "@/lib/validations/records";
 import { buildExpenseCreateData, serializeExpense } from "@/lib/expenses/service";
 
-export async function GET(_request, { params }) {
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+
+export async function GET(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_EXPENSES);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.VIEW_EXPENSES);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
+
+  const { searchParams } = new URL(request.url);
+  const limit = Math.min(
+    Math.max(Number(searchParams.get("limit") || DEFAULT_LIMIT) || DEFAULT_LIMIT, 1),
+    MAX_LIMIT
+  );
+  const cursor = searchParams.get("cursor");
+
+  const filter = { groupId, deletedAt: null };
+  if (cursor) {
+    const sep = cursor.lastIndexOf("_");
+    const ts = Number(cursor.slice(0, sep));
+    const lastId = cursor.slice(sep + 1);
+    if (Number.isFinite(ts) && lastId) {
+      const date = new Date(ts);
+      filter.$or = [
+        { expenseDate: { $lt: date } },
+        { expenseDate: date, _id: { $lt: lastId } },
+      ];
+    }
+  }
 
   await connectDb();
-  const expenses = await Expense.find({ groupId, deletedAt: null })
-    .sort({ expenseDate: -1, createdAt: -1 })
+  const rows = await Expense.find(filter)
+    .sort({ expenseDate: -1, _id: -1 })
+    .limit(limit + 1)
     .lean();
 
-  return ok({ expenses: expenses.map(serializeExpense) });
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const last = page[page.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? `${new Date(last.expenseDate || last.createdAt).getTime()}_${last._id}`
+      : null;
+
+  return ok({
+    expenses: page.map(serializeExpense),
+    nextCursor,
+    hasMore,
+  });
 }
 
 export async function POST(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.ADD_EXPENSE);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.ADD_EXPENSE);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   let body;
   try {
@@ -51,13 +92,12 @@ export async function POST(request, { params }) {
   await connectDb();
   const group = await Group.findById(groupId).lean();
   if (!group) return fail("Group not found", 404);
-  group.id = String(group._id);
 
   try {
     const result = await withTransaction(async (session) => {
       const { expense, duplicate } = await buildExpenseCreateData({
         group,
-        userId: auth.user.id,
+        userId: auth.user._id,
         input: parsed.data,
         session,
       });
@@ -66,10 +106,10 @@ export async function POST(request, { params }) {
         await recordActivity({
           session,
           groupId,
-          actorId: auth.user.id,
+          actorId: auth.user._id,
           action: "EXPENSE_CREATED",
           entityType: "expense",
-          entityId: expense.id,
+          entityId: expense._id,
           metadata: {
             title: expense.title,
             amountMinor: expense.amountMinor,
@@ -83,12 +123,12 @@ export async function POST(request, { params }) {
             [
               {
                 mutationId: parsed.data.clientMutationId,
-                userId: auth.user.id,
+                userId: auth.user._id,
                 type: "expense.create",
                 entity: "expense",
-                entityId: expense.id,
+                entityId: String(expense._id),
                 status: "APPLIED",
-                serverEntityId: expense.id,
+                serverEntityId: String(expense._id),
                 clientTimestamp: new Date(),
               },
             ],

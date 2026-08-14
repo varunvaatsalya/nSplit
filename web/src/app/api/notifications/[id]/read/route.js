@@ -12,7 +12,7 @@ export async function PATCH(_request, { params }) {
 
   const notification = await Notification.findOne({
     _id: id,
-    userId: auth.user.id,
+    userId: auth.user._id,
   }).lean();
   if (!notification) return fail("Notification not found", 404);
 

@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { applyIdTransform } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -21,6 +20,9 @@ const TransferSchema = new Schema(
 );
 
 TransferSchema.index({ groupId: 1, deletedAt: 1, transferDate: -1 });
-applyIdTransform(TransferSchema);
 
-export const Transfer = models.Transfer || model("Transfer", TransferSchema);
+if (models.Transfer) {
+  delete models.Transfer;
+}
+
+export const Transfer = model("Transfer", TransferSchema);

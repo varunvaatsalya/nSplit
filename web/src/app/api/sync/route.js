@@ -71,7 +71,7 @@ export async function POST(request) {
       try {
         await MutationLog.create({
           mutationId: mutation.mutationId,
-          userId: auth.user.id,
+          userId: auth.user._id,
           deviceId: parsed.data.deviceId ?? null,
           type: mutation.type,
           entity: mutation.entity,
@@ -100,16 +100,15 @@ async function applyMutation({ mutation, user, deviceId }) {
   const { type, payload } = mutation;
 
   if (type === "expense.create") {
-    const groupId = payload.groupId;
-    await requireGroupPermission(user.id, groupId, Actions.ADD_EXPENSE);
-    const group = await Group.findById(groupId).lean();
+    const membership = await requireGroupPermission(user._id, payload.groupId, Actions.ADD_EXPENSE);
+    const group = await Group.findById(membership.groupId).lean();
     if (!group) throw Object.assign(new Error("Group not found"), { status: 404 });
-    group.id = String(group._id);
+    const groupId = membership.groupId;
 
     const result = await withTransaction(async (session) => {
       const { expense, duplicate } = await buildExpenseCreateData({
         group,
-        userId: user.id,
+        userId: user._id,
         input: { ...payload, clientMutationId: mutation.mutationId },
         session,
       });
@@ -118,10 +117,10 @@ async function applyMutation({ mutation, user, deviceId }) {
         await recordActivity({
           session,
           groupId,
-          actorId: user.id,
+          actorId: user._id,
           action: "EXPENSE_CREATED",
           entityType: "expense",
-          entityId: expense.id,
+          entityId: expense._id,
           metadata: { title: expense.title, amountMinor: expense.amountMinor },
         });
       }
@@ -132,13 +131,13 @@ async function applyMutation({ mutation, user, deviceId }) {
         {
           $setOnInsert: {
             mutationId: mutation.mutationId,
-            userId: user.id,
+            userId: user._id,
             deviceId: deviceId ?? null,
             type,
             entity: "expense",
-            entityId: expense.id,
+            entityId: expense._id,
             status: duplicate ? "DUPLICATE" : "APPLIED",
-            serverEntityId: expense.id,
+            serverEntityId: expense._id,
             clientTimestamp: mutation.clientTimestamp
               ? new Date(mutation.clientTimestamp)
               : null,
@@ -154,16 +153,16 @@ async function applyMutation({ mutation, user, deviceId }) {
     return {
       mutationId: mutation.mutationId,
       status: result.duplicate ? "DUPLICATE" : "APPLIED",
-      serverEntityId: result.expense.id,
+      serverEntityId: result.expense._id,
       entity: result.expense,
     };
   }
 
   if (type === "transfer.create") {
-    const groupId = payload.groupId;
-    await requireGroupPermission(user.id, groupId, Actions.ADD_TRANSFER);
-    const group = await Group.findById(groupId).lean();
+    const membership = await requireGroupPermission(user._id, payload.groupId, Actions.ADD_TRANSFER);
+    const group = await Group.findById(membership.groupId).lean();
     if (!group) throw Object.assign(new Error("Group not found"), { status: 404 });
+    const groupId = membership.groupId;
 
     const transfer = await withTransaction(async (session) => {
       const opts = session ? { session } : {};
@@ -183,7 +182,7 @@ async function applyMutation({ mutation, user, deviceId }) {
             amountMinor: payload.amountMinor,
             currency: payload.currency || group.currency,
             note: payload.note ?? null,
-            createdById: user.id,
+            createdById: user._id,
             clientMutationId: mutation.mutationId,
             transferDate: payload.transferDate
               ? new Date(payload.transferDate)
@@ -196,7 +195,7 @@ async function applyMutation({ mutation, user, deviceId }) {
       await recordActivity({
         session,
         groupId,
-        actorId: user.id,
+        actorId: user._id,
         action: "TRANSFER_CREATED",
         entityType: "transfer",
         entityId: row._id,
@@ -211,7 +210,7 @@ async function applyMutation({ mutation, user, deviceId }) {
         [
           {
             mutationId: mutation.mutationId,
-            userId: user.id,
+            userId: user._id,
             deviceId: deviceId ?? null,
             type,
             entity: "transfer",
@@ -229,16 +228,16 @@ async function applyMutation({ mutation, user, deviceId }) {
     return {
       mutationId: mutation.mutationId,
       status: transfer.duplicate ? "DUPLICATE" : "APPLIED",
-      serverEntityId: String(transfer.row._id || transfer.row.id),
+      serverEntityId: String(transfer.row._id),
       entity: transfer.row,
     };
   }
 
   if (type === "income.create") {
-    const groupId = payload.groupId;
-    await requireGroupPermission(user.id, groupId, Actions.ADD_INCOME);
-    const group = await Group.findById(groupId).lean();
+    const membership = await requireGroupPermission(user._id, payload.groupId, Actions.ADD_INCOME);
+    const group = await Group.findById(membership.groupId).lean();
     if (!group) throw Object.assign(new Error("Group not found"), { status: 404 });
+    const groupId = membership.groupId;
 
     const splitResult = calculateSplit({
       method: payload.splitMethod || "EQUAL",
@@ -272,7 +271,7 @@ async function applyMutation({ mutation, user, deviceId }) {
             amountMinor: payload.amountMinor,
             currency: payload.currency || group.currency,
             splitMethod: payload.splitMethod || "EQUAL",
-            createdById: user.id,
+            createdById: user._id,
             clientMutationId: mutation.mutationId,
             receivers: splitResult.splits.map((s) => ({
               memberId: s.memberId,
@@ -286,7 +285,7 @@ async function applyMutation({ mutation, user, deviceId }) {
       await recordActivity({
         session,
         groupId,
-        actorId: user.id,
+        actorId: user._id,
         action: "INCOME_CREATED",
         entityType: "income",
         entityId: row._id,
@@ -297,7 +296,7 @@ async function applyMutation({ mutation, user, deviceId }) {
         [
           {
             mutationId: mutation.mutationId,
-            userId: user.id,
+            userId: user._id,
             deviceId: deviceId ?? null,
             type,
             entity: "income",
@@ -315,7 +314,7 @@ async function applyMutation({ mutation, user, deviceId }) {
     return {
       mutationId: mutation.mutationId,
       status: income.duplicate ? "DUPLICATE" : "APPLIED",
-      serverEntityId: String(income.row._id || income.row.id),
+      serverEntityId: String(income.row._id),
       entity: income.row,
     };
   }

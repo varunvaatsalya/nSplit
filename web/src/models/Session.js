@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { applyIdTransform } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -14,7 +13,5 @@ const SessionSchema = new Schema(
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
-
-applyIdTransform(SessionSchema);
 
 export const Session = models.Session || model("Session", SessionSchema);

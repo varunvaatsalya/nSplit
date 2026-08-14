@@ -17,12 +17,14 @@ export async function PATCH(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId, memberId } = await params;
+  const { id: code, memberId } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.MANAGE_MEMBERS);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.MANAGE_MEMBERS);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   let body;
   try {
@@ -61,7 +63,7 @@ export async function PATCH(request, { params }) {
   if (parsed.data.permission !== undefined) {
     await recordActivity({
       groupId,
-      actorId: auth.user.id,
+      actorId: auth.user._id,
       action: "MEMBER_PERMISSION_CHANGED",
       entityType: "member",
       entityId: memberId,
@@ -82,12 +84,14 @@ export async function DELETE(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId, memberId } = await params;
+  const { id: code, memberId } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.MANAGE_MEMBERS);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.MANAGE_MEMBERS);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   await connectDb();
   const group = await Group.findById(groupId);
@@ -108,7 +112,7 @@ export async function DELETE(_request, { params }) {
 
   await recordActivity({
     groupId,
-    actorId: auth.user.id,
+    actorId: auth.user._id,
     action: "MEMBER_REMOVED",
     entityType: "member",
     entityId: memberId,

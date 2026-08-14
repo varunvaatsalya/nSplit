@@ -23,12 +23,14 @@ export async function GET(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_EXPENSES);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.VIEW_EXPENSES);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   await connectDb();
   const incomes = await Income.find({ groupId, deletedAt: null })
@@ -41,12 +43,14 @@ export async function POST(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.ADD_INCOME);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.ADD_INCOME);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   let body;
   try {
@@ -94,7 +98,7 @@ export async function POST(request, { params }) {
           categoryKey: parsed.data.categoryId ?? null,
           icon: parsed.data.icon ?? null,
           splitMethod: parsed.data.splitMethod,
-          createdById: auth.user.id,
+          createdById: auth.user._id,
           clientMutationId: parsed.data.clientMutationId ?? undefined,
           incomeDate: parsed.data.incomeDate
             ? new Date(parsed.data.incomeDate)
@@ -111,7 +115,7 @@ export async function POST(request, { params }) {
     await recordActivity({
       session,
       groupId,
-      actorId: auth.user.id,
+      actorId: auth.user._id,
       action: "INCOME_CREATED",
       entityType: "income",
       entityId: row._id,
@@ -123,7 +127,7 @@ export async function POST(request, { params }) {
         [
           {
             mutationId: parsed.data.clientMutationId,
-            userId: auth.user.id,
+            userId: auth.user._id,
             type: "income.create",
             entity: "income",
             entityId: String(row._id),

@@ -54,7 +54,7 @@ export default function NotificationsPage() {
           ) : (
             notifications.map((n) => (
               <li
-                key={n.id}
+                key={n._id}
                 className="rounded-xl border border-border bg-surface px-4 py-3"
               >
                 <div className="font-medium">{n.title}</div>

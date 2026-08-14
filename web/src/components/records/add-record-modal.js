@@ -34,7 +34,7 @@ export function AddRecordModal({
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("expense");
-  const isEdit = Boolean(editExpense?.id);
+  const isEdit = Boolean(editExpense?._id);
 
   function openCreate() {
     setTab("expense");
@@ -42,10 +42,10 @@ export function AddRecordModal({
   }
 
   useEffect(() => {
-    if (!editExpense?.id) return;
+    if (!editExpense?._id) return;
     setTab("expense");
     setOpen(true);
-  }, [editExpense?.id]);
+  }, [editExpense?._id]);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -163,9 +163,9 @@ export function AddRecordModal({
             <ExpenseForm
               key={
                 isEdit
-                  ? `edit-${editExpense.id}`
+                  ? `edit-${editExpense._id}`
                   : open
-                    ? `create-${group?.id}-${group?.settings?.defaultSplitMethod || "EQUAL"}`
+                    ? `create-${group?._id}-${group?.settings?.defaultSplitMethod || "EQUAL"}`
                     : "create-idle"
               }
               group={group}

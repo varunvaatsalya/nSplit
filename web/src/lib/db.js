@@ -63,19 +63,34 @@ export async function withTransaction(fn) {
   }
 }
 
-export function idOf(doc) {
-  if (!doc) return null;
-  if (typeof doc === "string") return doc;
-  return String(doc._id ?? doc.id);
+function isObjectId(value) {
+  return (
+    value != null &&
+    typeof value === "object" &&
+    (value._bsontype === "ObjectId" || value.constructor?.name === "ObjectId")
+  );
+}
+
+function stringifyMongo(value) {
+  if (value == null) return value;
+  if (value instanceof Date) return value;
+  if (isObjectId(value)) return String(value);
+  if (Array.isArray(value)) return value.map(stringifyMongo);
+  if (typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (k === "__v") continue;
+      out[k] = stringifyMongo(v);
+    }
+    return out;
+  }
+  return value;
 }
 
 export function toJSON(doc) {
   if (!doc) return null;
   const obj = typeof doc.toObject === "function" ? doc.toObject() : { ...doc };
-  obj.id = String(obj._id);
-  delete obj._id;
-  delete obj.__v;
-  return obj;
+  return stringifyMongo(obj);
 }
 
 export function toJSONList(docs) {

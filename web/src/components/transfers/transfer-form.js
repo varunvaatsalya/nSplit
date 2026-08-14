@@ -45,8 +45,8 @@ export function TransferForm({
     setAmount("");
     setNote("");
     setFieldErrors({ amount: false, from: false, to: false });
-    const first = members[0]?.id || "";
-    const second = members[1]?.id || members[0]?.id || "";
+    const first = members[0]?._id || "";
+    const second = members[1]?._id || members[0]?._id || "";
     setFromMemberId(first);
     setToMemberId(second);
   }
@@ -55,7 +55,7 @@ export function TransferForm({
     if (!active || !members.length) return;
     resetForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, group?.id]);
+  }, [active, group?._id]);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -76,7 +76,7 @@ export function TransferForm({
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/groups/${group.id}/transfers`, {
+      const res = await fetch(`/api/groups/${group.code}/transfers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -145,7 +145,7 @@ export function TransferForm({
             </SelectTrigger>
             <SelectContent>
               {members.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
+                <SelectItem key={m._id} value={m._id}>
                   {memberLabel(m)}
                 </SelectItem>
               ))}
@@ -172,7 +172,7 @@ export function TransferForm({
             </SelectTrigger>
             <SelectContent>
               {members.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
+                <SelectItem key={m._id} value={m._id}>
                   {memberLabel(m)}
                 </SelectItem>
               ))}

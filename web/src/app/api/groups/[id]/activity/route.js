@@ -10,12 +10,14 @@ export async function GET(request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_ACTIVITY);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.VIEW_ACTIVITY);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   const { searchParams } = new URL(request.url);
   const limit = Math.min(Number(searchParams.get("limit") || 50), 100);

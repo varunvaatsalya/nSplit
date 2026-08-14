@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { applyIdTransform } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -38,8 +37,6 @@ const UserSchema = new Schema(
   },
   { timestamps: true }
 );
-
-applyIdTransform(UserSchema);
 
 if (models.User) {
   delete models.User;

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { ActivityAction, applyIdTransform } from "./_utils.js";
+import { ActivityAction } from "./_utils.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -16,6 +16,9 @@ const ActivitySchema = new Schema(
 );
 
 ActivitySchema.index({ groupId: 1, createdAt: -1 });
-applyIdTransform(ActivitySchema);
 
-export const Activity = models.Activity || model("Activity", ActivitySchema);
+if (models.Activity) {
+  delete models.Activity;
+}
+
+export const Activity = model("Activity", ActivitySchema);

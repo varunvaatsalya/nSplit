@@ -1,4 +1,4 @@
-import { connectDb, idOf } from "@/lib/db";
+import { connectDb } from "@/lib/db";
 import { Expense, Group, Income, Transfer, activeMembers } from "@/models";
 import { fail, ok } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
@@ -11,12 +11,14 @@ export async function GET(_request, { params }) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
 
-  const { id: groupId } = await params;
+  const { id: code } = await params;
+  let membership;
   try {
-    await requireGroupPermission(auth.user.id, groupId, Actions.VIEW_BALANCES);
+    membership = await requireGroupPermission(auth.user._id, code, Actions.VIEW_BALANCES);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }
+  const groupId = membership.groupId;
 
   await connectDb();
   const [group, expenses, incomes, transfers] = await Promise.all([
@@ -29,9 +31,9 @@ export async function GET(_request, { params }) {
   if (!group) return fail("Group not found", 404);
 
   const members = activeMembers(group);
-  const memberIds = members.map((m) => idOf(m));
+  const memberIds = members.map((m) => String(m._id));
   const nameById = Object.fromEntries(
-    members.map((m) => [idOf(m), m.displayName || "Member"])
+    members.map((m) => [String(m._id), m.displayName || "Member"])
   );
 
   const balances = computeGroupBalances({
@@ -89,7 +91,7 @@ export async function GET(_request, { params }) {
   );
 
   const memberRows = members.map((m) => {
-    const id = idOf(m);
+    const id = String(m._id);
     const bucket = balances.byMemberId[id] || {
       paidMinor: 0,
       owedMinor: 0,
@@ -99,7 +101,7 @@ export async function GET(_request, { params }) {
       netMinor: 0,
     };
     return {
-      id,
+      _id: id,
       userId: m.userId ? String(m.userId) : null,
       displayName: m.displayName,
       ...bucket,

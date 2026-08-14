@@ -30,7 +30,7 @@ function formatMinor(minor, currency = "INR") {
 }
 
 function memberById(members, id) {
-  return members.find((m) => m.id === id);
+  return members.find((m) => m._id === id);
 }
 
 function memberName(members, id) {
@@ -94,11 +94,11 @@ export function ExpenseDetailDialog({
   }, [open, index, total, canPrev, canNext]);
 
   async function confirmDelete() {
-    if (!expense || !group?.id || deleting) return;
+    if (!expense || !group?._id || deleting) return;
     setDeleting(true);
     try {
       const res = await fetch(
-        `/api/groups/${group.id}/expenses/${expense.id}`,
+        `/api/groups/${group.code}/expenses/${expense._id}`,
         { method: "DELETE" },
       );
       if (!res.ok) return;
@@ -218,7 +218,7 @@ export function ExpenseDetailDialog({
                             className="h-8 w-8"
                             name={name}
                             avatar={m?.avatar || m?.user?.avatar}
-                            seed={m?.userId || m?.id || p.memberId}
+                            seed={m?.userId || m?._id || p.memberId}
                           />
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-medium">{name}</div>
@@ -248,7 +248,7 @@ export function ExpenseDetailDialog({
                     {splits.map((s) => {
                       const m = memberById(members, s.memberId);
                       const name = memberName(members, s.memberId);
-                      const isYou = myMember && s.memberId === myMember.id;
+                      const isYou = myMember && s.memberId === myMember._id;
                       return (
                         <li
                           key={s.memberId}
@@ -258,7 +258,7 @@ export function ExpenseDetailDialog({
                             className="h-8 w-8"
                             name={name}
                             avatar={m?.avatar || m?.user?.avatar}
-                            seed={m?.userId || m?.id || s.memberId}
+                            seed={m?.userId || m?._id || s.memberId}
                           />
                           <div className="min-w-0 flex-1 truncate font-medium">
                             {name} {isYou ? <span className="text-[11px]">(You)</span> : ""}
@@ -291,7 +291,7 @@ export function ExpenseDetailDialog({
 
               <Separator />
 
-              <div className="flex items-center justify-between gap-3 px-5 py-3 text-xs text-muted">
+              <div className="flex items-center gap-3 px-5 py-3 text-xs text-muted">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="shrink-0">Added by</span>
                   <UserAvatar
@@ -303,7 +303,7 @@ export function ExpenseDetailDialog({
                     }
                     seed={
                       creatorMember?.userId ||
-                      creatorMember?.id ||
+                      creatorMember?._id ||
                       expense.createdById
                     }
                   />
@@ -311,9 +311,6 @@ export function ExpenseDetailDialog({
                     · {formatDetailWhen(expense)}
                   </span>
                 </div>
-                <span className="shrink-0 tabular-nums">
-                  {index + 1} / {total}
-                </span>
               </div>
             </div>
           </div>

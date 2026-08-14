@@ -6,6 +6,7 @@ export {
   activeMembers,
   findActiveMemberById,
   findActiveMemberByUserId,
+  findGroupByCode,
   serializeMember,
 } from "./Group.js";
 export { Expense } from "./Expense.js";
