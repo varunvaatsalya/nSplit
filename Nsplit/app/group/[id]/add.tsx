@@ -4,9 +4,11 @@ import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ExpenseForm } from '@/components/expenses/expense-form';
 import { useColors } from '@/hooks/use-colors';
-import { apiFetch, errorMessage } from '@/src/api/client';
 import type { Expense, GroupDetail } from '@/src/api/types';
 import { useAuth } from '@/src/auth/auth-context';
+import { getExpense } from '@/src/db/expenses';
+import { getGroup } from '@/src/db/groups';
+import { useIdentity } from '@/src/identity/identity-context';
 
 export default function AddExpenseScreen() {
   const { id, expenseId } = useLocalSearchParams<{ id: string; expenseId?: string }>();
@@ -14,6 +16,7 @@ export default function AddExpenseScreen() {
   const navigation = useNavigation();
   const colors = useColors();
   const { user } = useAuth();
+  const { name: myName, matchByName } = useIdentity();
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [error, setError] = useState('');
@@ -27,21 +30,19 @@ export default function AddExpenseScreen() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const gRes = await apiFetch<{ group: GroupDetail }>(`/api/groups/${id}`);
-      if (!gRes.ok || !gRes.data?.group) {
-        setError(errorMessage(gRes.error, 'Failed to load group'));
+      const local = await getGroup(String(id));
+      if (!local) {
+        setError('Group not found');
         return;
       }
-      setGroup(gRes.data.group);
+      setGroup(local);
       if (expenseId) {
-        const eRes = await apiFetch<{ expense: Expense }>(
-          `/api/groups/${id}/expenses/${expenseId}`
-        );
-        if (!eRes.ok || !eRes.data?.expense) {
-          setError(errorMessage(eRes.error, 'Failed to load expense'));
+        const item = await getExpense(local._id, String(expenseId));
+        if (!item) {
+          setError('Expense not found');
           return;
         }
-        setExpense(eRes.data.expense);
+        setExpense(item);
       }
     })();
   }, [id, expenseId]);
@@ -62,6 +63,9 @@ export default function AddExpenseScreen() {
     <ExpenseForm
       group={group}
       currentUserId={user?._id}
+      myName={myName || user?.name}
+      matchByName={matchByName}
+      myMemberId={group.myMembershipId}
       expense={expense}
       onSaved={() => router.back()}
     />

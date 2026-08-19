@@ -1,6 +1,6 @@
 import type { GroupDetail, GroupMember, GroupSummary, User } from '@/src/api/types';
 import { allocateMemberAvatar } from '@/src/lib/avatar';
-import { compareMembersByName } from '@/src/lib/members';
+import { compareMembersByName, resolveMyMember } from '@/src/lib/members';
 
 import { getDb } from './client';
 import { createGroupCode, createId } from './ids';
@@ -11,6 +11,7 @@ type GroupRow = {
   name: string;
   icon: string | null;
   currency: string;
+  my_member_id?: string | null;
   member_count?: number | null;
 };
 
@@ -31,6 +32,8 @@ export type CreateGroupInput = {
   currency?: string;
   members: { name: string }[];
   creator?: Pick<User, '_id' | 'name' | 'email'> | null;
+  myName?: string | null;
+  matchByName?: boolean;
 };
 
 function mapMember(row: MemberRow): GroupMember {
@@ -55,6 +58,7 @@ function mapSummary(row: GroupRow): GroupSummary {
     name: row.name,
     icon: row.icon,
     currency: row.currency,
+    myMembershipId: row.my_member_id || null,
     memberCount: Number(row.member_count || 0),
   };
 }
@@ -75,7 +79,7 @@ async function uniqueGroupCode() {
 export async function listGroups(): Promise<GroupSummary[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<GroupRow>(
-    `SELECT g.id, g.code, g.name, g.icon, g.currency,
+    `SELECT g.id, g.code, g.name, g.icon, g.currency, g.my_member_id,
             (SELECT COUNT(*) FROM group_members m
              WHERE m.group_id = g.id AND m.left_at IS NULL) AS member_count
      FROM groups g
@@ -88,7 +92,7 @@ export async function listGroups(): Promise<GroupSummary[]> {
 export async function getGroup(idOrCode: string): Promise<GroupDetail | null> {
   const db = await getDb();
   const group = await db.getFirstAsync<GroupRow>(
-    `SELECT id, code, name, icon, currency
+    `SELECT id, code, name, icon, currency, my_member_id
      FROM groups
      WHERE deleted_at IS NULL AND (id = ? OR code = ?)
      LIMIT 1`,
@@ -103,13 +107,16 @@ export async function getGroup(idOrCode: string): Promise<GroupDetail | null> {
     [group.id]
   );
   const members = memberRows.map(mapMember).sort(compareMembersByName);
-  const mine = members.find((m) => m.userId) || null;
+  const mine =
+    members.find((m) => m._id && group.my_member_id && m._id === group.my_member_id) ||
+    members.find((m) => m.userId) ||
+    null;
 
   return {
     ...mapSummary({ ...group, member_count: members.length }),
     members,
     myPermission: mine?.permission || null,
-    myMembershipId: mine?._id || members[0]?._id || null,
+    myMembershipId: group.my_member_id || mine?._id || null,
   };
 }
 
@@ -167,11 +174,25 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
     });
   }
 
+  const mine = resolveMyMember(
+    members.map((m) => ({
+      _id: m.id,
+      userId: m.userId,
+      displayName: m.displayName,
+    })),
+    {
+      userId: creatorId,
+      myName: input.myName || input.creator?.name,
+      matchByName: input.matchByName !== false,
+    }
+  );
+  const myMemberId = mine?._id || null;
+
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT INTO groups (id, code, name, icon, currency, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, code, input.name.trim(), icon, currency, now, now]
+      `INSERT INTO groups (id, code, name, icon, currency, my_member_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, code, input.name.trim(), icon, currency, myMemberId, now, now]
     );
 
     for (const member of members) {
@@ -197,4 +218,13 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
   const created = await getGroup(id);
   if (!created) throw new Error('Failed to create group');
   return created;
+}
+
+export async function setGroupMyMember(groupId: string, memberId: string | null) {
+  const db = await getDb();
+  await db.runAsync(`UPDATE groups SET my_member_id = ?, updated_at = ? WHERE id = ?`, [
+    memberId,
+    new Date().toISOString(),
+    groupId,
+  ]);
 }

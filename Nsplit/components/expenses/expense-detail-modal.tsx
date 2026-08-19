@@ -13,11 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UserAvatar } from '@/components/user-avatar';
 import { useColors } from '@/hooks/use-colors';
-import { apiFetch } from '@/src/api/client';
 import type { Expense, GroupDetail, GroupMember } from '@/src/api/types';
+import { deleteExpense } from '@/src/db/expenses';
 import { formatMinor } from '@/src/lib/format';
 import { getExpenseEmoji } from '@/src/lib/icons';
-import { canMutateCreatedRecord, memberListLabel, sortMembersByName } from '@/src/lib/members';
+import { memberListLabel, sortMembersByName } from '@/src/lib/members';
 
 const SPLIT_LABELS: Record<string, string> = {
   EQUAL: 'Equally',
@@ -49,6 +49,7 @@ export function ExpenseDetailModal({
   onIndexChange,
   group,
   currentUserId,
+  myMemberId,
   onEdit,
   onDeleted,
 }: {
@@ -59,6 +60,7 @@ export function ExpenseDetailModal({
   onIndexChange: (next: number) => void;
   group: GroupDetail;
   currentUserId?: string | null;
+  myMemberId?: string | null;
   onEdit: (expense: Expense) => void;
   onDeleted: () => void;
 }) {
@@ -73,20 +75,13 @@ export function ExpenseDetailModal({
 
   if (!expense) return null;
 
-  const myMember = members.find(
-    (m) => m.userId && String(m.userId) === String(currentUserId)
-  );
-  const canMutate = canMutateCreatedRecord(
-    myMember?.permission,
-    expense.createdById,
-    currentUserId
-  );
+  const canMutate = true;
   const payers = [...(expense.payers || [])];
   const splits = (expense.splits || []).filter((s) => (s.amountMinor || 0) > 0);
   const creator = members.find(
     (m) => m.userId && String(m.userId) === String(expense.createdById)
   );
-  const creatorName = creator ? memberListLabel(creator, currentUserId) : 'Someone';
+  const creatorName = creator ? memberListLabel(creator, currentUserId, myMemberId) : 'Someone';
 
   async function confirmDelete() {
     Alert.alert(
@@ -100,11 +95,7 @@ export function ExpenseDetailModal({
           onPress: async () => {
             setDeleting(true);
             try {
-              const res = await apiFetch(
-                `/api/groups/${group.code}/expenses/${expense._id}`,
-                { method: 'DELETE' }
-              );
-              if (!res.ok) return;
+              await deleteExpense(group._id, expense._id);
               onDeleted();
               onClose();
             } finally {
@@ -167,7 +158,7 @@ export function ExpenseDetailModal({
           <Text style={[styles.section, { color: colors.textSecondary }]}>PAID BY</Text>
           {payers.map((p) => {
             const m = memberById(members, p.memberId);
-            const name = memberListLabel(m || { displayName: 'Member' }, currentUserId);
+            const name = memberListLabel(m || { displayName: 'Member' }, currentUserId, myMemberId);
             return (
               <View key={p.memberId} style={styles.row}>
                 <UserAvatar
@@ -199,8 +190,8 @@ export function ExpenseDetailModal({
           </View>
           {splits.map((s) => {
             const m = memberById(members, s.memberId);
-            const name = memberListLabel(m || { displayName: 'Member' }, currentUserId);
-            const isYou = myMember && s.memberId === myMember._id;
+            const name = memberListLabel(m || { displayName: 'Member' }, currentUserId, myMemberId);
+            const isYou = Boolean(myMemberId && s.memberId === myMemberId);
             return (
               <View key={s.memberId} style={styles.row}>
                 <UserAvatar

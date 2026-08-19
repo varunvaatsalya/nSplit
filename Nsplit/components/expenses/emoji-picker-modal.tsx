@@ -57,14 +57,14 @@ export function EmojiPickerModal({
     <Modal visible={open} transparent animationType="fade" onRequestClose={close}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.overlay}>
-          <Pressable style={styles.backdrop} onPress={close} />
+          <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={close} />
           <GestureDetector gesture={pan}>
             <Animated.View
               style={[
                 styles.sheet,
                 {
                   height: sheetHeight,
-                  backgroundColor: colors.surface,
+                  backgroundColor: colors.elevated,
                   paddingBottom: Math.max(insets.bottom, 12),
                 },
                 sheetStyle,
@@ -122,7 +122,6 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
   },
   sheet: {
     borderTopLeftRadius: 20,

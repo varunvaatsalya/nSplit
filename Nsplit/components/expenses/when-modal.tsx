@@ -1,14 +1,21 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColors } from '@/hooks/use-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   combineDateTime,
-  formatWhenLabel,
   toLocalDateValue,
   toLocalTimeValue,
 } from '@/src/lib/expense-form-utils';
@@ -25,7 +32,10 @@ export function WhenModal({
   onSave: (next: Date) => void;
 }) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const colorScheme = useColorScheme() ?? 'light';
+  const sheetHeight = Math.min(height * 0.5, 420);
   const [draft, setDraft] = useState(value);
   const [mode, setMode] = useState<'date' | 'time' | null>(Platform.OS === 'ios' ? 'date' : null);
   const [timeOpen, setTimeOpen] = useState(false);
@@ -73,105 +83,130 @@ export function WhenModal({
   return (
     <Modal
       visible={open}
-      animationType="slide"
+      transparent
+      animationType="fade"
       onRequestClose={onClose}
       onShow={resetFromValue}>
-      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>When</Text>
-          <Pressable onPress={onClose}>
-            <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
-          </Pressable>
-        </View>
-        <Text style={{ color: colors.textSecondary, paddingHorizontal: 20, marginBottom: 12 }}>
-          Pick a date. Time stays on now unless you change it.
-        </Text>
-
-        {Platform.OS === 'android' ? (
-          <View style={{ paddingHorizontal: 20, gap: 10 }}>
-            <Pressable
-              onPress={() => setMode('date')}
-              style={[styles.row, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              <MaterialIcons name="event" size={18} color={colors.textSecondary} />
-              <View>
-                <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Date</Text>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>
-                  {draft.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                </Text>
-              </View>
-            </Pressable>
-            <Pressable
-              onPress={() => setMode('time')}
-              style={[styles.row, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              <MaterialIcons name="schedule" size={18} color={colors.textSecondary} />
-              <View>
-                <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Time</Text>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>
-                  {draft.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                </Text>
-              </View>
+      <View style={styles.overlay}>
+          <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={onClose} />
+        <View
+          style={[
+            styles.sheet,
+            {
+              height: sheetHeight,
+              backgroundColor: colors.elevated,
+              paddingBottom: Math.max(insets.bottom, 12),
+            },
+          ]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>When</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
           </View>
-        ) : (
-          <View style={{ paddingHorizontal: 12 }}>
-            <View style={[styles.toggle, { backgroundColor: colors.softSurface }]}>
+          <Text style={{ color: colors.textSecondary, paddingHorizontal: 20, marginBottom: 10 }}>
+            Pick a date. Time stays on now unless you change it.
+          </Text>
+
+          {Platform.OS === 'android' ? (
+            <View style={{ paddingHorizontal: 20, gap: 10, flex: 1 }}>
               <Pressable
-                onPress={() => setTimeOpen(false)}
-                style={[
-                  styles.toggleBtn,
-                  !timeOpen && { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
-                ]}>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>Date</Text>
+                onPress={() => setMode('date')}
+                style={[styles.row, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                <MaterialIcons name="event" size={18} color={colors.textSecondary} />
+                <View>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Date</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>
+                    {draft.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
               </Pressable>
               <Pressable
-                onPress={() => setTimeOpen(true)}
-                style={[
-                  styles.toggleBtn,
-                  timeOpen && { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
-                ]}>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>Time</Text>
+                onPress={() => setMode('time')}
+                style={[styles.row, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                <MaterialIcons name="schedule" size={18} color={colors.textSecondary} />
+                <View>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Time</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>
+                    {draft.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                </View>
               </Pressable>
+              {iosPicker}
             </View>
-            {iosPicker}
+          ) : (
+            <View style={{ paddingHorizontal: 12, flex: 1 }}>
+              <View style={[styles.toggle, { backgroundColor: colors.softSurface }]}>
+                <Pressable
+                  onPress={() => setTimeOpen(false)}
+                  style={[
+                    styles.toggleBtn,
+                    !timeOpen && { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+                  ]}>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Date</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setTimeOpen(true)}
+                  style={[
+                    styles.toggleBtn,
+                    timeOpen && { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+                  ]}>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>Time</Text>
+                </Pressable>
+              </View>
+              {iosPicker}
+            </View>
+          )}
+
+          <View style={styles.footer}>
+            <Pressable
+              onPress={() => setDraft(new Date())}
+              style={[styles.ghost, { borderColor: colors.border }]}>
+              <Text style={{ color: colors.text, fontWeight: '600' }}>Now</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                const dateStr = toLocalDateValue(draft);
+                const timeStr = toLocalTimeValue(draft);
+                onSave(combineDateTime(dateStr, timeStr));
+              }}
+              style={[styles.done, { backgroundColor: colors.primary }]}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Done</Text>
+            </Pressable>
           </View>
-        )}
-
-        {Platform.OS === 'android' ? iosPicker : null}
-
-        <View style={styles.footer}>
-          <Pressable
-            onPress={() => setDraft(new Date())}
-            style={[styles.ghost, { borderColor: colors.border }]}>
-            <Text style={{ color: colors.text, fontWeight: '600' }}>Now</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              const dateStr = toLocalDateValue(draft);
-              const timeStr = toLocalTimeValue(draft);
-              onSave(combineDateTime(dateStr, timeStr));
-            }}
-            style={[styles.done, { backgroundColor: colors.primary }]}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Done</Text>
-          </Pressable>
         </View>
-        <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
-          {formatWhenLabel(draft)}
-        </Text>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, paddingTop: 16 },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    marginTop: 8,
+    marginBottom: 4,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
-  title: { fontSize: 22, fontWeight: '700' },
+  title: { fontSize: 18, fontWeight: '700' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -186,7 +221,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 20,
-    marginTop: 20,
+    paddingTop: 8,
   },
   ghost: {
     flex: 1,

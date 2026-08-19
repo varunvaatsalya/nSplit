@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const LOCAL_SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS groups (
   currency TEXT NOT NULL DEFAULT 'INR',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  deleted_at TEXT
+  deleted_at TEXT,
+  my_member_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS group_members (

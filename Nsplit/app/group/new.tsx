@@ -20,6 +20,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/src/auth/auth-context';
 import { useGroups } from '@/src/groups/groups-context';
+import { useIdentity } from '@/src/identity/identity-context';
 import {
   CURRENCIES,
   DEFAULT_GROUP_EMOJI,
@@ -35,6 +36,7 @@ export default function NewGroupScreen() {
   const colors = useColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { name: myName, matchByName } = useIdentity();
   const { createGroup } = useGroups();
   const nameRef = useRef<TextInput>(null);
   const [name, setName] = useState('');
@@ -43,7 +45,7 @@ export default function NewGroupScreen() {
   const [iconsOpen, setIconsOpen] = useState(false);
   const [currency, setCurrency] = useState('INR');
   const [currencyOpen, setCurrencyOpen] = useState(false);
-  const [members, setMembers] = useState([emptyMember()]);
+  const [members, setMembers] = useState([{ name: '' }]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,6 +56,14 @@ export default function NewGroupScreen() {
     const timer = setTimeout(() => nameRef.current?.focus(), 450);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!myName) return;
+    setMembers((prev) => {
+      if (prev.length === 1 && !prev[0].name.trim()) return [{ name: myName }];
+      return prev;
+    });
+  }, [myName]);
 
   function addMember() {
     if (!canAddMember) return;
@@ -79,6 +89,8 @@ export default function NewGroupScreen() {
         currency,
         members: cleaned,
         creator: user,
+        myName: myName || user?.name,
+        matchByName,
       });
       router.back();
     } catch {
@@ -204,8 +216,8 @@ export default function NewGroupScreen() {
         animationType="fade"
         onRequestClose={() => setCurrencyOpen(false)}>
         <View style={styles.dropdownOverlay}>
-          <Pressable style={styles.dropdownBackdrop} onPress={() => setCurrencyOpen(false)} />
-          <View style={[styles.dropdownSheet, { backgroundColor: colors.surface }]}>
+          <Pressable style={[styles.dropdownBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setCurrencyOpen(false)} />
+          <View style={[styles.dropdownSheet, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
             <Text style={[styles.dropdownTitle, { color: colors.text }]}>Currency</Text>
             {CURRENCIES.map((item) => {
               const active = item.code === currency;
@@ -320,13 +332,17 @@ const styles = StyleSheet.create({
   },
   dropdownBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
   },
   dropdownSheet: {
     borderRadius: 16,
+    borderWidth: 1,
     paddingVertical: 8,
     overflow: 'hidden',
-    elevation: 8,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
   },
   dropdownTitle: {
     fontSize: 13,

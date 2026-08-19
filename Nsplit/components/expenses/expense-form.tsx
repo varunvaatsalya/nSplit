@@ -1,3 +1,5 @@
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -8,17 +10,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmojiPickerModal } from '@/components/expenses/emoji-picker-modal';
 import { WhenModal } from '@/components/expenses/when-modal';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { UserAvatar } from '@/components/user-avatar';
 import { useColors } from '@/hooks/use-colors';
-import { apiFetch, errorMessage } from '@/src/api/client';
 import type { Expense, GroupDetail, GroupMember } from '@/src/api/types';
+import { saveExpense } from '@/src/db/expenses';
 import {
   categoryKeyForEmoji,
   suggestEmojiFromText,
@@ -36,7 +39,7 @@ import {
   type SplitMethodValue,
 } from '@/src/lib/expense-form-utils';
 import { getExpenseEmoji } from '@/src/lib/icons';
-import { memberListLabel, sortMembersByName } from '@/src/lib/members';
+import { memberListLabel, resolveMyMember, sortMembersByName } from '@/src/lib/members';
 import { calculateSplit, distributePayerAmounts } from '@/src/lib/split';
 import { formatMinor } from '@/src/lib/format';
 
@@ -61,7 +64,7 @@ function Check({ on, colors }: { on: boolean; colors: ReturnType<typeof useColor
         backgroundColor: on ? colors.primary : 'transparent',
         borderColor: on ? colors.primary : colors.border,
       }}>
-      {on ? <Text style={{ color: '#fff', fontSize: 12 }}>✓</Text> : null}
+      {on ? <Feather name="check" size={16} color="#ffffff" /> : null}
     </View>
   );
 }
@@ -69,24 +72,39 @@ function Check({ on, colors }: { on: boolean; colors: ReturnType<typeof useColor
 export function ExpenseForm({
   group,
   currentUserId,
+  myName,
+  matchByName = true,
+  myMemberId,
   expense = null,
   onSaved,
 }: {
   group: GroupDetail;
   currentUserId?: string | null;
+  myName?: string | null;
+  matchByName?: boolean;
+  myMemberId?: string | null;
   expense?: Expense | null;
   onSaved: () => void;
 }) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const sheetHeight = Math.min(height * 0.5, 420);
   const isEdit = Boolean(expense?._id);
   const members = useMemo(() => sortMembersByName(group?.members || []), [group?.members]);
   const currency = group?.currency || 'INR';
-  const defaultPayer =
-    members.find(
-      (m) => currentUserId && m.userId && String(m.userId) === String(currentUserId)
-    ) ||
-    members[0] ||
-    null;
+  const selfMember = useMemo(
+    () =>
+      resolveMyMember(members, {
+        userId: currentUserId,
+        myName,
+        matchByName,
+        myMemberId: myMemberId || group?.myMembershipId,
+      }),
+    [members, currentUserId, myName, matchByName, myMemberId, group?.myMembershipId]
+  );
+  const selfId = selfMember?._id;
+  const defaultPayer = selfMember || members[0] || null;
 
   const [amount, setAmount] = useState('');
   const [title, setTitle] = useState('');
@@ -112,6 +130,7 @@ export function ExpenseForm({
 
   const [payersOpen, setPayersOpen] = useState(false);
   const [whenOpen, setWhenOpen] = useState(false);
+  const [methodOpen, setMethodOpen] = useState(false);
   const [draftPayerIds, setDraftPayerIds] = useState<string[]>([]);
   const [draftPayerAmounts, setDraftPayerAmounts] = useState<Record<string, number>>({});
   const [payerFieldErrors, setPayerFieldErrors] = useState<string[]>([]);
@@ -283,7 +302,7 @@ export function ExpenseForm({
     if (!payerIds.length) return 'Select payer';
     if (payerIds.length === 1) {
       const m = members.find((x) => x._id === payerIds[0]);
-      return m ? memberListLabel(m, currentUserId) : '1 payer';
+      return m ? memberListLabel(m, currentUserId, selfId) : '1 payer';
     }
     return `${payerIds.length} people paid`;
   }, [payerIds, members, currentUserId]);
@@ -566,18 +585,10 @@ export function ExpenseForm({
                 : Math.round(Number(exactInputs[m._id] || 0) * 100),
         })),
       };
-      const path = isEdit
-        ? `/api/groups/${group.code}/expenses/${expense?._id}`
-        : `/api/groups/${group.code}/expenses`;
-      const res = await apiFetch(path, {
-        method: isEdit ? 'PATCH' : 'POST',
-        body: JSON.stringify(isEdit ? { ...payload, baseVersion: expense?.version } : payload),
-      });
-      if (!res.ok) {
-        setError(errorMessage(res.error, isEdit ? 'Failed to save expense' : 'Failed to add expense'));
-        return;
-      }
+      await saveExpense(group._id, { ...payload, createdById: currentUserId }, expense?._id);
       onSaved();
+    } catch {
+      setError(isEdit ? 'Failed to save expense' : 'Failed to add expense');
     } finally {
       setSaving(false);
     }
@@ -592,6 +603,7 @@ export function ExpenseForm({
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <TextInput
           placeholder="0.00"
+          autoFocus
           placeholderTextColor={colors.textSecondary}
           keyboardType="decimal-pad"
           value={amount}
@@ -711,27 +723,12 @@ export function ExpenseForm({
                 Split with
               </Text>
             </Pressable>
-          </View>
-          <View style={styles.methodRow}>
-            {SPLIT_METHODS.map((m) => {
-              const active = splitMethod === m.value;
-              return (
-                <Pressable
-                  key={m.value}
-                  onPress={() => onSplitMethodChange(m.value)}
-                  style={[
-                    styles.methodChip,
-                    {
-                      backgroundColor: active ? colors.primary : colors.softSurface,
-                      borderColor: active ? colors.primary : colors.border,
-                    },
-                  ]}>
-                  <Text style={{ color: active ? '#fff' : colors.text, fontSize: 12, fontWeight: '600' }}>
-                    {m.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+            <Pressable onPress={() => setMethodOpen(true)} hitSlop={8} style={styles.methodBtn}>
+              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>
+                {SPLIT_METHODS.find((m) => m.value === splitMethod)?.label}
+              </Text>
+              <Ionicons name="chevron-expand" size={18} color={colors.primary} />
+            </Pressable>
           </View>
 
           {members.map((m) => {
@@ -745,13 +742,13 @@ export function ExpenseForm({
                   <Check on={included} colors={colors} />
                 </Pressable>
                 <UserAvatar
-                  name={memberListLabel(m, currentUserId)}
+                  name={memberListLabel(m, currentUserId, selfId)}
                   avatar={m.avatar || m.user?.avatar}
                   seed={m.userId || m._id}
                   size={28}
                 />
                 <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }} numberOfLines={1}>
-                  {memberListLabel(m, currentUserId)}
+                  {memberListLabel(m, currentUserId, selfId)}
                 </Text>
                 {splitMethod === 'EXACT' ? (
                   <TextInput
@@ -832,73 +829,119 @@ export function ExpenseForm({
         }}
       />
 
-      <Modal visible={payersOpen} animationType="slide" onRequestClose={() => setPayersOpen(false)}>
-        <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]}>
-          <View style={styles.modalHead}>
-            <Text style={{ color: colors.text, fontSize: 22, fontWeight: '700' }}>Paid by</Text>
-            <Pressable onPress={() => setPayersOpen(false)}>
-              <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
-            </Pressable>
+      <Modal
+        visible={payersOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPayersOpen(false)}>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={[styles.sheetBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setPayersOpen(false)} />
+          <View
+            style={[
+              styles.sheet,
+              {
+                height: sheetHeight,
+                backgroundColor: colors.elevated,
+                paddingBottom: Math.max(insets.bottom, 12),
+              },
+            ]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+            <View style={styles.modalHead}>
+              <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }}>Paid by</Text>
+              <Pressable onPress={() => setPayersOpen(false)} hitSlop={8}>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+              </Pressable>
+            </View>
+            <Text style={{ color: colors.textSecondary, paddingHorizontal: 20, marginBottom: 8 }}>
+              Select one or more people who paid.
+            </Text>
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12, gap: 4 }}>
+              {members.map((m: GroupMember) => {
+                const checked = draftPayerIds.includes(m._id);
+                const amountInvalid = payerFieldErrors.includes(m._id);
+                return (
+                  <View key={m._id} style={[styles.payerRow, { backgroundColor: colors.background }]}>
+                    <Pressable onPress={() => toggleDraftPayer(m._id)} style={styles.payerLeft}>
+                      <Check on={checked} colors={colors} />
+                      <UserAvatar
+                        name={memberListLabel(m, currentUserId, selfId)}
+                        avatar={m.avatar || m.user?.avatar}
+                        seed={m.userId || m._id}
+                        size={28}
+                      />
+                      <Text style={{ color: colors.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                        {memberListLabel(m, currentUserId, selfId)}
+                      </Text>
+                    </Pressable>
+                    {checked && draftPayerIds.length > 1 ? (
+                      <TextInput
+                        keyboardType="decimal-pad"
+                        value={
+                          draftPayerAmounts[m._id] != null
+                            ? (draftPayerAmounts[m._id] / 100).toString()
+                            : ''
+                        }
+                        onChangeText={(raw) => {
+                          const major = Number(raw);
+                          setDraftPayerAmounts((prev) => ({
+                            ...prev,
+                            [m._id]: Number.isFinite(major) ? Math.round(major * 100) : 0,
+                          }));
+                          setPayerFieldErrors((prev) => prev.filter((id) => id !== m._id));
+                        }}
+                        style={[
+                          styles.exactInput,
+                          {
+                            color: colors.text,
+                            borderColor: amountInvalid ? colors.danger : colors.border,
+                            backgroundColor: colors.surface,
+                          },
+                        ]}
+                      />
+                    ) : checked ? (
+                      <Text style={{ color: colors.text, fontWeight: '600' }}>
+                        {formatMinor(amountMinor, currency)}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+              <PrimaryButton title="Done" onPress={savePayers} />
+            </View>
           </View>
-          <Text style={{ color: colors.textSecondary, paddingHorizontal: 20, marginBottom: 8 }}>
-            Select one or more people who paid.
-          </Text>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20, gap: 4 }}>
-            {members.map((m: GroupMember) => {
-              const checked = draftPayerIds.includes(m._id);
-              const amountInvalid = payerFieldErrors.includes(m._id);
+        </View>
+      </Modal>
+
+      <Modal
+        visible={methodOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMethodOpen(false)}>
+        <View style={styles.methodOverlay}>
+          <Pressable style={[styles.sheetBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setMethodOpen(false)} />
+          <View style={[styles.methodSheet, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6 }}>
+              Split method
+            </Text>
+            {SPLIT_METHODS.map((m) => {
+              const active = splitMethod === m.value;
               return (
-                <View key={m._id} style={[styles.payerRow, { backgroundColor: colors.surface }]}>
-                  <Pressable onPress={() => toggleDraftPayer(m._id)} style={styles.payerLeft}>
-                    <Check on={checked} colors={colors} />
-                    <UserAvatar
-                      name={memberListLabel(m, currentUserId)}
-                      avatar={m.avatar || m.user?.avatar}
-                      seed={m.userId || m._id}
-                      size={28}
-                    />
-                    <Text style={{ color: colors.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
-                      {memberListLabel(m, currentUserId)}
-                    </Text>
-                  </Pressable>
-                  {checked && draftPayerIds.length > 1 ? (
-                    <TextInput
-                      keyboardType="decimal-pad"
-                      value={
-                        draftPayerAmounts[m._id] != null
-                          ? (draftPayerAmounts[m._id] / 100).toString()
-                          : ''
-                      }
-                      onChangeText={(raw) => {
-                        const major = Number(raw);
-                        setDraftPayerAmounts((prev) => ({
-                          ...prev,
-                          [m._id]: Number.isFinite(major) ? Math.round(major * 100) : 0,
-                        }));
-                        setPayerFieldErrors((prev) => prev.filter((id) => id !== m._id));
-                      }}
-                      style={[
-                        styles.exactInput,
-                        {
-                          color: colors.text,
-                          borderColor: amountInvalid ? colors.danger : colors.border,
-                          backgroundColor: colors.background,
-                        },
-                      ]}
-                    />
-                  ) : checked ? (
-                    <Text style={{ color: colors.text, fontWeight: '600' }}>
-                      {formatMinor(amountMinor, currency)}
-                    </Text>
-                  ) : null}
-                </View>
+                <Pressable
+                  key={m.value}
+                  onPress={() => {
+                    onSplitMethodChange(m.value);
+                    setMethodOpen(false);
+                  }}
+                  style={[styles.methodOption, active && { backgroundColor: colors.softSurface }]}>
+                  <Text style={{ color: colors.text, fontWeight: active ? '700' : '500' }}>{m.label}</Text>
+                  {active ? <Feather name="check" size={18} color={colors.primary} /> : null}
+                </Pressable>
               );
             })}
-          </ScrollView>
-          <View style={{ padding: 20 }}>
-            <PrimaryButton title="Done" onPress={savePayers} />
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -958,8 +1001,47 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   splitAll: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  methodRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 10 },
-  methodChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  methodBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  methodOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  methodSheet: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingBottom: 8,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  methodOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    marginTop: 8,
+    marginBottom: 4,
+  },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',

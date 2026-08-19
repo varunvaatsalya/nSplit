@@ -3,15 +3,19 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AddNotes from '@/assets/illustrations/add-notes-amico.svg';
+import BalanceAmico from '@/assets/illustrations/balence-amico.svg';
 import { ExpenseDetailModal } from '@/components/expenses/expense-detail-modal';
 import { UserAvatar } from '@/components/user-avatar';
 import { useColors } from '@/hooks/use-colors';
@@ -22,7 +26,9 @@ import type {
   GroupMember,
 } from '@/src/api/types';
 import { useAuth } from '@/src/auth/auth-context';
-import { getGroup } from '@/src/db/groups';
+import { groupBalance, listExpenses } from '@/src/db/expenses';
+import { getGroup, setGroupMyMember } from '@/src/db/groups';
+import { useIdentity } from '@/src/identity/identity-context';
 import {
   dateHeaderLabel,
   formatMinor,
@@ -30,6 +36,7 @@ import {
   memberName,
 } from '@/src/lib/format';
 import { getExpenseEmoji, getGroupEmoji } from '@/src/lib/icons';
+import { memberListLabel, resolveMyMember } from '@/src/lib/members';
 
 function expenseDayKey(expense: Expense) {
   const raw = expense.expenseDate || expense.createdAt;
@@ -75,6 +82,7 @@ export default function GroupScreen() {
   const router = useRouter();
   const colors = useColors();
   const { user } = useAuth();
+  const { name: myName, matchByName } = useIdentity();
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balance, setBalance] = useState<GroupBalance | null>(null);
@@ -85,6 +93,10 @@ export default function GroupScreen() {
   const [ready, setReady] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
+  const [whoOpen, setWhoOpen] = useState(false);
+  const { width } = useWindowDimensions();
+  const artWidth = Math.min(260, Math.round(width * 0.62));
+  const artHeight = artWidth;
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -97,8 +109,9 @@ export default function GroupScreen() {
     }
     setError('');
     setGroup(local);
-    setExpenses([]);
-    setBalance(null);
+    const localExpenses = await listExpenses(local._id);
+    setExpenses(localExpenses);
+    setBalance(groupBalance(local, localExpenses));
     setMe(user);
     setReady(true);
   }, [id, user]);
@@ -120,12 +133,22 @@ export default function GroupScreen() {
 
   const members = group?.members || [];
   const grouped = useMemo(() => groupExpensesByDate(expenses), [expenses]);
-  const myMember = useMemo(() => {
-    if (!me?._id) return null;
-    return members.find((m) => m.userId && String(m.userId) === String(me._id)) || null;
-  }, [members, me]);
-  const canAdd = false;
+  const myMember = useMemo(
+    () =>
+      resolveMyMember(members, {
+        userId: me?._id,
+        myName,
+        matchByName,
+        myMemberId: group?.myMembershipId,
+      }),
+    [members, me, myName, matchByName, group?.myMembershipId]
+  );
+  const canAdd = true;
   const flatExpenses = useMemo(() => grouped.flatMap((s) => s.items), [grouped]);
+
+  function openAdd() {
+    router.push({ pathname: '/group/[id]/add', params: { id: String(id) } });
+  }
 
   function openExpense(expenseId: string) {
     const idx = flatExpenses.findIndex((e) => e._id === expenseId);
@@ -168,6 +191,9 @@ export default function GroupScreen() {
         <Text style={[styles.groupTitle, { color: colors.text }]} numberOfLines={1}>
           {group.name}
         </Text>
+        <Pressable onPress={() => setWhoOpen(true)} hitSlop={10} style={styles.iconBtn}>
+          <MaterialIcons name="manage-accounts" size={22} color={colors.text} />
+        </Pressable>
       </View>
 
       <View style={styles.toggleWrap}>
@@ -201,18 +227,31 @@ export default function GroupScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.body}
+        contentContainerStyle={[styles.body, expenses.length === 0 && styles.bodyEmpty]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }>
-        {view === 'balance' ? (
-          <BalanceList balance={balance} currency={group.currency || 'INR'} />
-        ) : grouped.length === 0 ? (
-          <View style={[styles.empty, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
-              No expenses yet.
+        {expenses.length === 0 ? (
+          <View style={styles.empty}>
+            {view === 'balance' ? (
+              <BalanceAmico width={artWidth} height={artHeight} />
+            ) : (
+              <AddNotes width={artWidth} height={artHeight} />
+            )}
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
+              {view === 'balance' ? 'No balances yet' : 'Nothing here yet'}
             </Text>
+            <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
+              {view === 'balance'
+                ? 'Balances appear here after you\nadd an expense to this group.'
+                : 'Add the first expense to start splitting with this group.'}
+            </Text>
+            <Pressable onPress={openAdd} hitSlop={8}>
+              <Text style={[styles.emptyAction, { color: colors.primary }]}>Add expense</Text>
+            </Pressable>
           </View>
+        ) : view === 'balance' ? (
+          <BalanceList balance={balance} currency={group.currency || 'INR'} />
         ) : (
           grouped.map((section) => (
             <View key={section.key} style={{ marginBottom: 18 }}>
@@ -306,7 +345,7 @@ export default function GroupScreen() {
 
       {canAdd ? (
         <Pressable
-          onPress={() => router.push({ pathname: '/group/[id]/add', params: { id: String(id) } })}
+          onPress={openAdd}
           style={[styles.fab, { backgroundColor: colors.primary }]}>
           <MaterialIcons name="add" size={28} color="#ffffff" />
         </Pressable>
@@ -320,6 +359,7 @@ export default function GroupScreen() {
         onIndexChange={setDetailIndex}
         group={group}
         currentUserId={me?._id}
+        myMemberId={myMember?._id}
         onEdit={(item) => {
           setDetailOpen(false);
           router.push({
@@ -331,6 +371,51 @@ export default function GroupScreen() {
           load();
         }}
       />
+
+      <Modal visible={whoOpen} transparent animationType="fade" onRequestClose={() => setWhoOpen(false)}>
+        <View style={styles.whoOverlay}>
+          <Pressable style={[styles.whoBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setWhoOpen(false)} />
+          <View style={[styles.whoSheet, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+            <Text style={[styles.whoTitle, { color: colors.text }]}>You in this group</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 10 }}>
+              We’ll treat this member as you for “me”, balances, and default payer.
+            </Text>
+            {members.map((member) => {
+              const active = myMember?._id === member._id;
+              return (
+                <Pressable
+                  key={member._id}
+                  onPress={async () => {
+                    await setGroupMyMember(group._id, member._id);
+                    setWhoOpen(false);
+                    await load();
+                  }}
+                  style={[styles.whoRow, active && { backgroundColor: colors.softSurface }]}>
+                  <UserAvatar
+                    name={memberListLabel(member, me?._id, myMember?._id)}
+                    avatar={member.avatar}
+                    seed={member.userId || member._id}
+                    size={32}
+                  />
+                  <Text style={{ flex: 1, color: colors.text, fontWeight: active ? '700' : '500' }}>
+                    {memberListLabel(member, me?._id, myMember?._id)}
+                  </Text>
+                  {active ? <MaterialIcons name="check" size={18} color={colors.primary} /> : null}
+                </Pressable>
+              );
+            })}
+            <Pressable
+              onPress={async () => {
+                await setGroupMyMember(group._id, null);
+                setWhoOpen(false);
+                await load();
+              }}
+              style={styles.whoRow}>
+              <Text style={{ color: colors.textSecondary }}>Don’t mark anyone</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -421,12 +506,30 @@ const styles = StyleSheet.create({
   toggle: { alignSelf: 'flex-start', flexDirection: 'row', borderRadius: 999, padding: 4 },
   toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
   body: { paddingHorizontal: 20, paddingBottom: 110 },
+  bodyEmpty: { flexGrow: 1, justifyContent: 'center' },
   empty: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 18,
-    padding: 28,
-    marginTop: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 56,
+  },
+  emptyTitle: {
+    marginTop: 8,
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyCopy: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  emptyAction: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '600',
   },
   dateHead: {
     fontSize: 11,
@@ -464,5 +567,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
+  },
+  whoOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  whoBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  whoSheet: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  whoTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  whoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
   },
 });
