@@ -1,27 +1,45 @@
-import { LOCAL_SCHEMA_SQL } from './schema';
+import * as SQLite from 'expo-sqlite';
 
-type SqlExecutor = {
-  execAsync: (sql: string) => Promise<void>;
-  runAsync: (sql: string, params?: unknown[]) => Promise<unknown>;
-  getAllAsync: <T = unknown>(sql: string, params?: unknown[]) => Promise<T[]>;
-  getFirstAsync: <T = unknown>(sql: string, params?: unknown[]) => Promise<T | null>;
-};
+import { LOCAL_SCHEMA_SQL, RESET_LEGACY_SQL, SCHEMA_VERSION } from './schema';
+
+export type SqlExecutor = SQLite.SQLiteDatabase;
 
 let dbPromise: Promise<SqlExecutor> | null = null;
 
-/**
- * Opens (or returns) the local SQLite database.
- * Requires `expo-sqlite` - install during mobile offline phase setup.
- */
+async function readSchemaVersion(database: SqlExecutor) {
+  try {
+    const row = await database.getFirstAsync<{ value: string }>(
+      `SELECT value FROM meta WHERE key = 'schema_version'`
+    );
+    return Number(row?.value || 0);
+  } catch {
+    return 0;
+  }
+}
+
+async function migrate(database: SqlExecutor) {
+  const version = await readSchemaVersion(database);
+  if (version < SCHEMA_VERSION) {
+    await database.execAsync(RESET_LEGACY_SQL);
+  }
+  await database.execAsync(LOCAL_SCHEMA_SQL);
+  await database.runAsync(
+    `INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`,
+    ['schema_version', String(SCHEMA_VERSION)]
+  );
+}
+
 export async function getDb(): Promise<SqlExecutor> {
   if (!dbPromise) {
     dbPromise = (async () => {
-      // Dynamic import keeps the module loadable before the dependency is installed.
-      const SQLite = await import('expo-sqlite');
       const database = await SQLite.openDatabaseAsync('nsplit.db');
-      await database.execAsync(LOCAL_SCHEMA_SQL);
-      return database as unknown as SqlExecutor;
+      await migrate(database);
+      return database;
     })();
   }
   return dbPromise;
+}
+
+export async function initDb() {
+  return getDb();
 }

@@ -7,9 +7,9 @@ export const Colors = {
   light: {
     text: '#0F172A',
     textSecondary: '#64748B',
-    background: '#F8FAFC',
+    background: '#F3F4F6',
     surface: '#FFFFFF',
-    softSurface: '#F1F5F9',
+    softSurface: '#E5E7EB',
     border: '#E2E8F0',
     tint: '#6366F1',
     primary: '#6366F1',

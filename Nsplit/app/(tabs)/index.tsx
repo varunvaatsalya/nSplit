@@ -1,98 +1,157 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+// import RefundBro from '@/assets/illustrations/refund-bro.svg';
+import GroupDiscussion from '@/assets/illustrations/group-discussion-amico.svg';
+import { useColors } from '@/hooks/use-colors';
+import { useGroups } from '@/src/groups/groups-context';
+import { getGroupEmoji } from '@/src/lib/icons';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const colors = useColors();
+  const router = useRouter();
+  const { groups, reload } = useGroups();
+  const { width } = useWindowDimensions();
+  const artWidth = Math.min(280, Math.round(width * 0.72));
+  const artHeight = Math.round(artWidth * (419.74 / 474.81));
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload])
+  );
+
+  function openCreate() {
+    router.push('/group/new');
+  }
+
+  return (
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={[styles.brand, { color: colors.primary }]}>nSplit</Text>
+      </View>
+
+      {groups.length === 0 ? (
+        <View style={styles.empty}>
+          <GroupDiscussion width={artWidth} height={artHeight} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No groups yet</Text>
+          <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
+            Make a group, add your people, and start splitting expenses.
+          </Text>
+          <Pressable onPress={openCreate} hitSlop={8}>
+            <Text style={[styles.createLink, { color: colors.primary }]}>Create new group</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {groups.map((group) => (
+            <Pressable
+              key={group._id}
+              onPress={() =>
+                router.push({ pathname: '/group/[id]', params: { id: group._id } })
+              }
+              style={({ pressed }) => [
+                styles.row,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}>
+              <View style={[styles.iconWrap, { backgroundColor: colors.softSurface }]}>
+                <Text style={styles.emoji}>{getGroupEmoji(group.icon)}</Text>
+              </View>
+              <View style={styles.rowText}>
+                <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
+                  {group.name}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+                  {group.memberCount || 0} member{(group.memberCount || 0) === 1 ? '' : 's'}
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      <Pressable
+        onPress={openCreate}
+        style={[styles.fab, { backgroundColor: colors.primary }]}>
+        <MaterialIcons name="add" size={28} color="#ffffff" />
+      </Pressable>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safe: { flex: 1 },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  brand: {
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 64,
+  },
+  emptyTitle: {
+    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyCopy: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  createLink: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  list: { paddingHorizontal: 20, paddingBottom: 100, gap: 12 },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 14,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  iconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  emoji: { fontSize: 22 },
+  rowText: { flex: 1, minWidth: 0 },
+  groupName: { fontSize: 16, fontWeight: '700' },
+  fab: {
     position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
   },
 });
