@@ -1,7 +1,6 @@
 import {
   ActivityIndicator,
   Pressable,
-  StyleSheet,
   Text,
   View,
   type PressableProps,
@@ -18,46 +17,22 @@ export function PrimaryButton({
 }: PressableProps & { title: string; loading?: boolean }) {
   const colors = useColors();
   const isDisabled = Boolean(disabled || loading);
+
   return (
     <Pressable
       {...props}
       disabled={isDisabled}
-      style={({ pressed }) => [
-        styles.button,
-        {
+      className="w-full active:opacity-85"
+      style={typeof style === 'function' ? undefined : style}>
+      <View
+        className="h-12 w-full flex-row items-center justify-center gap-2 rounded-xl"
+        style={{
           backgroundColor: colors.primary,
-          opacity: isDisabled ? 0.7 : pressed ? 0.85 : 1,
-        },
-        typeof style === 'function' ? undefined : style,
-      ]}>
-      {loading ? (
-        <View style={styles.row}>
-          <ActivityIndicator color="#ffffff" />
-          <Text style={styles.title}>{title}</Text>
-        </View>
-      ) : (
-        <Text style={styles.title}>{title}</Text>
-      )}
+          opacity: isDisabled ? 0.7 : 1,
+        }}>
+        {loading ? <ActivityIndicator color="#ffffff" /> : null}
+        <Text className="text-[15px] font-semibold text-white">{title}</Text>
+      </View>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});

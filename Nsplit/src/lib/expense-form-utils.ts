@@ -118,18 +118,25 @@ export function combineDateTime(dateStr: string, timeStr: string) {
 }
 
 export function formatWhenLabel(date: Date) {
+  return `${formatWhenDateLabel(date)} · ${formatWhenTimeLabel(date)}`;
+}
+
+export function formatWhenDateLabel(date: Date) {
   const now = new Date();
   const sameDay =
     date.getFullYear() === now.getFullYear() &&
     date.getMonth() === now.getMonth() &&
     date.getDate() === now.getDate();
-  const time = date.toLocaleTimeString(undefined, {
+  if (sameDay) return 'Today';
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+export function formatWhenTimeLabel(date: Date) {
+  return date.toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
   });
-  if (sameDay) return `Today · ${time}`;
-  return `${date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-  })} · ${time}`;
 }

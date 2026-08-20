@@ -1,12 +1,15 @@
 import "react-native-gesture-handler";
+import "@/global.css";
 import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
+import { PortalHost } from "@rn-primitives/portal";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import { useColorScheme as useNativewindColorScheme } from "nativewind";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
@@ -35,8 +38,13 @@ function BootSplash() {
 
 function RootNavigator() {
   const colorScheme = useColorScheme();
+  const { setColorScheme } = useNativewindColorScheme();
   const colors = useColors();
   const { ready } = useGroups();
+
+  useEffect(() => {
+    setColorScheme(colorScheme === "dark" ? "dark" : "light");
+  }, [colorScheme, setColorScheme]);
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
@@ -69,6 +77,7 @@ function RootNavigator() {
         <Stack.Screen name="group" />
       </Stack>
       <StatusBar style="auto" />
+      <PortalHost />
     </ThemeProvider>
   );
 }

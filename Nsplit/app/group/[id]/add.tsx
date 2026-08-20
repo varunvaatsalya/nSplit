@@ -1,8 +1,10 @@
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { ExpenseForm } from '@/components/expenses/expense-form';
+import { RecordTypeTabs, type RecordTab } from '@/components/records/record-type-tabs';
+import { TransferForm } from '@/components/transfers/transfer-form';
 import { useColors } from '@/hooks/use-colors';
 import type { Expense, GroupDetail } from '@/src/api/types';
 import { useAuth } from '@/src/auth/auth-context';
@@ -20,12 +22,16 @@ export default function AddExpenseScreen() {
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [expense, setExpense] = useState<Expense | null>(null);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<RecordTab>('expense');
 
   const isEdit = Boolean(expenseId);
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: isEdit ? 'Edit expense' : 'Add expense' });
-  }, [navigation, isEdit]);
+    navigation.setOptions({
+      headerTitle:
+        isEdit ? 'Edit expense' : tab === 'transfer' ? 'Add transfer' : 'Add expense',
+    });
+  }, [navigation, isEdit, tab]);
 
   useEffect(() => {
     if (!id) return;
@@ -49,7 +55,7 @@ export default function AddExpenseScreen() {
 
   if (!group || (isEdit && !expense)) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+      <View className="flex-1 items-center justify-center bg-background">
         {error ? (
           <Text style={{ color: colors.danger, padding: 20 }}>{error}</Text>
         ) : (
@@ -60,14 +66,29 @@ export default function AddExpenseScreen() {
   }
 
   return (
-    <ExpenseForm
-      group={group}
-      currentUserId={user?._id}
-      myName={myName || user?.name}
-      matchByName={matchByName}
-      myMemberId={group.myMembershipId}
-      expense={expense}
-      onSaved={() => router.back()}
-    />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {isEdit ? null : (
+        <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 }}>
+          <RecordTypeTabs value={tab} onChange={setTab} />
+        </View>
+      )}
+      {tab === 'transfer' && !isEdit ? (
+        <TransferForm
+          group={group}
+          currentUserId={user?._id}
+          onSaved={() => router.back()}
+        />
+      ) : (
+        <ExpenseForm
+          group={group}
+          currentUserId={user?._id}
+          myName={myName || user?.name}
+          matchByName={matchByName}
+          myMemberId={group.myMembershipId}
+          expense={expense}
+          onSaved={() => router.back()}
+        />
+      )}
+    </View>
   );
 }

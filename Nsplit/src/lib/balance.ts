@@ -21,11 +21,17 @@ function emptyBucket(): MemberBucket {
 export function computeGroupBalances({
   members = [],
   expenses = [],
+  transfers = [],
 }: {
   members?: { id: string }[];
   expenses?: {
     payers?: { memberId: string; amountMinor: number }[];
     splits?: { memberId: string; amountMinor: number }[];
+  }[];
+  transfers?: {
+    fromMemberId: string;
+    toMemberId: string;
+    amountMinor: number;
   }[];
 }) {
   const byMemberId: Record<string, MemberBucket> = {};
@@ -44,8 +50,20 @@ export function computeGroupBalances({
     }
   }
 
+  for (const transfer of transfers) {
+    if (!byMemberId[transfer.fromMemberId]) byMemberId[transfer.fromMemberId] = emptyBucket();
+    if (!byMemberId[transfer.toMemberId]) byMemberId[transfer.toMemberId] = emptyBucket();
+    byMemberId[transfer.fromMemberId].transferredOutMinor += transfer.amountMinor;
+    byMemberId[transfer.toMemberId].transferredInMinor += transfer.amountMinor;
+  }
+
   for (const bucket of Object.values(byMemberId)) {
-    bucket.netMinor = bucket.paidMinor - bucket.owedMinor;
+    bucket.netMinor =
+      bucket.paidMinor -
+      bucket.owedMinor +
+      bucket.incomeMinor +
+      bucket.transferredOutMinor -
+      bucket.transferredInMinor;
   }
 
   return { byMemberId, pairwise: simplifyPairwise(byMemberId) };

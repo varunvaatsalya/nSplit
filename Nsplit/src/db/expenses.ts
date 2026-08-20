@@ -1,4 +1,4 @@
-import type { Expense, GroupBalance, GroupDetail } from '@/src/api/types';
+import type { Expense, GroupBalance, GroupDetail, Transfer } from '@/src/api/types';
 import { computeGroupBalances } from '@/src/lib/balance';
 import { calculateSplit } from '@/src/lib/split';
 
@@ -221,13 +221,22 @@ export async function deleteExpense(groupId: string, expenseId: string) {
   await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, groupId]);
 }
 
-export function groupBalance(group: GroupDetail, expenses: Expense[]): GroupBalance {
+export function groupBalance(
+  group: GroupDetail,
+  expenses: Expense[],
+  transfers: Transfer[] = []
+): GroupBalance {
   const members = group.members || [];
   const result = computeGroupBalances({
     members: members.map((m) => ({ id: m._id })),
     expenses: expenses.map((e) => ({
       payers: e.payers || [],
       splits: e.splits || [],
+    })),
+    transfers: transfers.map((t) => ({
+      fromMemberId: t.fromMemberId,
+      toMemberId: t.toMemberId,
+      amountMinor: t.amountMinor,
     })),
   });
   const nameById = Object.fromEntries(members.map((m) => [m._id, m.displayName || 'Member']));

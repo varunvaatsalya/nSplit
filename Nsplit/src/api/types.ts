@@ -46,6 +46,19 @@ export type GroupDetail = GroupSummary & {
   };
 };
 
+export type Transfer = {
+  _id: string;
+  title: string;
+  icon?: string | null;
+  amountMinor: number;
+  currency?: string;
+  fromMemberId: string;
+  toMemberId: string;
+  transferDate?: string;
+  createdAt?: string;
+  createdById?: string;
+};
+
 export type Expense = {
   _id: string;
   title: string;

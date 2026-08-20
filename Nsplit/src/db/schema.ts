@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const LOCAL_SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -52,9 +52,27 @@ CREATE TABLE IF NOT EXISTS expenses (
   FOREIGN KEY (group_id) REFERENCES groups(id)
 );
 
+CREATE TABLE IF NOT EXISTS transfers (
+  id TEXT PRIMARY KEY NOT NULL,
+  group_id TEXT NOT NULL,
+  title TEXT,
+  amount_minor INTEGER,
+  currency TEXT,
+  icon TEXT,
+  from_member_id TEXT NOT NULL,
+  to_member_id TEXT NOT NULL,
+  transfer_date TEXT,
+  created_at TEXT,
+  updated_at TEXT,
+  deleted_at TEXT,
+  created_by_id TEXT,
+  FOREIGN KEY (group_id) REFERENCES groups(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_groups_updated ON groups(deleted_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_members_group ON group_members(group_id, left_at);
 CREATE INDEX IF NOT EXISTS idx_expenses_group ON expenses(group_id, deleted_at, expense_date);
+CREATE INDEX IF NOT EXISTS idx_transfers_group ON transfers(group_id, deleted_at, transfer_date);
 `;
 
 export const RESET_LEGACY_SQL = `

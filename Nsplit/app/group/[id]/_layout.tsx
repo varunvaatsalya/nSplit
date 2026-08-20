@@ -19,6 +19,9 @@ export default function GroupStackLayout() {
         options={{
           presentation: 'modal',
           headerShown: true,
+          headerTitleAlign: 'center',
+          headerShadowVisible: false,
+          headerTitleStyle: { fontSize: 16, fontWeight: '600' },
           title: 'Add expense',
         }}
       />

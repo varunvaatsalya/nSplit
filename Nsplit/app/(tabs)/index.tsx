@@ -4,8 +4,9 @@ import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// import RefundBro from '@/assets/illustrations/refund-bro.svg';
 import GroupDiscussion from '@/assets/illustrations/group-discussion-amico.svg';
+import { Button } from '@/components/ui/button';
+import { Text as UIText } from '@/components/ui/text';
 import { useColors } from '@/hooks/use-colors';
 import { useGroups } from '@/src/groups/groups-context';
 import { getGroupEmoji } from '@/src/lib/icons';
@@ -35,42 +36,41 @@ export default function HomeScreen() {
       </View>
 
       {groups.length === 0 ? (
-        <View style={styles.empty}>
+        <View className="flex-1 items-center justify-center px-6 pb-16">
           <GroupDiscussion width={artWidth} height={artHeight} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No groups yet</Text>
-          <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
+          <UIText className="mt-4 text-center text-xl font-bold">No groups yet</UIText>
+          <UIText variant="muted" className="mt-1.5 max-w-[280px] text-center leading-5">
             Make a group, add your people, and start splitting expenses.
-          </Text>
-          <Pressable onPress={openCreate} hitSlop={8}>
-            <Text style={[styles.createLink, { color: colors.primary }]}>Create new group</Text>
-          </Pressable>
+          </UIText>
+          <Button variant="link" onPress={openCreate} className="mt-4">
+            <UIText>Create new group</UIText>
+          </Button>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.list}>
+        <ScrollView contentContainerClassName="gap-3 px-5 pb-[100px]">
           {groups.map((group) => (
             <Pressable
               key={group._id}
               onPress={() =>
                 router.push({ pathname: '/group/[id]', params: { id: group._id } })
               }
-              style={({ pressed }) => [
-                styles.row,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}>
-              <View style={[styles.iconWrap, { backgroundColor: colors.softSurface }]}>
-                <Text style={styles.emoji}>{getGroupEmoji(group.icon)}</Text>
+              className="flex-row items-center gap-3.5 rounded-[18px] border p-3.5 active:opacity-85"
+              style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              }}>
+              <View
+                className="h-12 w-12 items-center justify-center rounded-full"
+                style={{ backgroundColor: colors.softSurface }}>
+                <Text className="text-[22px]">{getGroupEmoji(group.icon)}</Text>
               </View>
-              <View style={styles.rowText}>
-                <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
+              <View className="min-w-0 flex-1">
+                <UIText className="text-base font-bold" numberOfLines={1}>
                   {group.name}
-                </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+                </UIText>
+                <UIText variant="muted" className="text-[13px]">
                   {group.memberCount || 0} member{(group.memberCount || 0) === 1 ? '' : 's'}
-                </Text>
+                </UIText>
               </View>
               <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
             </Pressable>
@@ -99,50 +99,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.8,
   },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 64,
-  },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptyCopy: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
-  createLink: {
-    marginTop: 16,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  list: { paddingHorizontal: 20, paddingBottom: 100, gap: 12 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
-  },
-  iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emoji: { fontSize: 22 },
-  rowText: { flex: 1, minWidth: 0 },
-  groupName: { fontSize: 16, fontWeight: '700' },
   fab: {
     position: 'absolute',
     right: 20,

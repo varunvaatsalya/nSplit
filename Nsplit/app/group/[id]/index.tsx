@@ -1,6 +1,6 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -11,49 +11,67 @@ import {
   Text,
   useWindowDimensions,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import AddNotes from '@/assets/illustrations/add-notes-amico.svg';
-import BalanceAmico from '@/assets/illustrations/balence-amico.svg';
-import { ExpenseDetailModal } from '@/components/expenses/expense-detail-modal';
-import { UserAvatar } from '@/components/user-avatar';
-import { useColors } from '@/hooks/use-colors';
+import AddNotes from "@/assets/illustrations/add-notes-amico.svg";
+import BalanceAmico from "@/assets/illustrations/balence-amico.svg";
+import { ExpenseDetailModal } from "@/components/expenses/expense-detail-modal";
+import { UserAvatar } from "@/components/user-avatar";
+import { useColors } from "@/hooks/use-colors";
 import type {
   Expense,
   GroupBalance,
   GroupDetail,
   GroupMember,
-} from '@/src/api/types';
-import { useAuth } from '@/src/auth/auth-context';
-import { groupBalance, listExpenses } from '@/src/db/expenses';
-import { getGroup, setGroupMyMember } from '@/src/db/groups';
-import { useIdentity } from '@/src/identity/identity-context';
+  Transfer,
+} from "@/src/api/types";
+import { useAuth } from "@/src/auth/auth-context";
+import { groupBalance, listExpenses } from "@/src/db/expenses";
+import { getGroup, setGroupMyMember } from "@/src/db/groups";
+import { listTransfers } from "@/src/db/transfers";
+import { useIdentity } from "@/src/identity/identity-context";
 import {
   dateHeaderLabel,
   formatMinor,
   formatRowTime,
   memberName,
-} from '@/src/lib/format';
-import { getExpenseEmoji, getGroupEmoji } from '@/src/lib/icons';
-import { memberListLabel, resolveMyMember } from '@/src/lib/members';
+} from "@/src/lib/format";
+import { getExpenseEmoji, getGroupEmoji } from "@/src/lib/icons";
+import { memberListLabel, resolveMyMember } from "@/src/lib/members";
 
-function expenseDayKey(expense: Expense) {
-  const raw = expense.expenseDate || expense.createdAt;
-  const d = new Date(raw || '');
-  if (Number.isNaN(d.getTime())) return 'unknown';
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+type FeedItem =
+  | { kind: "expense"; id: string; date: Date; expense: Expense }
+  | { kind: "transfer"; id: string; date: Date; transfer: Transfer };
+
+function feedDayKey(date: Date) {
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-function groupExpensesByDate(expenses: Expense[]) {
-  const map = new Map<string, { key: string; date: Date; items: Expense[] }>();
-  for (const expense of expenses) {
-    const key = expenseDayKey(expense);
-    if (!map.has(key)) {
-      const raw = expense.expenseDate || expense.createdAt;
-      map.set(key, { key, date: new Date(raw || ''), items: [] });
-    }
-    map.get(key)!.items.push(expense);
+function groupFeedItems(expenses: Expense[], transfers: Transfer[]) {
+  const items: FeedItem[] = [
+    ...expenses.map((expense) => ({
+      kind: "expense" as const,
+      id: expense._id,
+      date: new Date(expense.expenseDate || expense.createdAt || ""),
+      expense,
+    })),
+    ...transfers.map((transfer) => ({
+      kind: "transfer" as const,
+      id: transfer._id,
+      date: new Date(transfer.transferDate || transfer.createdAt || ""),
+      transfer,
+    })),
+  ];
+  const map = new Map<string, { key: string; date: Date; items: FeedItem[] }>();
+  for (const item of items) {
+    const key = feedDayKey(item.date);
+    if (!map.has(key)) map.set(key, { key, date: item.date, items: [] });
+    map.get(key)!.items.push(item);
+  }
+  for (const section of map.values()) {
+    section.items.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
   return [...map.values()].sort((a, b) => b.date.getTime() - a.date.getTime());
 }
@@ -64,17 +82,31 @@ function payerMembers(expense: Expense, members: GroupMember[]) {
     .filter(Boolean) as GroupMember[];
 }
 
-function myShareLine(expense: Expense, myMemberId?: string | null, currency = 'INR') {
+function myShareLine(
+  expense: Expense,
+  myMemberId?: string | null,
+  currency = "INR",
+) {
   if (!myMemberId) return null;
   const paid =
-    (expense.payers || []).find((p) => p.memberId === myMemberId)?.amountMinor || 0;
+    (expense.payers || []).find((p) => p.memberId === myMemberId)
+      ?.amountMinor || 0;
   const owed =
-    (expense.splits || []).find((s) => s.memberId === myMemberId)?.amountMinor || 0;
+    (expense.splits || []).find((s) => s.memberId === myMemberId)
+      ?.amountMinor || 0;
   const net = paid - owed;
   if (net === 0 && owed === 0 && paid === 0) return null;
-  if (net > 0) return { text: `You lent ${formatMinor(net, currency)}`, tone: 'positive' as const };
-  if (net < 0) return { text: `You owe ${formatMinor(-net, currency)}`, tone: 'owes' as const };
-  return { text: 'Settled for you', tone: 'muted' as const };
+  if (net > 0)
+    return {
+      text: `You lent ${formatMinor(net, currency)}`,
+      tone: "positive" as const,
+    };
+  if (net < 0)
+    return {
+      text: `You owe ${formatMinor(-net, currency)}`,
+      tone: "owes" as const,
+    };
+  return { text: "Settled for you", tone: "muted" as const };
 }
 
 export default function GroupScreen() {
@@ -85,10 +117,11 @@ export default function GroupScreen() {
   const { name: myName, matchByName } = useIdentity();
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [balance, setBalance] = useState<GroupBalance | null>(null);
   const [me, setMe] = useState(user);
-  const [error, setError] = useState('');
-  const [view, setView] = useState<'expenses' | 'balance'>('expenses');
+  const [error, setError] = useState("");
+  const [view, setView] = useState<"expenses" | "balance">("expenses");
   const [refreshing, setRefreshing] = useState(false);
   const [ready, setReady] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -102,16 +135,18 @@ export default function GroupScreen() {
     if (!id) return;
     const local = await getGroup(String(id));
     if (!local) {
-      setError('Group not found');
+      setError("Group not found");
       setGroup(null);
       setReady(true);
       return;
     }
-    setError('');
+    setError("");
     setGroup(local);
     const localExpenses = await listExpenses(local._id);
+    const localTransfers = await listTransfers(local._id);
     setExpenses(localExpenses);
-    setBalance(groupBalance(local, localExpenses));
+    setTransfers(localTransfers);
+    setBalance(groupBalance(local, localExpenses, localTransfers));
     setMe(user);
     setReady(true);
   }, [id, user]);
@@ -119,7 +154,7 @@ export default function GroupScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+    }, [load]),
   );
 
   async function onRefresh() {
@@ -132,7 +167,11 @@ export default function GroupScreen() {
   }
 
   const members = group?.members || [];
-  const grouped = useMemo(() => groupExpensesByDate(expenses), [expenses]);
+  const grouped = useMemo(
+    () => groupFeedItems(expenses, transfers),
+    [expenses, transfers],
+  );
+  const feedEmpty = expenses.length === 0 && transfers.length === 0;
   const myMember = useMemo(
     () =>
       resolveMyMember(members, {
@@ -141,13 +180,19 @@ export default function GroupScreen() {
         matchByName,
         myMemberId: group?.myMembershipId,
       }),
-    [members, me, myName, matchByName, group?.myMembershipId]
+    [members, me, myName, matchByName, group?.myMembershipId],
   );
   const canAdd = true;
-  const flatExpenses = useMemo(() => grouped.flatMap((s) => s.items), [grouped]);
+  const flatExpenses = useMemo(
+    () =>
+      grouped.flatMap((s) =>
+        s.items.flatMap((item) => (item.kind === "expense" ? [item.expense] : [])),
+      ),
+    [grouped],
+  );
 
   function openAdd() {
-    router.push({ pathname: '/group/[id]/add', params: { id: String(id) } });
+    router.push({ pathname: "/group/[id]/add", params: { id: String(id) } });
   }
 
   function openExpense(expenseId: string) {
@@ -159,9 +204,11 @@ export default function GroupScreen() {
 
   if (error && !group) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.safe, { backgroundColor: colors.background }]}
+      >
         <Pressable onPress={() => router.back()} style={styles.backRow}>
-          <MaterialIcons name="arrow-back" size={22} color={colors.text} />
+          <Feather name="settings" size={22} color={colors.text} />
           <Text style={{ color: colors.text, marginLeft: 8 }}>Groups</Text>
         </Pressable>
         <Text style={{ color: colors.danger, padding: 20 }}>{error}</Text>
@@ -171,7 +218,9 @@ export default function GroupScreen() {
 
   if (!ready || !group) {
     return (
-      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.safe, { backgroundColor: colors.background }]}
+      >
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -180,25 +229,41 @@ export default function GroupScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: colors.background }]}
+      edges={["top"]}
+    >
       <View style={styles.topBar}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.iconBtn}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={10}
+          style={styles.iconBtn}
+        >
           <MaterialIcons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
-        <View style={[styles.groupIcon, { backgroundColor: colors.softSurface }]}>
+        <View
+          style={[styles.groupIcon, { backgroundColor: colors.softSurface }]}
+        >
           <Text style={{ fontSize: 22 }}>{getGroupEmoji(group.icon)}</Text>
         </View>
-        <Text style={[styles.groupTitle, { color: colors.text }]} numberOfLines={1}>
+        <Text
+          style={[styles.groupTitle, { color: colors.text }]}
+          numberOfLines={1}
+        >
           {group.name}
         </Text>
-        <Pressable onPress={() => setWhoOpen(true)} hitSlop={10} style={styles.iconBtn}>
-          <MaterialIcons name="manage-accounts" size={22} color={colors.text} />
+        <Pressable
+          onPress={() => setWhoOpen(true)}
+          hitSlop={10}
+          style={styles.iconBtn}
+        >
+          <Feather name="settings" size={22} color={colors.text} />
         </Pressable>
       </View>
 
       <View style={styles.toggleWrap}>
         <View style={[styles.toggle, { backgroundColor: colors.softSurface }]}>
-          {(['expenses', 'balance'] as const).map((key) => {
+          {(["expenses", "balance"] as const).map((key) => {
             const active = view === key;
             return (
               <Pressable
@@ -211,13 +276,15 @@ export default function GroupScreen() {
                     borderColor: colors.border,
                     borderWidth: 1,
                   },
-                ]}>
+                ]}
+              >
                 <Text
                   style={{
                     color: active ? colors.text : colors.textSecondary,
-                    fontWeight: '600',
-                    textTransform: 'capitalize',
-                  }}>
+                    fontWeight: "600",
+                    textTransform: "capitalize",
+                  }}
+                >
                   {key}
                 </Text>
               </Pressable>
@@ -227,31 +294,41 @@ export default function GroupScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.body, expenses.length === 0 && styles.bodyEmpty]}
+        contentContainerStyle={[
+          styles.body,
+          feedEmpty && styles.bodyEmpty,
+        ]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }>
-        {expenses.length === 0 ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {feedEmpty ? (
           <View style={styles.empty}>
-            {view === 'balance' ? (
+            {view === "balance" ? (
               <BalanceAmico width={artWidth} height={artHeight} />
             ) : (
               <AddNotes width={artWidth} height={artHeight} />
             )}
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              {view === 'balance' ? 'No balances yet' : 'Nothing here yet'}
+              {view === "balance" ? "No balances yet" : "Nothing here yet"}
             </Text>
             <Text style={[styles.emptyCopy, { color: colors.textSecondary }]}>
-              {view === 'balance'
-                ? 'Balances appear here after you\nadd an expense to this group.'
-                : 'Add the first expense to start splitting with this group.'}
+              {view === "balance"
+                ? "Balances appear here after you\nadd an expense to this group."
+                : "Add the first expense to start splitting with this group."}
             </Text>
             <Pressable onPress={openAdd} hitSlop={8}>
-              <Text style={[styles.emptyAction, { color: colors.primary }]}>Add expense</Text>
+              <Text style={[styles.emptyAction, { color: colors.primary }]}>
+                Add expense
+              </Text>
             </Pressable>
           </View>
-        ) : view === 'balance' ? (
-          <BalanceList balance={balance} currency={group.currency || 'INR'} />
+        ) : view === "balance" ? (
+          <BalanceList balance={balance} currency={group.currency || "INR"} />
         ) : (
           grouped.map((section) => (
             <View key={section.key} style={{ marginBottom: 18 }}>
@@ -259,20 +336,81 @@ export default function GroupScreen() {
                 {dateHeaderLabel(section.date).toUpperCase()}
               </Text>
               <View style={{ gap: 10 }}>
-                {section.items.map((expense) => {
+                {section.items.map((item) => {
+                  if (item.kind === "transfer") {
+                    const transfer = item.transfer;
+                    const from = members.find(
+                      (m) => m._id === transfer.fromMemberId,
+                    );
+                    const to = members.find(
+                      (m) => m._id === transfer.toMemberId,
+                    );
+                    return (
+                      <View
+                        key={transfer._id}
+                        className="flex-row items-center gap-3 rounded-2xl border p-3.5"
+                        style={{
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        }}
+                      >
+                        <View
+                          className="h-10 w-10 items-center justify-center rounded-full"
+                          style={{ backgroundColor: colors.softSurface }}
+                        >
+                          <Text style={{ fontSize: 18 }}>
+                            {transfer.icon || "💸"}
+                          </Text>
+                        </View>
+                        <View className="min-w-0 flex-1">
+                          <Text
+                            style={[styles.expenseTitle, { color: colors.text }]}
+                            numberOfLines={1}
+                          >
+                            {transfer.title || "Transfer"}
+                          </Text>
+                          <Text
+                            style={{
+                              color: colors.textSecondary,
+                              fontSize: 12,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {memberName(from)} → {memberName(to)} ·{" "}
+                            {formatRowTime(item.date)}
+                          </Text>
+                        </View>
+                        <Text style={[styles.amount, { color: colors.text }]}>
+                          {formatMinor(
+                            transfer.amountMinor,
+                            transfer.currency || group.currency,
+                          )}
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  const expense = item.expense;
                   const payers = payerMembers(expense, members);
                   const paidBy =
-                    payers.length === 1 ? memberName(payers[0]) : payers.length ? null : 'Unknown';
+                    payers.length === 1
+                      ? memberName(payers[0])
+                      : payers.length
+                        ? null
+                        : "Unknown";
                   const share = myShareLine(
                     expense,
                     myMember?._id,
-                    expense.currency || group.currency
+                    expense.currency || group.currency,
                   );
-                  const when = new Date(expense.expenseDate || expense.createdAt || '');
+                  const when = new Date(
+                    expense.expenseDate || expense.createdAt || "",
+                  );
                   return (
                     <Pressable
                       key={expense._id}
                       onPress={() => openExpense(expense._id)}
+                      className="flex-row items-center gap-3"
                       style={({ pressed }) => [
                         styles.expenseRow,
                         {
@@ -280,18 +418,34 @@ export default function GroupScreen() {
                           borderColor: colors.border,
                           opacity: pressed ? 0.85 : 1,
                         },
-                      ]}>
-                      <View style={[styles.expenseIcon, { backgroundColor: colors.softSurface }]}>
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.expenseIcon,
+                          { backgroundColor: colors.softSurface },
+                        ]}
+                      >
                         <Text style={{ fontSize: 18 }}>
                           {getExpenseEmoji(expense.icon, expense.categoryKey)}
                         </Text>
                       </View>
                       <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={[styles.expenseTitle, { color: colors.text }]} numberOfLines={1}>
+                        <Text
+                          style={[styles.expenseTitle, { color: colors.text }]}
+                          numberOfLines={1}
+                        >
                           {expense.title}
                         </Text>
                         <View style={styles.paidRow}>
-                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Paid by </Text>
+                          <Text
+                            style={{
+                              color: colors.textSecondary,
+                              fontSize: 12,
+                            }}
+                          >
+                            Paid by{" "}
+                          </Text>
                           {payers.length > 1 ? (
                             <View style={styles.avatars}>
                               {payers.slice(0, 3).map((m) => (
@@ -305,31 +459,46 @@ export default function GroupScreen() {
                               ))}
                             </View>
                           ) : (
-                            <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>
+                            <Text
+                              style={{
+                                color: colors.text,
+                                fontSize: 12,
+                                fontWeight: "600",
+                              }}
+                            >
                               {paidBy}
                             </Text>
                           )}
-                          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                            {' '}
+                          <Text
+                            style={{
+                              color: colors.textSecondary,
+                              fontSize: 12,
+                            }}
+                          >
+                            {" "}
                             · {formatRowTime(when)}
                           </Text>
                         </View>
                       </View>
-                      <View style={{ alignItems: 'flex-end' }}>
+                      <View style={{ alignItems: "flex-end" }}>
                         <Text style={[styles.amount, { color: colors.text }]}>
-                          {formatMinor(expense.amountMinor, expense.currency || group.currency)}
+                          {formatMinor(
+                            expense.amountMinor,
+                            expense.currency || group.currency,
+                          )}
                         </Text>
                         {share ? (
                           <Text
                             style={{
                               fontSize: 11,
                               color:
-                                share.tone === 'positive'
+                                share.tone === "positive"
                                   ? colors.success
-                                  : share.tone === 'owes'
+                                  : share.tone === "owes"
                                     ? colors.danger
                                     : colors.textSecondary,
-                            }}>
+                            }}
+                          >
                             {share.text}
                           </Text>
                         ) : null}
@@ -346,7 +515,8 @@ export default function GroupScreen() {
       {canAdd ? (
         <Pressable
           onPress={openAdd}
-          style={[styles.fab, { backgroundColor: colors.primary }]}>
+          style={[styles.fab, { backgroundColor: colors.primary }]}
+        >
           <MaterialIcons name="add" size={28} color="#ffffff" />
         </Pressable>
       ) : null}
@@ -363,7 +533,7 @@ export default function GroupScreen() {
         onEdit={(item) => {
           setDetailOpen(false);
           router.push({
-            pathname: '/group/[id]/add',
+            pathname: "/group/[id]/add",
             params: { id: String(id), expenseId: item._id },
           });
         }}
@@ -372,13 +542,35 @@ export default function GroupScreen() {
         }}
       />
 
-      <Modal visible={whoOpen} transparent animationType="fade" onRequestClose={() => setWhoOpen(false)}>
+      <Modal
+        visible={whoOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWhoOpen(false)}
+      >
         <View style={styles.whoOverlay}>
-          <Pressable style={[styles.whoBackdrop, { backgroundColor: colors.overlay }]} onPress={() => setWhoOpen(false)} />
-          <View style={[styles.whoSheet, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
-            <Text style={[styles.whoTitle, { color: colors.text }]}>You in this group</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 10 }}>
-              We’ll treat this member as you for “me”, balances, and default payer.
+          <Pressable
+            style={[styles.whoBackdrop, { backgroundColor: colors.overlay }]}
+            onPress={() => setWhoOpen(false)}
+          />
+          <View
+            style={[
+              styles.whoSheet,
+              { backgroundColor: colors.elevated, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.whoTitle, { color: colors.text }]}>
+              You in this group
+            </Text>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: 13,
+                marginBottom: 10,
+              }}
+            >
+              We’ll treat this member as you for “me”, balances, and default
+              payer.
             </Text>
             {members.map((member) => {
               const active = myMember?._id === member._id;
@@ -390,17 +582,33 @@ export default function GroupScreen() {
                     setWhoOpen(false);
                     await load();
                   }}
-                  style={[styles.whoRow, active && { backgroundColor: colors.softSurface }]}>
+                  style={[
+                    styles.whoRow,
+                    active && { backgroundColor: colors.softSurface },
+                  ]}
+                >
                   <UserAvatar
                     name={memberListLabel(member, me?._id, myMember?._id)}
                     avatar={member.avatar}
                     seed={member.userId || member._id}
                     size={32}
                   />
-                  <Text style={{ flex: 1, color: colors.text, fontWeight: active ? '700' : '500' }}>
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: colors.text,
+                      fontWeight: active ? "700" : "500",
+                    }}
+                  >
                     {memberListLabel(member, me?._id, myMember?._id)}
                   </Text>
-                  {active ? <MaterialIcons name="check" size={18} color={colors.primary} /> : null}
+                  {active ? (
+                    <MaterialIcons
+                      name="check"
+                      size={18}
+                      color={colors.primary}
+                    />
+                  ) : null}
                 </Pressable>
               );
             })}
@@ -410,8 +618,11 @@ export default function GroupScreen() {
                 setWhoOpen(false);
                 await load();
               }}
-              style={styles.whoRow}>
-              <Text style={{ color: colors.textSecondary }}>Don’t mark anyone</Text>
+              style={styles.whoRow}
+            >
+              <Text style={{ color: colors.textSecondary }}>
+                Don’t mark anyone
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -433,7 +644,13 @@ function BalanceList({
 
   if (!members.length) {
     return (
-      <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 24 }}>
+      <Text
+        style={{
+          color: colors.textSecondary,
+          textAlign: "center",
+          marginTop: 24,
+        }}
+      >
         No balances yet.
       </Text>
     );
@@ -448,20 +665,30 @@ function BalanceList({
             ? `gets back ${formatMinor(net, currency)}`
             : net < 0
               ? `owes ${formatMinor(-net, currency)}`
-              : 'settled up';
+              : "settled up";
         return (
           <View
             key={m._id}
-            style={[styles.expenseRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            style={[
+              styles.expenseRow,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <View style={{ flex: 1 }}>
               <Text style={[styles.expenseTitle, { color: colors.text }]}>
-                {m.displayName || 'Member'}
+                {m.displayName || "Member"}
               </Text>
               <Text
                 style={{
-                  color: net > 0 ? colors.success : net < 0 ? colors.danger : colors.textSecondary,
+                  color:
+                    net > 0
+                      ? colors.success
+                      : net < 0
+                        ? colors.danger
+                        : colors.textSecondary,
                   fontSize: 13,
-                }}>
+                }}
+              >
                 {label}
               </Text>
             </View>
@@ -470,10 +697,16 @@ function BalanceList({
       })}
       {pairwise.length ? (
         <View style={{ marginTop: 8 }}>
-          <Text style={[styles.dateHead, { color: colors.textSecondary }]}>SUGGESTED SETTLEMENTS</Text>
+          <Text style={[styles.dateHead, { color: colors.textSecondary }]}>
+            SUGGESTED SETTLEMENTS
+          </Text>
           {pairwise.map((p, i) => (
-            <Text key={`${p.from}-${p.to}-${i}`} style={{ color: colors.text, marginBottom: 6 }}>
-              {p.fromName} owes {p.toName} {formatMinor(p.amountMinor, currency)}
+            <Text
+              key={`${p.from}-${p.to}-${i}`}
+              style={{ color: colors.text, marginBottom: 6 }}
+            >
+              {p.fromName} owes {p.toName}{" "}
+              {formatMinor(p.amountMinor, currency)}
             </Text>
           ))}
         </View>
@@ -484,63 +717,69 @@ function BalanceList({
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  backRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  backRow: { flexDirection: "row", alignItems: "center", padding: 16 },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   iconBtn: { padding: 6 },
   groupIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  groupTitle: { flex: 1, fontSize: 18, fontWeight: '700' },
+  groupTitle: { flex: 1, fontSize: 18, fontWeight: "700" },
   toggleWrap: { paddingHorizontal: 20, marginBottom: 8 },
-  toggle: { alignSelf: 'flex-start', flexDirection: 'row', borderRadius: 999, padding: 4 },
+  toggle: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    borderRadius: 999,
+    padding: 4,
+  },
   toggleBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999 },
   body: { paddingHorizontal: 20, paddingBottom: 110 },
-  bodyEmpty: { flexGrow: 1, justifyContent: 'center' },
+  bodyEmpty: { flexGrow: 1, justifyContent: "center" },
   empty: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingBottom: 56,
   },
   emptyTitle: {
     marginTop: 8,
     fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontWeight: "700",
+    textAlign: "center",
   },
   emptyCopy: {
     marginTop: 6,
     fontSize: 14,
     lineHeight: 20,
-    textAlign: 'center',
+    textAlign: "center",
     maxWidth: 280,
   },
   emptyAction: {
     marginTop: 16,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   dateHead: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.8,
     marginBottom: 10,
     paddingHorizontal: 4,
   },
   expenseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     borderWidth: 1,
     borderRadius: 16,
@@ -550,27 +789,33 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  expenseTitle: { fontSize: 15, fontWeight: '700' },
-  paidRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, flexWrap: 'wrap' },
-  avatars: { flexDirection: 'row', gap: 2 },
-  amount: { fontSize: 14, fontWeight: '700' },
+  expenseTitle: { fontSize: 15, fontWeight: "700" },
+  paidRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+    flexWrap: "wrap",
+  },
+  avatars: { flexDirection: "row", gap: 2 },
+  amount: { fontSize: 14, fontWeight: "700" },
   fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: "absolute",
+    right: 24,
+    bottom: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
     elevation: 4,
+    
   },
   whoOverlay: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 24,
   },
   whoBackdrop: {
@@ -580,17 +825,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 12,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.28,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
   },
-  whoTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  whoTitle: { fontSize: 18, fontWeight: "700", marginBottom: 6 },
   whoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     paddingVertical: 10,
     paddingHorizontal: 8,
