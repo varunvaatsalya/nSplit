@@ -85,22 +85,25 @@ function MemberInline({
   member,
   currentUserId,
   myMemberId,
-  colors,
 }: {
   member?: GroupMember | null;
   currentUserId?: string | null;
   myMemberId?: string | null;
-  colors: ReturnType<typeof useColors>;
+  // colors: ReturnType<typeof useColors>;
 }) {
   const self = isSelfMember(member, currentUserId, myMemberId);
   return (
     <>
-      {memberName(member)}
+      <Text
+        style={{
+          fontWeight: "700",
+          fontSize: 12,
+        }}
+      >
+        {memberName(member)}
+      </Text>
       {self ? (
-        <Text style={{ fontSize: 10, fontWeight: "400", color: colors.textSecondary }}>
-          {" "}
-          (me)
-        </Text>
+        <Text style={{ fontSize: 11, fontWeight: "700" }}> (me)</Text>
       ) : null}
     </>
   );
@@ -137,13 +140,24 @@ function FeedRow({
           {meta}
         </View>
       </View>
-      <Text style={[styles.amount, { color: colors.text, flexShrink: 0, paddingRight: 8 }]}>{amount}</Text>
+      <Text
+        style={[
+          styles.amount,
+          { color: colors.text, flexShrink: 0, paddingRight: 8 },
+        ]}
+      >
+        {amount}
+      </Text>
     </>
   );
   const rowStyle = [styles.expenseRow, { backgroundColor: colors.softSurface }];
   if (onPress) {
     return (
-      <Pressable onPress={onPress} className="flex-row items-center gap-3" style={rowStyle}>
+      <Pressable
+        onPress={onPress}
+        className="flex-row items-center gap-3"
+        style={rowStyle}
+      >
         {body}
       </Pressable>
     );
@@ -385,8 +399,12 @@ export default function GroupScreen() {
                 {section.items.map((item) => {
                   if (item.kind === "transfer") {
                     const transfer = item.transfer;
-                    const from = members.find((m) => m._id === transfer.fromMemberId);
-                    const to = members.find((m) => m._id === transfer.toMemberId);
+                    const from = members.find(
+                      (m) => m._id === transfer.fromMemberId,
+                    );
+                    const to = members.find(
+                      (m) => m._id === transfer.toMemberId,
+                    );
                     return (
                       <FeedRow
                         key={transfer._id}
@@ -400,21 +418,22 @@ export default function GroupScreen() {
                         onPress={() => openRecord("transfer", transfer._id)}
                         meta={
                           <Text
-                            style={[styles.meta, { color: colors.textSecondary }]}
+                            style={[
+                              styles.meta,
+                              { color: colors.textSecondary },
+                            ]}
                             numberOfLines={2}
                           >
                             <MemberInline
                               member={from}
                               currentUserId={me?._id}
                               myMemberId={myMember?._id}
-                              colors={colors}
                             />
                             {" → "}
                             <MemberInline
                               member={to}
                               currentUserId={me?._id}
                               myMemberId={myMember?._id}
-                              colors={colors}
                             />
                             {" · "}
                             {formatRowTime(item.date)}
@@ -443,7 +462,12 @@ export default function GroupScreen() {
                       meta={
                         payers.length > 1 ? (
                           <View style={styles.paidRow}>
-                            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+                            <Text
+                              style={[
+                                styles.meta,
+                                { color: colors.textSecondary },
+                              ]}
+                            >
                               Paid by{" "}
                             </Text>
                             <View style={styles.avatars}>
@@ -467,14 +491,24 @@ export default function GroupScreen() {
                                 </View>
                               ))}
                             </View>
-                            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+                            <Text
+                              style={[
+                                styles.meta,
+                                {
+                                  color: colors.textSecondary,
+                                },
+                              ]}
+                            >
                               {" · "}
                               {formatRowTime(when)}
                             </Text>
                           </View>
                         ) : (
                           <Text
-                            style={[styles.meta, { color: colors.textSecondary }]}
+                            style={[
+                              styles.meta,
+                              { color: colors.textSecondary },
+                            ]}
                             numberOfLines={2}
                           >
                             Paid by{" "}
@@ -482,7 +516,6 @@ export default function GroupScreen() {
                               member={payers[0]}
                               currentUserId={me?._id}
                               myMemberId={myMember?._id}
-                              colors={colors}
                             />
                             {" · "}
                             {formatRowTime(when)}
@@ -703,8 +736,8 @@ const styles = StyleSheet.create({
   expenseTitle: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
   meta: {
     marginTop: 2,
-    fontSize: 12,
-    fontWeight: "400",
+    fontSize: 11,
+    fontWeight: "300",
     lineHeight: 15,
   },
   paidRow: {

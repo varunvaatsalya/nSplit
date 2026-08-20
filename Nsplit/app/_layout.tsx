@@ -1,24 +1,20 @@
 import "react-native-gesture-handler";
 import "@/global.css";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import { ThemeProvider } from "@react-navigation/native";
 import { PortalHost } from "@rn-primitives/portal";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme as useNativewindColorScheme } from "nativewind";
 import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useColors } from "@/hooks/use-colors";
+import { getNavTheme } from "@/lib/theme";
 import { AuthProvider } from "@/src/auth/auth-context";
-import { IdentityProvider } from "@/src/identity/identity-context";
 import { GroupsProvider, useGroups } from "@/src/groups/groups-context";
+import { IdentityProvider } from "@/src/identity/identity-context";
+import { AppearanceProvider, useAppearance } from "@/src/theme/appearance-context";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -37,33 +33,20 @@ function BootSplash() {
 }
 
 function RootNavigator() {
-  const colorScheme = useColorScheme();
-  const { setColorScheme } = useNativewindColorScheme();
+  const { ready: appearanceReady, scheme } = useAppearance();
   const colors = useColors();
   const { ready } = useGroups();
 
   useEffect(() => {
-    setColorScheme(colorScheme === "dark" ? "dark" : "light");
-  }, [colorScheme, setColorScheme]);
+    if (ready && appearanceReady) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [ready, appearanceReady]);
 
-  useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
-
-  if (!ready) return <BootSplash />;
-
-  const baseTheme = colorScheme === "dark" ? DarkTheme : DefaultTheme;
-  const navTheme = {
-    ...baseTheme,
-    colors: {
-      ...baseTheme.colors,
-      background: colors.background,
-      card: colors.background,
-    },
-  };
+  if (!ready || !appearanceReady) return <BootSplash />;
 
   return (
-    <ThemeProvider value={navTheme}>
+    <ThemeProvider value={getNavTheme(scheme, colors)}>
       <Stack
         screenOptions={{
           headerShown: false,
@@ -76,7 +59,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="group" />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <PortalHost />
     </ThemeProvider>
   );
@@ -84,13 +67,15 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <IdentityProvider>
-        <GroupsProvider>
-          <RootNavigator />
-        </GroupsProvider>
-      </IdentityProvider>
-    </AuthProvider>
+    <AppearanceProvider>
+      <AuthProvider>
+        <IdentityProvider>
+          <GroupsProvider>
+            <RootNavigator />
+          </GroupsProvider>
+        </IdentityProvider>
+      </AuthProvider>
+    </AppearanceProvider>
   );
 }
 
