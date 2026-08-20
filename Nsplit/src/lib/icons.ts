@@ -16,14 +16,14 @@ export const GROUP_ICONS = [
 ] as const;
 
 export const CURRENCIES = [
-  { code: 'INR', label: '₹ Indian Rupee' },
-  { code: 'USD', label: '$ US Dollar' },
-  { code: 'EUR', label: '€ Euro' },
-  { code: 'GBP', label: '£ British Pound' },
-  { code: 'AED', label: 'د.إ UAE Dirham' },
-  { code: 'SGD', label: '$ Singapore Dollar' },
-  { code: 'AUD', label: '$ Australian Dollar' },
-  { code: 'CAD', label: '$ Canadian Dollar' },
+  { code: 'INR', label: '₹ Indian Rupee', flag: '🇮🇳' },
+  { code: 'USD', label: '$ US Dollar', flag: '🇺🇸' },
+  { code: 'EUR', label: '€ Euro', flag: '🇪🇺' },
+  { code: 'GBP', label: '£ British Pound', flag: '🇬🇧' },
+  { code: 'AED', label: 'د.إ UAE Dirham', flag: '🇦🇪' },
+  { code: 'SGD', label: '$ Singapore Dollar', flag: '🇸🇬' },
+  { code: 'AUD', label: '$ Australian Dollar', flag: '🇦🇺' },
+  { code: 'CAD', label: '$ Canadian Dollar', flag: '🇨🇦' },
 ] as const;
 
 const CATEGORY_EMOJI: Record<string, string> = {

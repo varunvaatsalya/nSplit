@@ -6,9 +6,10 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import "react-native-reanimated";
 
+import { NsplitBrand } from "@/components/nsplit-logo";
 import { useColors } from "@/hooks/use-colors";
 import { getNavTheme } from "@/lib/theme";
 import { AuthProvider } from "@/src/auth/auth-context";
@@ -26,7 +27,7 @@ function BootSplash() {
   const colors = useColors();
   return (
     <View style={[styles.splash, { backgroundColor: colors.background }]}>
-      <Text style={[styles.brand, { color: colors.primary }]}>nSplit</Text>
+      <NsplitBrand color={colors.primary} logoSize={44} fontSize={36} align="center" />
       <ActivityIndicator color={colors.primary} style={{ marginTop: 16 }} />
     </View>
   );
@@ -84,9 +85,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  brand: {
-    fontSize: 32,
-    fontWeight: "700",
   },
 });

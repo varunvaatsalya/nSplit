@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import GroupDiscussion from '@/assets/illustrations/group-discussion-amico.svg';
+import { NsplitBrand } from '@/components/nsplit-logo';
 import { Button } from '@/components/ui/button';
 import { Text as UIText } from '@/components/ui/text';
 import { useColors } from '@/hooks/use-colors';
@@ -32,7 +33,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Text style={[styles.brand, { color: colors.primary }]}>nSplit</Text>
+        <NsplitBrand color={colors.primary} logoSize={34} fontSize={32} />
       </View>
 
       {groups.length === 0 ? (
@@ -93,11 +94,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 16,
-  },
-  brand: {
-    fontSize: 36,
-    fontWeight: '800',
-    letterSpacing: -0.8,
   },
   fab: {
     position: 'absolute',

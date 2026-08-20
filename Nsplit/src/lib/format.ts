@@ -45,6 +45,17 @@ export function formatRowTime(date: Date) {
   });
 }
 
+export function formatLongDate(value?: string | Date | null) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export function memberName(member?: {
   displayName?: string | null;
   user?: { name?: string | null } | null;

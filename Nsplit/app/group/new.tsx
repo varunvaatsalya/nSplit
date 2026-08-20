@@ -232,9 +232,13 @@ export default function NewGroupScreen() {
                     styles.dropdownOption,
                     active && { backgroundColor: colors.softSurface },
                   ]}>
-                  <Text style={{ color: colors.text, fontWeight: active ? '700' : '500' }}>
-                    {item.label}
-                  </Text>
+                  <Text style={{ fontSize: 22, marginRight: 10 }}>{item.flag}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontWeight: active ? '700' : '500' }}>
+                      {item.label}
+                    </Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{item.code}</Text>
+                  </View>
                   {active ? (
                     <MaterialIcons name="check" size={18} color={colors.primary} />
                   ) : null}

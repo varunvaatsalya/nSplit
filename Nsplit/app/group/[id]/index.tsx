@@ -15,6 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AddNotes from "@/assets/illustrations/add-notes-amico.svg";
 import BalanceAmico from "@/assets/illustrations/balence-amico.svg";
+import { BalanceView } from "@/components/balance/balance-view";
+import { ExportLedgerSheet } from "@/components/balance/export-ledger-sheet";
 import { RecordDetailModal } from "@/components/records/record-detail-modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { useColors } from "@/hooks/use-colors";
@@ -186,6 +188,7 @@ export default function GroupScreen() {
   const [ready, setReady] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
+  const [exportOpen, setExportOpen] = useState(false);
   const { width } = useWindowDimensions();
   const artWidth = Math.min(260, Math.round(width * 0.62));
   const artHeight = artWidth;
@@ -310,6 +313,15 @@ export default function GroupScreen() {
         >
           {group.name}
         </Text>
+        {!feedEmpty ? (
+          <Pressable
+            onPress={() => setExportOpen(true)}
+            hitSlop={10}
+            style={styles.iconBtn}
+          >
+            <MaterialIcons name="ios-share" size={22} color={colors.text} />
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={() =>
             router.push({
@@ -388,7 +400,14 @@ export default function GroupScreen() {
             </Pressable>
           </View>
         ) : view === "balance" ? (
-          <BalanceList balance={balance} currency={group.currency || "INR"} />
+          <BalanceView
+            group={group}
+            balance={balance}
+            currentUserId={me?._id}
+            myMemberId={myMember?._id}
+            onPaid={load}
+            onExport={() => setExportOpen(true)}
+          />
         ) : (
           grouped.map((section) => (
             <View key={section.key} style={{ marginBottom: 18 }}>
@@ -541,6 +560,17 @@ export default function GroupScreen() {
       ) : null}
 
       {group ? (
+        <ExportLedgerSheet
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          group={group}
+          expenses={expenses}
+          transfers={transfers}
+          balance={balance}
+        />
+      ) : null}
+
+      {group ? (
         <RecordDetailModal
           open={detailOpen}
           onClose={() => setDetailOpen(false)}
@@ -570,90 +600,6 @@ export default function GroupScreen() {
         />
       ) : null}
     </SafeAreaView>
-  );
-}
-
-function BalanceList({
-  balance,
-  currency,
-}: {
-  balance: GroupBalance | null;
-  currency: string;
-}) {
-  const colors = useColors();
-  const members = balance?.members || [];
-  const pairwise = balance?.pairwise || [];
-
-  if (!members.length) {
-    return (
-      <Text
-        style={{
-          color: colors.textSecondary,
-          textAlign: "center",
-          marginTop: 24,
-        }}
-      >
-        No balances yet.
-      </Text>
-    );
-  }
-
-  return (
-    <View style={{ gap: 10 }}>
-      {members.map((m) => {
-        const net = m.netMinor || 0;
-        const label =
-          net > 0
-            ? `gets back ${formatMinor(net, currency)}`
-            : net < 0
-              ? `owes ${formatMinor(-net, currency)}`
-              : "settled up";
-        return (
-          <View
-            key={m._id}
-            style={[
-              styles.expenseRow,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.expenseTitle, { color: colors.text }]}>
-                {m.displayName || "Member"}
-              </Text>
-              <Text
-                style={{
-                  color:
-                    net > 0
-                      ? colors.success
-                      : net < 0
-                        ? colors.danger
-                        : colors.textSecondary,
-                  fontSize: 13,
-                }}
-              >
-                {label}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
-      {pairwise.length ? (
-        <View style={{ marginTop: 8 }}>
-          <Text style={[styles.dateHead, { color: colors.textSecondary }]}>
-            SUGGESTED SETTLEMENTS
-          </Text>
-          {pairwise.map((p, i) => (
-            <Text
-              key={`${p.from}-${p.to}-${i}`}
-              style={{ color: colors.text, marginBottom: 6 }}
-            >
-              {p.fromName} owes {p.toName}{" "}
-              {formatMinor(p.amountMinor, currency)}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-    </View>
   );
 }
 

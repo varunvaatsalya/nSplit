@@ -79,7 +79,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ color: colors.text, fontWeight: '600' }}>Match me by name</Text>
               <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-                Not exact — nicknames and partial names still count.
+                Not exact - nicknames and partial names still count.
               </Text>
             </View>
             <Switch

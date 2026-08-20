@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Field } from '@/components/ui/field';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { NsplitBrand } from '@/components/nsplit-logo';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/src/auth/auth-context';
 
@@ -44,7 +45,13 @@ export default function LoginScreen() {
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled">
-          <Text style={[styles.brand, { color: colors.primary }]}>Nsplit</Text>
+          <NsplitBrand
+            color={colors.primary}
+            logoSize={36}
+            fontSize={26}
+            align="center"
+            style={styles.brand}
+          />
           <View
             style={[
               styles.card,
@@ -107,9 +114,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   brand: {
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '700',
     marginBottom: 20,
   },
   card: {
