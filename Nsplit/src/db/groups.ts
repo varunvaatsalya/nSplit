@@ -1,5 +1,6 @@
 import type { GroupDetail, GroupMember, GroupSummary, User } from '@/src/api/types';
 import { allocateMemberAvatar } from '@/src/lib/avatar';
+import { normalizeSplitMethod } from '@/src/lib/expense-form-utils';
 import { compareMembersByName, resolveMyMember } from '@/src/lib/members';
 
 import { getDb } from './client';
@@ -12,8 +13,11 @@ type GroupRow = {
   icon: string | null;
   currency: string;
   my_member_id?: string | null;
+  settings_json?: string | null;
   member_count?: number | null;
 };
+
+export type GroupSettings = NonNullable<GroupDetail['settings']>;
 
 type MemberRow = {
   id: string;
@@ -35,6 +39,41 @@ export type CreateGroupInput = {
   myName?: string | null;
   matchByName?: boolean;
 };
+
+function emptySettings(): GroupSettings {
+  return { defaultSplitMethod: 'EQUAL', defaultSplitConfig: null };
+}
+
+function parseSettings(raw?: string | null): GroupSettings {
+  if (!raw) return emptySettings();
+  try {
+    const parsed = JSON.parse(raw) as GroupSettings;
+    return {
+      defaultSplitMethod: normalizeSplitMethod(parsed?.defaultSplitMethod),
+      defaultSplitConfig: Array.isArray(parsed?.defaultSplitConfig)
+        ? parsed.defaultSplitConfig
+            .filter((row) => row?.memberId)
+            .map((row) => ({
+              memberId: String(row.memberId),
+              value: Number.isFinite(Number(row.value))
+                ? Math.max(1, Math.round(Number(row.value)))
+                : 1,
+            }))
+        : null,
+      simplifyDebts: Boolean(parsed?.simplifyDebts),
+    };
+  } catch {
+    return emptySettings();
+  }
+}
+
+function serializeSettings(settings: GroupSettings) {
+  return JSON.stringify({
+    defaultSplitMethod: normalizeSplitMethod(settings.defaultSplitMethod),
+    defaultSplitConfig: settings.defaultSplitConfig ?? null,
+    simplifyDebts: Boolean(settings.simplifyDebts),
+  });
+}
 
 function mapMember(row: MemberRow): GroupMember {
   return {
@@ -92,7 +131,7 @@ export async function listGroups(): Promise<GroupSummary[]> {
 export async function getGroup(idOrCode: string): Promise<GroupDetail | null> {
   const db = await getDb();
   const group = await db.getFirstAsync<GroupRow>(
-    `SELECT id, code, name, icon, currency, my_member_id
+    `SELECT id, code, name, icon, currency, my_member_id, settings_json
      FROM groups
      WHERE deleted_at IS NULL AND (id = ? OR code = ?)
      LIMIT 1`,
@@ -117,6 +156,7 @@ export async function getGroup(idOrCode: string): Promise<GroupDetail | null> {
     members,
     myPermission: mine?.permission || null,
     myMembershipId: group.my_member_id || mine?._id || null,
+    settings: parseSettings(group.settings_json),
   };
 }
 
@@ -190,9 +230,9 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
 
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT INTO groups (id, code, name, icon, currency, my_member_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, code, input.name.trim(), icon, currency, myMemberId, now, now]
+      `INSERT INTO groups (id, code, name, icon, currency, my_member_id, settings_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, code, input.name.trim(), icon, currency, myMemberId, serializeSettings(emptySettings()), now, now]
     );
 
     for (const member of members) {
@@ -228,3 +268,135 @@ export async function setGroupMyMember(groupId: string, memberId: string | null)
     groupId,
   ]);
 }
+
+export async function updateGroup(
+  groupId: string,
+  input: { name?: string; icon?: string | null; currency?: string }
+) {
+  const group = await getGroup(groupId);
+  if (!group) throw new Error('Group not found');
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE groups SET name = ?, icon = ?, currency = ?, updated_at = ? WHERE id = ?`,
+    [
+      (input.name ?? group.name).trim(),
+      input.icon ?? group.icon ?? null,
+      input.currency ?? group.currency ?? 'INR',
+      new Date().toISOString(),
+      group._id,
+    ]
+  );
+}
+
+export async function updateGroupSettings(groupId: string, patch: Partial<GroupSettings>) {
+  const group = await getGroup(groupId);
+  if (!group) throw new Error('Group not found');
+  const next: GroupSettings = {
+    ...emptySettings(),
+    ...group.settings,
+    ...patch,
+  };
+  if (next.defaultSplitMethod !== 'SHARES') next.defaultSplitConfig = null;
+  const db = await getDb();
+  await db.runAsync(`UPDATE groups SET settings_json = ?, updated_at = ? WHERE id = ?`, [
+    serializeSettings(next),
+    new Date().toISOString(),
+    group._id,
+  ]);
+}
+
+export async function addGroupMember(groupId: string, name: string) {
+  const group = await getGroup(groupId);
+  if (!group) throw new Error('Group not found');
+  const displayName = name.trim();
+  if (!displayName) throw new Error('Name required');
+
+  const used = { letters: [] as string[], bgs: [] as string[] };
+  for (const member of group.members || []) {
+    if (member.avatar?.letters) used.letters.push(member.avatar.letters);
+    if (member.avatar?.bg) used.bgs.push(member.avatar.bg);
+  }
+  const avatar = allocateMemberAvatar(displayName, used);
+  const now = new Date().toISOString();
+  const id = createId();
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO group_members
+        (id, group_id, display_name, user_id, email, permission, avatar_letters, avatar_bg, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, group._id, displayName, null, null, 'ADD', avatar.letters, avatar.bg, now]
+    );
+    const settings = group.settings || emptySettings();
+    if (settings.defaultSplitMethod === 'SHARES') {
+      const config = [...(settings.defaultSplitConfig || [])];
+      if (!config.some((row) => row.memberId === id)) {
+        config.push({ memberId: id, value: 1 });
+        await db.runAsync(`UPDATE groups SET settings_json = ?, updated_at = ? WHERE id = ?`, [
+          serializeSettings({ ...settings, defaultSplitConfig: config }),
+          now,
+          group._id,
+        ]);
+      }
+    } else {
+      await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, group._id]);
+    }
+  });
+}
+
+export async function renameGroupMember(groupId: string, memberId: string, name: string) {
+  const displayName = name.trim();
+  if (!displayName) throw new Error('Name required');
+  const group = await getGroup(groupId);
+  if (!group) throw new Error('Group not found');
+  const member = (group.members || []).find((m) => m._id === memberId);
+  if (!member) throw new Error('Member not found');
+
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE group_members SET display_name = ? WHERE id = ? AND group_id = ?`,
+    [displayName, memberId, group._id]
+  );
+  await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [
+    new Date().toISOString(),
+    group._id,
+  ]);
+}
+
+export async function removeGroupMember(groupId: string, memberId: string) {
+  const group = await getGroup(groupId);
+  if (!group) throw new Error('Group not found');
+  const members = group.members || [];
+  if (members.length <= 1) throw new Error('A group needs at least one member');
+  const member = members.find((m) => m._id === memberId);
+  if (!member) throw new Error('Member not found');
+
+  const now = new Date().toISOString();
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE group_members SET left_at = ? WHERE id = ? AND group_id = ?`,
+      [now, memberId, group._id]
+    );
+    if (group.myMembershipId === memberId) {
+      await db.runAsync(`UPDATE groups SET my_member_id = NULL WHERE id = ?`, [group._id]);
+    }
+    const settings = group.settings || emptySettings();
+    const config = (settings.defaultSplitConfig || []).filter((row) => row.memberId !== memberId);
+    await db.runAsync(`UPDATE groups SET settings_json = ?, updated_at = ? WHERE id = ?`, [
+      serializeSettings({ ...settings, defaultSplitConfig: config.length ? config : null }),
+      now,
+      group._id,
+    ]);
+  });
+}
+
+export async function deleteGroup(groupId: string) {
+  const db = await getDb();
+  await db.runAsync(`UPDATE groups SET deleted_at = ?, updated_at = ? WHERE id = ?`, [
+    new Date().toISOString(),
+    new Date().toISOString(),
+    groupId,
+  ]);
+}
+

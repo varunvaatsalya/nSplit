@@ -6,14 +6,19 @@ import { ExpenseForm } from '@/components/expenses/expense-form';
 import { RecordTypeTabs, type RecordTab } from '@/components/records/record-type-tabs';
 import { TransferForm } from '@/components/transfers/transfer-form';
 import { useColors } from '@/hooks/use-colors';
-import type { Expense, GroupDetail } from '@/src/api/types';
+import type { Expense, GroupDetail, Transfer } from '@/src/api/types';
 import { useAuth } from '@/src/auth/auth-context';
 import { getExpense } from '@/src/db/expenses';
 import { getGroup } from '@/src/db/groups';
+import { getTransfer } from '@/src/db/transfers';
 import { useIdentity } from '@/src/identity/identity-context';
 
 export default function AddExpenseScreen() {
-  const { id, expenseId } = useLocalSearchParams<{ id: string; expenseId?: string }>();
+  const { id, expenseId, transferId } = useLocalSearchParams<{
+    id: string;
+    expenseId?: string;
+    transferId?: string;
+  }>();
   const router = useRouter();
   const navigation = useNavigation();
   const colors = useColors();
@@ -21,17 +26,25 @@ export default function AddExpenseScreen() {
   const { name: myName, matchByName } = useIdentity();
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [expense, setExpense] = useState<Expense | null>(null);
+  const [transfer, setTransfer] = useState<Transfer | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<RecordTab>('expense');
 
-  const isEdit = Boolean(expenseId);
+  const isExpenseEdit = Boolean(expenseId);
+  const isTransferEdit = Boolean(transferId);
+  const isEdit = isExpenseEdit || isTransferEdit;
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle:
-        isEdit ? 'Edit expense' : tab === 'transfer' ? 'Add transfer' : 'Add expense',
+      headerTitle: isExpenseEdit
+        ? 'Edit expense'
+        : isTransferEdit
+          ? 'Edit transfer'
+          : tab === 'transfer'
+            ? 'Add transfer'
+            : 'Add expense',
     });
-  }, [navigation, isEdit, tab]);
+  }, [navigation, isExpenseEdit, isTransferEdit, tab]);
 
   useEffect(() => {
     if (!id) return;
@@ -50,10 +63,18 @@ export default function AddExpenseScreen() {
         }
         setExpense(item);
       }
+      if (transferId) {
+        const item = await getTransfer(local._id, String(transferId));
+        if (!item) {
+          setError('Transfer not found');
+          return;
+        }
+        setTransfer(item);
+      }
     })();
-  }, [id, expenseId]);
+  }, [id, expenseId, transferId]);
 
-  if (!group || (isEdit && !expense)) {
+  if (!group || (isExpenseEdit && !expense) || (isTransferEdit && !transfer)) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
         {error ? (
@@ -72,10 +93,11 @@ export default function AddExpenseScreen() {
           <RecordTypeTabs value={tab} onChange={setTab} />
         </View>
       )}
-      {tab === 'transfer' && !isEdit ? (
+      {isTransferEdit || (tab === 'transfer' && !isExpenseEdit) ? (
         <TransferForm
           group={group}
           currentUserId={user?._id}
+          transfer={transfer}
           onSaved={() => router.back()}
         />
       ) : (

@@ -19,7 +19,7 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/compone
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Text as UIText } from '@/components/ui/text';
 import { useColors } from '@/hooks/use-colors';
-import type { GroupDetail, GroupMember } from '@/src/api/types';
+import type { GroupDetail, GroupMember, Transfer } from '@/src/api/types';
 import { saveTransfer } from '@/src/db/transfers';
 import { suggestEmojiFromText } from '@/src/lib/expense-icons';
 import { memberListLabel, sortMembersByName } from '@/src/lib/members';
@@ -98,14 +98,17 @@ function MemberSelect({
 export function TransferForm({
   group,
   currentUserId,
+  transfer,
   onSaved,
 }: {
   group: GroupDetail;
   currentUserId?: string | null;
+  transfer?: Transfer | null;
   onSaved: () => void;
 }) {
   const colors = useColors();
   const members = useMemo(() => sortMembersByName(group.members || []), [group.members]);
+  const isEdit = Boolean(transfer?._id);
 
   const [title, setTitle] = useState('');
   const [icon, setIcon] = useState(DEFAULT_TRANSFER_EMOJI);
@@ -137,11 +140,37 @@ export function TransferForm({
     setIcon(suggested.emoji);
   }
 
-  useEffect(() => {
-    const first = members[0]?._id || '';
-    setFromMemberId(first);
+  function resetForm() {
+    setTitle('');
+    setIcon(DEFAULT_TRANSFER_EMOJI);
+    setIconManual(false);
+    setAmount('');
+    setDescription('');
+    setShowDesc(false);
+    setFromMemberId(members[0]?._id || '');
     setToMemberId('');
-  }, [group._id, members]);
+    setTransferAt(new Date());
+    setFieldErrors({ amount: false, title: false, from: false, to: false });
+  }
+
+  function hydrateFromTransfer(item: Transfer) {
+    setTitle(item.title || '');
+    setIcon(item.icon || DEFAULT_TRANSFER_EMOJI);
+    setIconManual(Boolean(item.icon));
+    setAmount(((item.amountMinor || 0) / 100).toString());
+    setFromMemberId(item.fromMemberId || '');
+    setToMemberId(item.toMemberId || '');
+    const when = item.transferDate || item.createdAt;
+    setTransferAt(when ? new Date(when) : new Date());
+    setFieldErrors({ amount: false, title: false, from: false, to: false });
+  }
+
+  useEffect(() => {
+    if (!members.length) return;
+    if (transfer?._id) hydrateFromTransfer(transfer);
+    else resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group._id, transfer?._id, members.length]);
 
   const toOptions = members.filter((m) => m._id !== fromMemberId);
 
@@ -164,15 +193,19 @@ export function TransferForm({
 
     setSaving(true);
     try {
-      await saveTransfer(group._id, {
-        title: title.trim(),
-        icon,
-        amountMinor: Math.round(n * 100),
-        fromMemberId,
-        toMemberId,
-        transferDate: transferAt.toISOString(),
-        createdById: currentUserId,
-      });
+      await saveTransfer(
+        group._id,
+        {
+          title: title.trim(),
+          icon,
+          amountMinor: Math.round(n * 100),
+          fromMemberId,
+          toMemberId,
+          transferDate: transferAt.toISOString(),
+          createdById: currentUserId,
+        },
+        transfer?._id
+      );
       onSaved();
     } finally {
       setSaving(false);
@@ -186,7 +219,7 @@ export function TransferForm({
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <TextInput
           placeholder="0.00"
-          autoFocus
+          autoFocus={!isEdit}
           placeholderTextColor={colors.textSecondary}
           keyboardType="decimal-pad"
           returnKeyType="next"
@@ -310,7 +343,7 @@ export function TransferForm({
         </View>
 
         <PrimaryButton
-          title={saving ? 'Saving…' : 'Record transfer'}
+          title={saving ? 'Saving…' : isEdit ? 'Save changes' : 'Record transfer'}
           loading={saving}
           onPress={onSubmit}
         />

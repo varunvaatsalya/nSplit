@@ -19,12 +19,22 @@ export function parseMajorToMinor(value: string) {
 
 export function dateHeaderLabel(date: Date) {
   if (Number.isNaN(date.getTime())) return 'Unknown date';
-  return date.toLocaleDateString(undefined, {
-    weekday: 'short',
+
+  const today = new Date();
+  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startGiven = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startToday.getTime() - startGiven.getTime()) / 86400000);
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+
+  const weekday = date.toLocaleDateString('en-GB', { weekday: 'short' });
+  const rest = date.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
+  return `${weekday}, ${rest}`;
 }
 
 export function formatRowTime(date: Date) {

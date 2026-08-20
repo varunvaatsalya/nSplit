@@ -1,9 +1,8 @@
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AddNotes from "@/assets/illustrations/add-notes-amico.svg";
 import BalanceAmico from "@/assets/illustrations/balence-amico.svg";
-import { ExpenseDetailModal } from "@/components/expenses/expense-detail-modal";
+import { RecordDetailModal } from "@/components/records/record-detail-modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { useColors } from "@/hooks/use-colors";
 import type {
@@ -28,7 +27,7 @@ import type {
 } from "@/src/api/types";
 import { useAuth } from "@/src/auth/auth-context";
 import { groupBalance, listExpenses } from "@/src/db/expenses";
-import { getGroup, setGroupMyMember } from "@/src/db/groups";
+import { getGroup } from "@/src/db/groups";
 import { listTransfers } from "@/src/db/transfers";
 import { useIdentity } from "@/src/identity/identity-context";
 import {
@@ -38,7 +37,7 @@ import {
   memberName,
 } from "@/src/lib/format";
 import { getExpenseEmoji, getGroupEmoji } from "@/src/lib/icons";
-import { memberListLabel, resolveMyMember } from "@/src/lib/members";
+import { isSelfMember, resolveMyMember } from "@/src/lib/members";
 
 type FeedItem =
   | { kind: "expense"; id: string; date: Date; expense: Expense }
@@ -82,31 +81,78 @@ function payerMembers(expense: Expense, members: GroupMember[]) {
     .filter(Boolean) as GroupMember[];
 }
 
-function myShareLine(
-  expense: Expense,
-  myMemberId?: string | null,
-  currency = "INR",
-) {
-  if (!myMemberId) return null;
-  const paid =
-    (expense.payers || []).find((p) => p.memberId === myMemberId)
-      ?.amountMinor || 0;
-  const owed =
-    (expense.splits || []).find((s) => s.memberId === myMemberId)
-      ?.amountMinor || 0;
-  const net = paid - owed;
-  if (net === 0 && owed === 0 && paid === 0) return null;
-  if (net > 0)
-    return {
-      text: `You lent ${formatMinor(net, currency)}`,
-      tone: "positive" as const,
-    };
-  if (net < 0)
-    return {
-      text: `You owe ${formatMinor(-net, currency)}`,
-      tone: "owes" as const,
-    };
-  return { text: "Settled for you", tone: "muted" as const };
+function MemberInline({
+  member,
+  currentUserId,
+  myMemberId,
+  colors,
+}: {
+  member?: GroupMember | null;
+  currentUserId?: string | null;
+  myMemberId?: string | null;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const self = isSelfMember(member, currentUserId, myMemberId);
+  return (
+    <>
+      {memberName(member)}
+      {self ? (
+        <Text style={{ fontSize: 10, fontWeight: "400", color: colors.textSecondary }}>
+          {" "}
+          (me)
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+function FeedRow({
+  icon,
+  title,
+  amount,
+  meta,
+  onPress,
+  colors,
+}: {
+  icon: string;
+  title: string;
+  amount: string;
+  meta: ReactNode;
+  onPress?: () => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const body = (
+    <>
+      <View className="min-w-0 flex-1 flex-row items-center gap-2">
+        <View style={styles.expenseIcon}>
+          <Text style={{ fontSize: 24 }}>{icon}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={[styles.expenseTitle, { color: colors.text }]}
+            numberOfLines={2}
+          >
+            {title}
+          </Text>
+          {meta}
+        </View>
+      </View>
+      <Text style={[styles.amount, { color: colors.text, flexShrink: 0, paddingRight: 8 }]}>{amount}</Text>
+    </>
+  );
+  const rowStyle = [styles.expenseRow, { backgroundColor: colors.softSurface }];
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} className="flex-row items-center gap-3" style={rowStyle}>
+        {body}
+      </Pressable>
+    );
+  }
+  return (
+    <View className="flex-row items-center" style={rowStyle}>
+      {body}
+    </View>
+  );
 }
 
 export default function GroupScreen() {
@@ -126,7 +172,6 @@ export default function GroupScreen() {
   const [ready, setReady] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
-  const [whoOpen, setWhoOpen] = useState(false);
   const { width } = useWindowDimensions();
   const artWidth = Math.min(260, Math.round(width * 0.62));
   const artHeight = artWidth;
@@ -183,11 +228,8 @@ export default function GroupScreen() {
     [members, me, myName, matchByName, group?.myMembershipId],
   );
   const canAdd = true;
-  const flatExpenses = useMemo(
-    () =>
-      grouped.flatMap((s) =>
-        s.items.flatMap((item) => (item.kind === "expense" ? [item.expense] : [])),
-      ),
+  const feedItems = useMemo(
+    () => grouped.flatMap((section) => section.items),
     [grouped],
   );
 
@@ -195,8 +237,10 @@ export default function GroupScreen() {
     router.push({ pathname: "/group/[id]/add", params: { id: String(id) } });
   }
 
-  function openExpense(expenseId: string) {
-    const idx = flatExpenses.findIndex((e) => e._id === expenseId);
+  function openRecord(kind: FeedItem["kind"], recordId: string) {
+    const idx = feedItems.findIndex(
+      (item) => item.kind === kind && item.id === recordId,
+    );
     if (idx < 0) return;
     setDetailIndex(idx);
     setDetailOpen(true);
@@ -253,7 +297,12 @@ export default function GroupScreen() {
           {group.name}
         </Text>
         <Pressable
-          onPress={() => setWhoOpen(true)}
+          onPress={() =>
+            router.push({
+              pathname: "/group/[id]/settings",
+              params: { id: String(id) },
+            })
+          }
           hitSlop={10}
           style={styles.iconBtn}
         >
@@ -294,10 +343,7 @@ export default function GroupScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.body,
-          feedEmpty && styles.bodyEmpty,
-        ]}
+        contentContainerStyle={[styles.body, feedEmpty && styles.bodyEmpty]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -332,121 +378,74 @@ export default function GroupScreen() {
         ) : (
           grouped.map((section) => (
             <View key={section.key} style={{ marginBottom: 18 }}>
-              <Text style={[styles.dateHead, { color: colors.textSecondary }]}>
-                {dateHeaderLabel(section.date).toUpperCase()}
+              <Text style={[styles.dateHead, { color: colors.text }]}>
+                {dateHeaderLabel(section.date)}
               </Text>
               <View style={{ gap: 10 }}>
                 {section.items.map((item) => {
                   if (item.kind === "transfer") {
                     const transfer = item.transfer;
-                    const from = members.find(
-                      (m) => m._id === transfer.fromMemberId,
-                    );
-                    const to = members.find(
-                      (m) => m._id === transfer.toMemberId,
-                    );
+                    const from = members.find((m) => m._id === transfer.fromMemberId);
+                    const to = members.find((m) => m._id === transfer.toMemberId);
                     return (
-                      <View
+                      <FeedRow
                         key={transfer._id}
-                        className="flex-row items-center gap-3 rounded-2xl border p-3.5"
-                        style={{
-                          backgroundColor: colors.surface,
-                          borderColor: colors.border,
-                        }}
-                      >
-                        <View
-                          className="h-10 w-10 items-center justify-center rounded-full"
-                          style={{ backgroundColor: colors.softSurface }}
-                        >
-                          <Text style={{ fontSize: 18 }}>
-                            {transfer.icon || "💸"}
-                          </Text>
-                        </View>
-                        <View className="min-w-0 flex-1">
+                        icon={transfer.icon || "💸"}
+                        title={transfer.title || "Transfer"}
+                        amount={formatMinor(
+                          transfer.amountMinor,
+                          transfer.currency || group.currency,
+                        )}
+                        colors={colors}
+                        onPress={() => openRecord("transfer", transfer._id)}
+                        meta={
                           <Text
-                            style={[styles.expenseTitle, { color: colors.text }]}
-                            numberOfLines={1}
+                            style={[styles.meta, { color: colors.textSecondary }]}
+                            numberOfLines={2}
                           >
-                            {transfer.title || "Transfer"}
-                          </Text>
-                          <Text
-                            style={{
-                              color: colors.textSecondary,
-                              fontSize: 12,
-                            }}
-                            numberOfLines={1}
-                          >
-                            {memberName(from)} → {memberName(to)} ·{" "}
+                            <MemberInline
+                              member={from}
+                              currentUserId={me?._id}
+                              myMemberId={myMember?._id}
+                              colors={colors}
+                            />
+                            {" → "}
+                            <MemberInline
+                              member={to}
+                              currentUserId={me?._id}
+                              myMemberId={myMember?._id}
+                              colors={colors}
+                            />
+                            {" · "}
                             {formatRowTime(item.date)}
                           </Text>
-                        </View>
-                        <Text style={[styles.amount, { color: colors.text }]}>
-                          {formatMinor(
-                            transfer.amountMinor,
-                            transfer.currency || group.currency,
-                          )}
-                        </Text>
-                      </View>
+                        }
+                      />
                     );
                   }
 
                   const expense = item.expense;
                   const payers = payerMembers(expense, members);
-                  const paidBy =
-                    payers.length === 1
-                      ? memberName(payers[0])
-                      : payers.length
-                        ? null
-                        : "Unknown";
-                  const share = myShareLine(
-                    expense,
-                    myMember?._id,
-                    expense.currency || group.currency,
-                  );
                   const when = new Date(
                     expense.expenseDate || expense.createdAt || "",
                   );
                   return (
-                    <Pressable
+                    <FeedRow
                       key={expense._id}
-                      onPress={() => openExpense(expense._id)}
-                      className="flex-row items-center gap-3"
-                      style={({ pressed }) => [
-                        styles.expenseRow,
-                        {
-                          backgroundColor: colors.surface,
-                          borderColor: colors.border,
-                          opacity: pressed ? 0.85 : 1,
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.expenseIcon,
-                          { backgroundColor: colors.softSurface },
-                        ]}
-                      >
-                        <Text style={{ fontSize: 18 }}>
-                          {getExpenseEmoji(expense.icon, expense.categoryKey)}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text
-                          style={[styles.expenseTitle, { color: colors.text }]}
-                          numberOfLines={1}
-                        >
-                          {expense.title}
-                        </Text>
-                        <View style={styles.paidRow}>
-                          <Text
-                            style={{
-                              color: colors.textSecondary,
-                              fontSize: 12,
-                            }}
-                          >
-                            Paid by{" "}
-                          </Text>
-                          {payers.length > 1 ? (
+                      icon={getExpenseEmoji(expense.icon, expense.categoryKey)}
+                      title={expense.title}
+                      amount={formatMinor(
+                        expense.amountMinor,
+                        expense.currency || group.currency,
+                      )}
+                      colors={colors}
+                      onPress={() => openRecord("expense", expense._id)}
+                      meta={
+                        payers.length > 1 ? (
+                          <View style={styles.paidRow}>
+                            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+                              Paid by{" "}
+                            </Text>
                             <View style={styles.avatars}>
                               {payers.slice(0, 3).map((m) => (
                                 <UserAvatar
@@ -454,56 +453,33 @@ export default function GroupScreen() {
                                   name={memberName(m)}
                                   avatar={m.avatar || m.user?.avatar}
                                   seed={m.userId || m._id}
-                                  size={18}
+                                  size={16}
                                 />
                               ))}
                             </View>
-                          ) : (
-                            <Text
-                              style={{
-                                color: colors.text,
-                                fontSize: 12,
-                                fontWeight: "600",
-                              }}
-                            >
-                              {paidBy}
+                            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+                              {" · "}
+                              {formatRowTime(when)}
                             </Text>
-                          )}
+                          </View>
+                        ) : (
                           <Text
-                            style={{
-                              color: colors.textSecondary,
-                              fontSize: 12,
-                            }}
+                            style={[styles.meta, { color: colors.textSecondary }]}
+                            numberOfLines={2}
                           >
-                            {" "}
-                            · {formatRowTime(when)}
+                            Paid by{" "}
+                            <MemberInline
+                              member={payers[0]}
+                              currentUserId={me?._id}
+                              myMemberId={myMember?._id}
+                              colors={colors}
+                            />
+                            {" · "}
+                            {formatRowTime(when)}
                           </Text>
-                        </View>
-                      </View>
-                      <View style={{ alignItems: "flex-end" }}>
-                        <Text style={[styles.amount, { color: colors.text }]}>
-                          {formatMinor(
-                            expense.amountMinor,
-                            expense.currency || group.currency,
-                          )}
-                        </Text>
-                        {share ? (
-                          <Text
-                            style={{
-                              fontSize: 11,
-                              color:
-                                share.tone === "positive"
-                                  ? colors.success
-                                  : share.tone === "owes"
-                                    ? colors.danger
-                                    : colors.textSecondary,
-                            }}
-                          >
-                            {share.text}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </Pressable>
+                        )
+                      }
+                    />
                   );
                 })}
               </View>
@@ -521,112 +497,35 @@ export default function GroupScreen() {
         </Pressable>
       ) : null}
 
-      <ExpenseDetailModal
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        expenses={flatExpenses}
-        index={detailIndex}
-        onIndexChange={setDetailIndex}
-        group={group}
-        currentUserId={me?._id}
-        myMemberId={myMember?._id}
-        onEdit={(item) => {
-          setDetailOpen(false);
-          router.push({
-            pathname: "/group/[id]/add",
-            params: { id: String(id), expenseId: item._id },
-          });
-        }}
-        onDeleted={() => {
-          load();
-        }}
-      />
-
-      <Modal
-        visible={whoOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setWhoOpen(false)}
-      >
-        <View style={styles.whoOverlay}>
-          <Pressable
-            style={[styles.whoBackdrop, { backgroundColor: colors.overlay }]}
-            onPress={() => setWhoOpen(false)}
-          />
-          <View
-            style={[
-              styles.whoSheet,
-              { backgroundColor: colors.elevated, borderColor: colors.border },
-            ]}
-          >
-            <Text style={[styles.whoTitle, { color: colors.text }]}>
-              You in this group
-            </Text>
-            <Text
-              style={{
-                color: colors.textSecondary,
-                fontSize: 13,
-                marginBottom: 10,
-              }}
-            >
-              We’ll treat this member as you for “me”, balances, and default
-              payer.
-            </Text>
-            {members.map((member) => {
-              const active = myMember?._id === member._id;
-              return (
-                <Pressable
-                  key={member._id}
-                  onPress={async () => {
-                    await setGroupMyMember(group._id, member._id);
-                    setWhoOpen(false);
-                    await load();
-                  }}
-                  style={[
-                    styles.whoRow,
-                    active && { backgroundColor: colors.softSurface },
-                  ]}
-                >
-                  <UserAvatar
-                    name={memberListLabel(member, me?._id, myMember?._id)}
-                    avatar={member.avatar}
-                    seed={member.userId || member._id}
-                    size={32}
-                  />
-                  <Text
-                    style={{
-                      flex: 1,
-                      color: colors.text,
-                      fontWeight: active ? "700" : "500",
-                    }}
-                  >
-                    {memberListLabel(member, me?._id, myMember?._id)}
-                  </Text>
-                  {active ? (
-                    <MaterialIcons
-                      name="check"
-                      size={18}
-                      color={colors.primary}
-                    />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-            <Pressable
-              onPress={async () => {
-                await setGroupMyMember(group._id, null);
-                setWhoOpen(false);
-                await load();
-              }}
-              style={styles.whoRow}
-            >
-              <Text style={{ color: colors.textSecondary }}>
-                Don’t mark anyone
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      {group ? (
+        <RecordDetailModal
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
+          items={feedItems}
+          index={detailIndex}
+          onIndexChange={setDetailIndex}
+          group={group}
+          currentUserId={me?._id}
+          myMemberId={myMember?._id}
+          onEditExpense={(item) => {
+            setDetailOpen(false);
+            router.push({
+              pathname: "/group/[id]/add",
+              params: { id: String(id), expenseId: item._id },
+            });
+          }}
+          onEditTransfer={(item) => {
+            setDetailOpen(false);
+            router.push({
+              pathname: "/group/[id]/add",
+              params: { id: String(id), transferId: item._id },
+            });
+          }}
+          onDeleted={() => {
+            load();
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -771,28 +670,33 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   dateHead: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: "700",
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
     marginBottom: 10,
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
   },
   expenseRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
     borderRadius: 16,
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
   },
   expenseIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  expenseTitle: { fontSize: 15, fontWeight: "700" },
+  expenseTitle: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
+  meta: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 15,
+  },
   paidRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -811,7 +715,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
-    
   },
   whoOverlay: {
     flex: 1,
