@@ -131,9 +131,14 @@ export function TransferDetailPage({
 
       <Text style={[styles.title, { color: colors.text }]}>{transfer.title || 'Transfer'}</Text>
       <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{formatDetailWhen(transfer)}</Text>
-      <Text style={[styles.amount, { color: colors.text }]}>
-        {formatMinor(transfer.amountMinor, currency)}
-      </Text>
+      <View style={styles.amountRow}>
+        <Text style={[styles.amount, { color: colors.text }]}>
+          {formatMinor(transfer.amountMinor, currency)}
+        </Text>
+        <View style={[styles.kindBadge, { backgroundColor: colors.softSurface }]}>
+          <Text style={[styles.kindBadgeText, { color: colors.textSecondary }]}>Transfer</Text>
+        </View>
+      </View>
 
       <MemberBlock
         label="FROM"
@@ -174,7 +179,27 @@ const styles = StyleSheet.create({
   },
   iconHit: { padding: 8 },
   title: { fontSize: 22, fontWeight: '700', marginTop: 12 },
-  amount: { fontSize: 32, fontWeight: '700', marginTop: 10, marginBottom: 16 },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  amount: { fontSize: 32, fontWeight: '700', flexShrink: 1 },
+  kindBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  kindBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
   section: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginTop: 16, marginBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   added: {

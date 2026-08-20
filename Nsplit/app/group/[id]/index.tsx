@@ -447,14 +447,24 @@ export default function GroupScreen() {
                               Paid by{" "}
                             </Text>
                             <View style={styles.avatars}>
-                              {payers.slice(0, 3).map((m) => (
-                                <UserAvatar
+                              {payers.slice(0, 3).map((m, i) => (
+                                <View
                                   key={m._id}
-                                  name={memberName(m)}
-                                  avatar={m.avatar || m.user?.avatar}
-                                  seed={m.userId || m._id}
-                                  size={16}
-                                />
+                                  style={{
+                                    marginLeft: i === 0 ? 0 : -4,
+                                    zIndex: 3 - i,
+                                    borderWidth: 1.5,
+                                    borderColor: colors.softSurface,
+                                    borderRadius: 10,
+                                  }}
+                                >
+                                  <UserAvatar
+                                    name={memberName(m)}
+                                    avatar={m.avatar || m.user?.avatar}
+                                    seed={m.userId || m._id}
+                                    size={16}
+                                  />
+                                </View>
                               ))}
                             </View>
                             <Text style={[styles.meta, { color: colors.textSecondary }]}>
@@ -703,7 +713,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     flexWrap: "wrap",
   },
-  avatars: { flexDirection: "row", gap: 2 },
+  avatars: { flexDirection: "row", alignItems: "center" },
   amount: { fontSize: 14, fontWeight: "700" },
   fab: {
     position: "absolute",

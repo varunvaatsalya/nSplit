@@ -1,13 +1,14 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useState } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 import { UserAvatar } from '@/components/user-avatar';
 import { useColors } from '@/hooks/use-colors';
@@ -56,35 +57,26 @@ export function ExpenseDetailPage({
 }) {
   const colors = useColors();
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const members = sortMembersByName(group?.members || []);
   const currency = expense.currency || group?.currency || 'INR';
   const payers = [...(expense.payers || [])];
   const splits = (expense.splits || []).filter((s) => (s.amountMinor || 0) > 0);
 
   async function confirmDelete() {
-    Alert.alert(
-      'Delete expense?',
-      `“${expense.title}” will be removed from this group. This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              await deleteExpense(group._id, expense._id);
-              onDeleted();
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ]
-    );
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteExpense(group._id, expense._id);
+      setConfirmOpen(false);
+      onDeleted();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
+    <>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={styles.body}
@@ -97,7 +89,11 @@ export function ExpenseDetailPage({
           <Pressable onPress={() => onEdit(expense)} style={styles.iconHit} hitSlop={8}>
             <MaterialIcons name="edit" size={20} color={colors.text} />
           </Pressable>
-          <Pressable onPress={confirmDelete} disabled={deleting} style={styles.iconHit} hitSlop={8}>
+          <Pressable
+            onPress={() => setConfirmOpen(true)}
+            disabled={deleting}
+            style={styles.iconHit}
+            hitSlop={8}>
             <MaterialIcons name="delete" size={20} color={colors.danger} />
           </Pressable>
         </View>
@@ -105,9 +101,14 @@ export function ExpenseDetailPage({
 
       <Text style={[styles.title, { color: colors.text }]}>{expense.title}</Text>
       <Text style={{ color: colors.textSecondary, marginTop: 4 }}>{formatDetailWhen(expense)}</Text>
-      <Text style={[styles.amount, { color: colors.text }]}>
-        {formatMinor(expense.amountMinor, currency)}
-      </Text>
+      <View style={styles.amountRow}>
+        <Text style={[styles.amount, { color: colors.text }]}>
+          {formatMinor(expense.amountMinor, currency)}
+        </Text>
+        <View style={[styles.kindBadge, { backgroundColor: colors.softSurface }]}>
+          <Text style={[styles.kindBadgeText, { color: colors.textSecondary }]}>Expense</Text>
+        </View>
+      </View>
 
       <Text style={[styles.section, { color: colors.textSecondary }]}>PAID BY</Text>
       {payers.map((p) => {
@@ -176,6 +177,18 @@ export function ExpenseDetailPage({
         </Text>
       </View>
     </ScrollView>
+    <ConfirmDialog
+      open={confirmOpen}
+      onOpenChange={setConfirmOpen}
+      title="Delete expense?"
+      description={`“${expense.title}” will be removed from this group. This cannot be undone.`}
+      confirmLabel="Delete"
+      cancelLabel="Cancel"
+      tone="danger"
+      loading={deleting}
+      onConfirm={confirmDelete}
+    />
+    </>
   );
 }
 
@@ -191,7 +204,27 @@ const styles = StyleSheet.create({
   },
   iconHit: { padding: 8 },
   title: { fontSize: 22, fontWeight: '700', marginTop: 12 },
-  amount: { fontSize: 32, fontWeight: '700', marginTop: 10, marginBottom: 16 },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 10,
+    marginBottom: 16,
+  },
+  amount: { fontSize: 32, fontWeight: '700', flexShrink: 1 },
+  kindBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    flexShrink: 0,
+  },
+  kindBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
   section: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginTop: 16, marginBottom: 8 },
   splitLabel: {
     marginTop: 16,

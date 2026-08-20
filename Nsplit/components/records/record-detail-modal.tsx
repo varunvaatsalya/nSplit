@@ -9,7 +9,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExpenseDetailPage } from '@/components/expenses/expense-detail-modal';
 import { TransferDetailPage } from '@/components/transfers/transfer-detail-modal';
@@ -46,6 +46,7 @@ export function RecordDetailModal({
   onDeleted: () => void;
 }) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<RecordFeedItem>>(null);
   const indexRef = useRef(index);
   const [session, setSession] = useState({ open: false, key: 0, start: 0 });
@@ -93,22 +94,6 @@ export function RecordDetailModal({
           <Pressable onPress={onClose} hitSlop={8}>
             <MaterialIcons name="close" size={24} color={colors.text} />
           </Pressable>
-          <View style={styles.chevrons}>
-            <Pressable disabled={!canPrev} onPress={() => go(index - 1)} hitSlop={8}>
-              <MaterialIcons
-                name="chevron-left"
-                size={28}
-                color={canPrev ? colors.text : colors.border}
-              />
-            </Pressable>
-            <Pressable disabled={!canNext} onPress={() => go(index + 1)} hitSlop={8}>
-              <MaterialIcons
-                name="chevron-right"
-                size={28}
-                color={canNext ? colors.text : colors.border}
-              />
-            </Pressable>
-          </View>
         </View>
 
         <View
@@ -181,6 +166,27 @@ export function RecordDetailModal({
             />
           ) : null}
         </View>
+
+        <View
+          style={[
+            styles.bottom,
+            { paddingBottom: Math.max(insets.bottom, 8) },
+          ]}>
+          <Pressable disabled={!canPrev} onPress={() => go(index - 1)} hitSlop={12} style={styles.navHit}>
+            <MaterialIcons
+              name="chevron-left"
+              size={32}
+              color={canPrev ? colors.text : colors.border}
+            />
+          </Pressable>
+          <Pressable disabled={!canNext} onPress={() => go(index + 1)} hitSlop={12} style={styles.navHit}>
+            <MaterialIcons
+              name="chevron-right"
+              size={32}
+              color={canNext ? colors.text : colors.border}
+            />
+          </Pressable>
+        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -190,11 +196,17 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   top: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  chevrons: { flexDirection: 'row', gap: 8 },
+  bottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 4,
+  },
+  navHit: { padding: 8 },
   pager: { flex: 1 },
 });
