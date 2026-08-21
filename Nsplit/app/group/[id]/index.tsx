@@ -17,6 +17,7 @@ import AddNotes from "@/assets/illustrations/add-notes-amico.svg";
 import BalanceAmico from "@/assets/illustrations/balence-amico.svg";
 import { BalanceView } from "@/components/balance/balance-view";
 import { ExportLedgerSheet } from "@/components/balance/export-ledger-sheet";
+import { OfflineBanner } from "@/components/offline-banner";
 import { RecordDetailModal } from "@/components/records/record-detail-modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { useColors } from "@/hooks/use-colors";
@@ -294,6 +295,7 @@ export default function GroupScreen() {
       style={[styles.safe, { backgroundColor: colors.background }]}
       edges={["top"]}
     >
+      <OfflineBanner />
       <View style={styles.topBar}>
         <Pressable
           onPress={() => router.back()}

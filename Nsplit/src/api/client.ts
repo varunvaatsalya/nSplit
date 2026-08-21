@@ -6,6 +6,8 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+import { isOnline } from '@/src/lib/network';
+
 import type { ApiError } from './types';
 
 const TOKEN_KEY = 'nsplit_session_token';
@@ -96,10 +98,21 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong') 
   return fallback;
 }
 
+export function networkError(message?: string): ApiError {
+  return {
+    message: message || 'You’re offline. Changes stay on this phone.',
+    code: 'NETWORK',
+  };
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<{ ok: boolean; status: number; data: T | null; error: ApiError }> {
+  if (!(await isOnline())) {
+    return { ok: false, status: 0, data: null, error: networkError() };
+  }
+
   const token = await getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -108,7 +121,7 @@ export async function apiFetch<T = unknown>(
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), 6000);
   try {
     const res = await fetch(`${getApiBase()}${path}`, {
       ...options,
@@ -127,10 +140,7 @@ export async function apiFetch<T = unknown>(
       ok: false,
       status: 0,
       data: null,
-      error: {
-        message: `Cannot reach ${getApiBase()}. Start the web app and check EXPO_PUBLIC_API_URL.`,
-        code: 'NETWORK',
-      },
+      error: networkError(`Cannot reach ${getApiBase()}. Try again when you’re online.`),
     };
   } finally {
     clearTimeout(timeout);

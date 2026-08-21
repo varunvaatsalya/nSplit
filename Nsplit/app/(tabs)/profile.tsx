@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppearanceSettings } from '@/components/profile/appearance-settings';
+import { OfflineBanner } from '@/components/offline-banner';
 import { Field } from '@/components/ui/field';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { UserAvatar } from '@/components/user-avatar';
@@ -31,7 +32,9 @@ export default function ProfileScreen() {
   }
 
   async function saveName() {
-    await setName(draftName);
+    const trimmed = draftName.trim();
+    setDraftName(trimmed);
+    await setName(trimmed);
   }
 
   return (
@@ -43,6 +46,7 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
         </View>
+        <OfflineBanner />
 
         {user ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -52,9 +56,13 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.name, { color: colors.text }]}>Your groups stay on this phone</Text>
+            <Text style={[styles.name, { color: colors.text }]}>
+              {storedName.trim() || 'Your groups stay on this phone'}
+            </Text>
             <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
-              Log in later to back them up.
+              {storedName.trim()
+                ? 'Saved on this phone. Log in later if you want a backup.'
+                : 'Log in later to back them up.'}
             </Text>
           </View>
         )}

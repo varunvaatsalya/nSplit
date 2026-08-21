@@ -15,6 +15,7 @@ import { getNavTheme } from "@/lib/theme";
 import { AuthProvider } from "@/src/auth/auth-context";
 import { GroupsProvider, useGroups } from "@/src/groups/groups-context";
 import { IdentityProvider } from "@/src/identity/identity-context";
+import { OfflineProvider } from "@/src/offline/offline-context";
 import { AppearanceProvider, useAppearance } from "@/src/theme/appearance-context";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -69,13 +70,15 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AppearanceProvider>
-      <AuthProvider>
-        <IdentityProvider>
-          <GroupsProvider>
-            <RootNavigator />
-          </GroupsProvider>
-        </IdentityProvider>
-      </AuthProvider>
+      <OfflineProvider>
+        <AuthProvider>
+          <IdentityProvider>
+            <GroupsProvider>
+              <RootNavigator />
+            </GroupsProvider>
+          </IdentityProvider>
+        </AuthProvider>
+      </OfflineProvider>
     </AppearanceProvider>
   );
 }

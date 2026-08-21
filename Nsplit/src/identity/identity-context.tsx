@@ -26,7 +26,7 @@ type IdentityContextValue = {
 const IdentityContext = createContext<IdentityContextValue | null>(null);
 
 export function IdentityProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, updateLocalUser } = useAuth();
   const [ready, setReady] = useState(false);
   const [name, setNameState] = useState('');
   const [matchByName, setMatchState] = useState(true);
@@ -41,6 +41,9 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
         setNameState(nextName);
         setMatchState(stored.matchByName);
         if (!stored.name && nextName) await persistName(nextName);
+        if (user && nextName && nextName !== user.name) {
+          await updateLocalUser({ name: nextName });
+        }
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -48,13 +51,14 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.name]);
+  }, [user, updateLocalUser]);
 
   const setName = useCallback(async (next: string) => {
     const trimmed = next.trim();
     setNameState(trimmed);
     await persistName(trimmed);
-  }, []);
+    await updateLocalUser({ name: trimmed });
+  }, [updateLocalUser]);
 
   const setMatchByName = useCallback(async (enabled: boolean) => {
     setMatchState(enabled);

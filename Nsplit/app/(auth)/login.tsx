@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NsplitBrand } from '@/components/nsplit-logo';
+import { OfflineBanner } from '@/components/offline-banner';
 import { Field } from '@/components/ui/field';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { NsplitBrand } from '@/components/nsplit-logo';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/src/auth/auth-context';
 
@@ -52,6 +53,7 @@ export default function LoginScreen() {
             align="center"
             style={styles.brand}
           />
+          <OfflineBanner />
           <View
             style={[
               styles.card,

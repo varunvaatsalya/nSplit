@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import GroupDiscussion from '@/assets/illustrations/group-discussion-amico.svg';
 import { NsplitBrand } from '@/components/nsplit-logo';
+import { OfflineBanner } from '@/components/offline-banner';
 import { Button } from '@/components/ui/button';
 import { Text as UIText } from '@/components/ui/text';
 import { useColors } from '@/hooks/use-colors';
@@ -35,6 +36,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <NsplitBrand color={colors.primary} logoSize={34} fontSize={32} />
       </View>
+      <OfflineBanner />
 
       {groups.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6 pb-16">
