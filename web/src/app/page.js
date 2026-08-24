@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSessionUser } from "@/lib/auth/session";
 import PhoneMockup from "@/components/landing/phone-mockup";
 import ScrollTour from "@/components/landing/scroll-tour";
+import FeaturesTour from "@/components/landing/features-tour";
 import { Logo } from "@/components/brand/logo";
 import { Check, Play, ReceiptText, Calculator, Scale, Handshake } from "lucide-react";
 
@@ -210,7 +211,7 @@ export default async function HomePage() {
       </main>
 
       {/* Shared expenses shouldn't be complicated Section - Sticky stack layer */}
-      <section className="sticky top-0 h-screen z-10 w-full bg-background flex items-center justify-center overflow-hidden rounded-b-[40px] md:rounded-b-[48px] border-b border-border shadow-2xl">
+      <section className="sticky top-0 h-screen z-6 w-full bg-background flex items-center justify-center overflow-hidden rounded-b-[40px] md:rounded-b-[48px] border-b border-border shadow-2xl">
         <div className="mx-auto w-full max-w-6xl px-6">
           <div className="grid items-center gap-12 lg:grid-cols-12 py-12">
             {/* Left Column: Floating mockup chat & calculations sheet */}
@@ -293,6 +294,9 @@ export default async function HomePage() {
 
       {/* Scroll-Driven Expense Tour Section */}
       <ScrollTour />
+
+      {/* Dynamic Features Tour Section */}
+      <FeaturesTour />
     </div>
   );
 }

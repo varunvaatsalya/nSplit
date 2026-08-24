@@ -9,12 +9,7 @@ import {
   AnimatePresence,
 } from "framer-motion";
 import {
-  MessageSquare,
-  IndianRupee,
-  Settings,
-  History,
   ArrowLeft,
-  Plus,
   MousePointer2,
   Pointer,
   TextCursor,
@@ -315,10 +310,10 @@ export default function ScrollTour() {
   return (
     <section
       ref={sectionRef}
-      className="relative bg-[#090b11] text-white overflow-visible animate-none z-20"
+      className="relative bg-[#090b11] text-white overflow-visible animate-none z-7"
       style={{ height: `${n * 160}vh` }}
     >
-      <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden w-full">
+      <div className="sticky top-0 z-7 bg-[#090b11] h-screen flex items-center justify-center overflow-hidden w-full">
         {/* Typewriter Blinking Cursor Animation */}
         <style
           dangerouslySetInnerHTML={{
