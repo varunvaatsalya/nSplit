@@ -25,6 +25,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "framer-motion": "^13.1.1",
     "lucide-react": "^0.544.0",
     "mongoose": "^8.24.3",
     "nanoid": "^6.0.1",

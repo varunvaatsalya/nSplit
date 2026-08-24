@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Sticky Stacking Sections</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background: #111;
+      }
+
+      .section {
+        position: sticky;
+        top: 0;
+
+        height: 100vh;
+        min-height: 200px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        border-radius: 0 0 50px 50px;
+
+        color: white;
+        font-size: clamp(3rem, 8vw, 8rem);
+        font-weight: 800;
+
+        overflow: hidden;
+      }
+
+      .section h1 {
+        position: relative;
+        z-index: 2;
+      }
+
+      /* Individual sections */
+
+      .section-1 {
+        background: #ff5c5c;
+        z-index: 1;
+      }
+
+      .section-2 {
+        background: #ff9f43;
+        z-index: 2;
+      }
+
+      .section-3 {
+        background: #10ac84;
+        z-index: 3;
+      }
+
+      .section-4 {
+        background: #54a0ff;
+        z-index: 4;
+      }
+
+      .section-5 {
+        background: #5f27cd;
+        z-index: 5;
+        height: 40vh;
+      }
+    </style>
+  </head>
+
+  <body>
+    <section class="section section-1">
+      <h1>SECTION 01</h1>
+    </section>
+
+    <section class="section section-2">
+      <h1>SECTION 02</h1>
+    </section>
+
+    <section class="section section-3">
+      <h1>SECTION 03</h1>
+    </section>
+
+    <section class="section section-4">
+      <h1>SECTION 04</h1>
+    </section>
+
+    <section class="section section-5">
+      <h1>SECTION 05</h1>
+    </section>
+  </body>
+</html>
