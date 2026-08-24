@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  InteractionManager,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -216,7 +217,10 @@ export default function GroupScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      const task = InteractionManager.runAfterInteractions(() => {
+        load();
+      });
+      return () => task.cancel();
     }, [load]),
   );
 

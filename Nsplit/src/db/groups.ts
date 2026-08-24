@@ -3,7 +3,7 @@ import { allocateMemberAvatar } from '@/src/lib/avatar';
 import { normalizeSplitMethod } from '@/src/lib/expense-form-utils';
 import { compareMembersByName, resolveMyMember } from '@/src/lib/members';
 
-import { getDb } from './client';
+import { getDb, runInTransaction } from './client';
 import { createGroupCode, createId } from './ids';
 
 type GroupRow = {
@@ -228,7 +228,7 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
   );
   const myMemberId = mine?._id || null;
 
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync(
       `INSERT INTO groups (id, code, name, icon, currency, my_member_id, settings_json, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -320,7 +320,7 @@ export async function addGroupMember(groupId: string, name: string) {
   const now = new Date().toISOString();
   const id = createId();
   const db = await getDb();
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync(
       `INSERT INTO group_members
         (id, group_id, display_name, user_id, email, permission, avatar_letters, avatar_bg, created_at)
@@ -373,7 +373,7 @@ export async function removeGroupMember(groupId: string, memberId: string) {
 
   const now = new Date().toISOString();
   const db = await getDb();
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync(
       `UPDATE group_members SET left_at = ? WHERE id = ? AND group_id = ?`,
       [now, memberId, group._id]

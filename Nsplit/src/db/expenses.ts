@@ -2,7 +2,7 @@ import type { Expense, GroupBalance, GroupDetail, Transfer } from '@/src/api/typ
 import { computeGroupBalances } from '@/src/lib/balance';
 import { calculateSplit } from '@/src/lib/split';
 
-import { getDb } from './client';
+import { getDb, runInTransaction } from './client';
 import { getGroup } from './groups';
 import { createId } from './ids';
 
@@ -161,7 +161,7 @@ export async function saveExpense(
     splits: expense.splits,
   } satisfies ExpenseJson);
 
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     if (existing) {
       await db.runAsync(
         `UPDATE expenses

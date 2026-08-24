@@ -1,6 +1,7 @@
 import { Check, ChevronDown, User } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -206,8 +207,9 @@ export function TransferForm({
         },
         transfer?._id
       );
+      Keyboard.dismiss();
       onSaved();
-    } finally {
+    } catch {
       setSaving(false);
     }
   }

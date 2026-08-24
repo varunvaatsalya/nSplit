@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { UserAvatar } from "@/components/user-avatar";
+import { Logo } from "@/components/brand/logo";
 import { BellIcon } from "lucide-react";
 
 export function AppShell({ user, children }) {
@@ -9,9 +10,10 @@ export function AppShell({ user, children }) {
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex flex-col items-center min-h-screen py-4 px-4 sm:px-6">
         <header className="w-full max-w-3xl flex shrink-0 items-center justify-between gap-3 px-4 sm:px-6">
-          <Link href="/groups" className="min-w-0">
-            <div className="text-xl font-semibold tracking-tight text-primary">
-              Nsplit
+          <Link href="/groups" className="min-w-0 flex items-center gap-2">
+            <Logo className="h-5 w-5 text-primary" />
+            <div className="text-xl font-bold tracking-tight text-primary">
+              nSplit
             </div>
           </Link>
           <div className="flex items-center gap-3">

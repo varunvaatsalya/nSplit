@@ -37,8 +37,8 @@ export function getApiBase() {
   if (env) return env;
   const host = hostFromExpo();
   if (host) return `http://${host}:3000`;
-  if (Platform.OS === 'android') return 'http://10.0.2.2:3000';
-  return 'http://localhost:3000';
+  if (Platform.OS === 'android') return 'https://nsplit.vercel.app';
+  return 'https://nsplit.vercel.app';
 }
 
 async function storageGet(key: string): Promise<string | null> {

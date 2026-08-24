@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -92,10 +93,10 @@ export default function NewGroupScreen() {
         myName: myName || user?.name,
         matchByName,
       });
+      Keyboard.dismiss();
       router.back();
     } catch {
       setError('Could not create group');
-    } finally {
       setCreating(false);
     }
   }

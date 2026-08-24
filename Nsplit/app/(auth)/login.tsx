@@ -59,7 +59,7 @@ export default function LoginScreen() {
               styles.card,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}>
-            <Text style={[styles.title, { color: colors.text }]}>Welcome back</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Welcome</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Log in to Nsplit
             </Text>

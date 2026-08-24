@@ -60,3 +60,24 @@ export async function getDb(): Promise<SqlExecutor> {
 export async function initDb() {
   return getDb();
 }
+
+export async function runInTransaction<T>(
+  db: SqlExecutor,
+  action: () => Promise<T>
+): Promise<T> {
+  // Use manual transactions to prevent native crashes with expo-sqlite's withTransactionAsync on Android release builds.
+  await db.execAsync('BEGIN IMMEDIATE TRANSACTION;');
+  try {
+    const result = await action();
+    await db.execAsync('COMMIT;');
+    return result;
+  } catch (error) {
+    try {
+      await db.execAsync('ROLLBACK;');
+    } catch (rollbackError) {
+      console.error('Transaction rollback failed:', rollbackError);
+    }
+    throw error;
+  }
+}
+

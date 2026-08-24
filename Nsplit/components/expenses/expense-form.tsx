@@ -723,10 +723,10 @@ export function ExpenseForm({
         { ...payload, createdById: currentUserId },
         expense?._id,
       );
+      Keyboard.dismiss();
       onSaved();
     } catch {
       setError(isEdit ? "Failed to save expense" : "Failed to add expense");
-    } finally {
       setSaving(false);
     }
   }

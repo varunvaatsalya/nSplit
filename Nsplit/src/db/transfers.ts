@@ -1,5 +1,5 @@
 import type { Transfer } from '@/src/api/types';
-import { getDb } from './client';
+import { getDb, runInTransaction } from './client';
 import { getGroup } from './groups';
 import { createId } from './ids';
 
@@ -98,7 +98,7 @@ export async function saveTransfer(
   };
 
   const db = await getDb();
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     if (existing) {
       await db.runAsync(
         `UPDATE transfers
@@ -149,7 +149,7 @@ export async function saveTransfer(
 export async function deleteTransfer(groupId: string, transferId: string) {
   const db = await getDb();
   const now = new Date().toISOString();
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync(
       `UPDATE transfers SET deleted_at = ?, updated_at = ? WHERE id = ? AND group_id = ? AND deleted_at IS NULL`,
       [now, now, transferId, groupId]

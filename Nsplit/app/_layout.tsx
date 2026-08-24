@@ -57,8 +57,8 @@ function RootNavigator() {
           presentation: "card",
         }}
       >
-        <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(auth)" />
         <Stack.Screen name="group" />
       </Stack>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />

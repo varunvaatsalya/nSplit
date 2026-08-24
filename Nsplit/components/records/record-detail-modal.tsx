@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -54,11 +54,13 @@ export function RecordDetailModal({
 
   indexRef.current = index;
 
-  if (open && !session.open) {
-    setSession({ open: true, key: session.key + 1, start: index });
-  } else if (!open && session.open) {
-    setSession({ ...session, open: false });
-  }
+  useEffect(() => {
+    if (open && !session.open) {
+      setSession((prev) => ({ open: true, key: prev.key + 1, start: index }));
+    } else if (!open && session.open) {
+      setSession((prev) => ({ ...prev, open: false }));
+    }
+  }, [open]);
 
   const canPrev = index > 0;
   const canNext = index < items.length - 1;
