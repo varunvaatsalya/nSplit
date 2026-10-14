@@ -15,6 +15,7 @@ import { ExpenseDetailPage } from '@/components/expenses/expense-detail-modal';
 import { TransferDetailPage } from '@/components/transfers/transfer-detail-modal';
 import { useColors } from '@/hooks/use-colors';
 import type { Expense, GroupDetail, Transfer } from '@/src/api/types';
+import type { Ledger } from '@/src/lib/ledger';
 
 export type RecordFeedItem =
   | { kind: 'expense'; id: string; expense: Expense }
@@ -29,6 +30,7 @@ export function RecordDetailModal({
   group,
   currentUserId,
   myMemberId,
+  ledger,
   onEditExpense,
   onEditTransfer,
   onDeleted,
@@ -41,6 +43,7 @@ export function RecordDetailModal({
   group: GroupDetail;
   currentUserId?: string | null;
   myMemberId?: string | null;
+  ledger?: Ledger;
   onEditExpense: (expense: Expense) => void;
   onEditTransfer: (transfer: Transfer) => void;
   onDeleted: () => void;
@@ -150,6 +153,7 @@ export function RecordDetailModal({
                       group={group}
                       currentUserId={currentUserId}
                       myMemberId={myMemberId}
+                      ledger={ledger}
                       onEdit={onEditExpense}
                       onDeleted={handleDeleted}
                     />

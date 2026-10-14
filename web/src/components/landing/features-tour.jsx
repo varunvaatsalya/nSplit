@@ -71,8 +71,8 @@ export default function FeaturesTour() {
         <div className="sticky top-0 z-8 bg-background h-screen flex items-center justify-center overflow-hidden">
           
           {/* Ambient Glows */}
-          <div className="absolute top-1/2 left-1/4 -translate-y-1/2 -z-10 h-[350px] w-[350px] rounded-full bg-primary/10 blur-3xl opacity-30 dark:opacity-60" />
-          <div className="absolute top-1/3 right-1/4 -translate-y-1/2 -z-10 h-[300px] w-[300px] rounded-full bg-emerald-500/5 blur-3xl opacity-20 dark:opacity-40" />
+          <div className="absolute top-1/2 left-1/4 -translate-y-1/2 -z-10 h-87.5 w-87.5 rounded-full bg-primary/10 blur-3xl opacity-30 dark:opacity-60" />
+          <div className="absolute top-1/3 right-1/4 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-emerald-500/5 blur-3xl opacity-20 dark:opacity-40" />
 
           <div className="mx-auto grid w-full max-w-5xl items-center gap-16 px-6 grid-cols-1 lg:grid-cols-12">
             
@@ -139,7 +139,7 @@ export default function FeaturesTour() {
               </div>
 
               {/* Steps Horizontal Sliding Card Deck */}
-              <div className="min-h-[190px] flex items-center justify-start mt-2">
+              <div className="min-h-47.5 flex items-center justify-start mt-2">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeIndex}
@@ -175,7 +175,7 @@ export default function FeaturesTour() {
       <section className="relative pt-28 pb-20 bg-background border-t border-border/60 overflow-hidden">
         
         {/* Glow */}
-        <div className="absolute top-1/2 right-0 -translate-y-1/2 -z-10 h-[300px] w-[300px] rounded-full bg-emerald-500/5 blur-3xl opacity-20 dark:opacity-40" />
+        <div className="absolute top-1/2 right-0 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-emerald-500/5 blur-3xl opacity-20 dark:opacity-40" />
 
         <div className="mx-auto grid w-full max-w-5xl items-center gap-16 px-6 grid-cols-1 lg:grid-cols-12">
           
@@ -195,12 +195,12 @@ export default function FeaturesTour() {
 
           {/* Right: Balances high-fidelity cards */}
           <div className="lg:col-span-7 flex justify-center items-center relative w-full">
-            <div className="bg-card/70 border border-border rounded-[28px] p-6 shadow-2xl backdrop-blur-md w-full max-w-[340px] flex flex-col gap-4 select-none">
+            <div className="bg-card/70 border border-border rounded-[28px] p-6 shadow-2xl backdrop-blur-md w-full max-w-85 flex flex-col gap-4 select-none">
               
               {/* Record 1: Rahul M. owes you */}
               <div className="flex items-center justify-between bg-background/50 border border-border/80 rounded-2xl p-4.5 transition-transform hover:scale-[1.02] duration-200">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 text-[10px] font-bold text-white flex items-center justify-center border border-border/80 shadow-md">
+                  <div className="h-9 w-9 rounded-full bg-linear-to-r from-blue-400 to-indigo-500 text-[10px] font-bold text-white flex items-center justify-center border border-border/80 shadow-md">
                     RM
                   </div>
                   <div className="flex flex-col">
@@ -214,7 +214,7 @@ export default function FeaturesTour() {
               {/* Record 2: Priya S. you owe */}
               <div className="flex items-center justify-between bg-background/50 border border-border/80 rounded-2xl p-4.5 transition-transform hover:scale-[1.02] duration-200">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 text-[10px] font-bold text-white flex items-center justify-center border border-border/80 shadow-md">
+                  <div className="h-9 w-9 rounded-full bg-linear-to-r from-emerald-400 to-teal-500 text-[10px] font-bold text-white flex items-center justify-center border border-border/80 shadow-md">
                     PS
                   </div>
                   <div className="flex flex-col">
@@ -241,13 +241,13 @@ export default function FeaturesTour() {
       <section className="relative pt-20 pb-28 bg-background border-t border-border/60 overflow-hidden">
         
         {/* Glow */}
-        <div className="absolute top-1/2 left-0 -translate-y-1/2 -z-10 h-[300px] w-[300px] rounded-full bg-rose-500/5 blur-3xl opacity-15 dark:opacity-35" />
+        <div className="absolute top-1/2 left-0 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-rose-500/5 blur-3xl opacity-15 dark:opacity-35" />
 
         <div className="mx-auto grid w-full max-w-5xl items-center gap-16 px-6 grid-cols-1 lg:grid-cols-12">
           
           {/* Left: High fidelity settle up mockup card */}
           <div className="lg:col-span-5 flex justify-center items-center relative w-full order-2 lg:order-1">
-            <div className="bg-card/70 border border-border rounded-[28px] p-6 shadow-2xl backdrop-blur-md w-full max-w-[300px] flex flex-col items-center gap-5 select-none text-center">
+            <div className="bg-card/70 border border-border rounded-[28px] p-6 shadow-2xl backdrop-blur-md w-full max-w-75 flex flex-col items-center gap-5 select-none text-center">
               
               {/* Handshake circle decoration */}
               <div className="h-14 w-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-lg">
@@ -257,13 +257,13 @@ export default function FeaturesTour() {
               {/* Title descriptions */}
               <div className="space-y-1.5">
                 <h3 className="text-[15px] font-black text-foreground">Settle Up</h3>
-                <p className="text-[10px] text-muted-foreground leading-normal max-w-[210px] mx-auto">
+                <p className="text-[10px] text-muted-foreground leading-normal max-w-52.5 mx-auto">
                   Record a cash payment or use an external app to settle your debt with Priya.
                 </p>
               </div>
 
               {/* Amount visual pill */}
-              <div className="bg-background/60 border border-border/80 py-3.5 px-6 rounded-2xl w-full max-w-[200px] flex flex-col gap-1 items-center">
+              <div className="bg-background/60 border border-border/80 py-3.5 px-6 rounded-2xl w-full max-w-50 flex flex-col gap-1 items-center">
                 <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider">Amount to settle</span>
                 <span className="text-xl font-mono font-black text-emerald-400">$28.50</span>
               </div>

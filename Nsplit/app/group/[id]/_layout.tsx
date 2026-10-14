@@ -21,6 +21,7 @@ export default function GroupStackLayout() {
           animation: 'slide_from_right',
         }}
       />
+      <Stack.Screen name="export" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen
         name="add"
         options={{

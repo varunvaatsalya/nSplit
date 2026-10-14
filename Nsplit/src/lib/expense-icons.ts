@@ -57,7 +57,7 @@ export function suggestEmojiFromText(text = '') {
   const tokens = raw.split(/[^a-z0-9]+/).filter((t) => t.length >= 2);
   const queries = [...new Set([raw, collapsed, ...tokens])];
 
-  let best = DEFAULT;
+  let best: (typeof CATEGORIES)[number] = DEFAULT;
   let bestScore = 0;
 
   for (const category of CATEGORIES) {

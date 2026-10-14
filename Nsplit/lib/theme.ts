@@ -1,6 +1,17 @@
-import { DarkTheme, DefaultTheme, type Theme } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, type Theme } from 'expo-router/react-navigation';
 
-import type { ColorSchemeName, ColorThemeId, ColorTokens } from '@/constants/theme';
+import type {
+  ColorSchemeName,
+  ColorThemeId,
+  ColorTokens,
+} from '@/constants/theme';
+
+/**
+ * NativeWind / Tailwind theme tokens.
+ *
+ * Dark mode uses a neutral charcoal/slate foundation.
+ * Color themes are preserved primarily through primary/tint colors.
+ */
 
 type HslTheme = {
   background: string;
@@ -56,7 +67,10 @@ const DARK_HSL = {
   input: '215 25% 27%',
 } as const;
 
-const THEME_HSL: Record<ColorThemeId, Record<ColorSchemeName, HslTheme>> = {
+const THEME_HSL: Record<
+  ColorThemeId,
+  Record<ColorSchemeName, HslTheme>
+> = {
   indigo: {
     light: {
       ...LIGHT_HSL,
@@ -64,16 +78,22 @@ const THEME_HSL: Record<ColorThemeId, Record<ColorSchemeName, HslTheme>> = {
       primary: '239 84% 67%',
       ring: '239 84% 67%',
     },
+
     dark: {
       ...DARK_HSL,
-      background: '226 49% 8%',
-      card: '222 47% 11%',
-      popover: '222 47% 11%',
+
+      // Neutral charcoal/slate surfaces.
+      background: '220 10% 7%',
+      card: '220 9% 10%',
+      popover: '220 9% 10%',
+
+      // Indigo remains the accent.
       primary: '234 89% 74%',
-      primaryForeground: '226 49% 8%',
+      primaryForeground: '220 10% 7%',
       ring: '234 89% 74%',
     },
   },
+
   teal: {
     light: {
       ...LIGHT_HSL,
@@ -81,16 +101,22 @@ const THEME_HSL: Record<ColorThemeId, Record<ColorSchemeName, HslTheme>> = {
       primary: '175 84% 32%',
       ring: '175 84% 32%',
     },
+
     dark: {
       ...DARK_HSL,
-      background: '170 40% 5%',
-      card: '168 33% 9%',
-      popover: '168 33% 9%',
+
+      // Same neutral foundation as the other dark themes.
+      background: '220 10% 7%',
+      card: '220 9% 10%',
+      popover: '220 9% 10%',
+
+      // Teal remains the accent.
       primary: '172 66% 50%',
-      primaryForeground: '170 40% 5%',
+      primaryForeground: '220 10% 7%',
       ring: '172 66% 50%',
     },
   },
+
   violet: {
     light: {
       ...LIGHT_HSL,
@@ -98,16 +124,22 @@ const THEME_HSL: Record<ColorThemeId, Record<ColorSchemeName, HslTheme>> = {
       primary: '263 70% 50%',
       ring: '263 70% 50%',
     },
+
     dark: {
       ...DARK_HSL,
-      background: '255 40% 7%',
-      card: '255 35% 11%',
-      popover: '255 35% 11%',
+
+      // Neutral foundation instead of purple-tinted surfaces.
+      background: '220 10% 7%',
+      card: '220 9% 10%',
+      popover: '220 9% 10%',
+
+      // Violet remains the accent.
       primary: '255 92% 76%',
-      primaryForeground: '255 40% 7%',
+      primaryForeground: '220 10% 7%',
       ring: '255 92% 76%',
     },
   },
+
   amber: {
     light: {
       ...LIGHT_HSL,
@@ -115,13 +147,18 @@ const THEME_HSL: Record<ColorThemeId, Record<ColorSchemeName, HslTheme>> = {
       primary: '32 95% 44%',
       ring: '32 95% 44%',
     },
+
     dark: {
       ...DARK_HSL,
-      background: '33 43% 5%',
-      card: '36 38% 8%',
-      popover: '36 38% 8%',
+
+      // Neutral foundation instead of brown/orange-tinted surfaces.
+      background: '220 10% 7%',
+      card: '220 9% 10%',
+      popover: '220 9% 10%',
+
+      // Amber remains the accent.
       primary: '43 96% 56%',
-      primaryForeground: '33 43% 5%',
+      primaryForeground: '220 10% 7%',
       ring: '43 96% 56%',
     },
   },
@@ -156,8 +193,12 @@ function hslThemeToCss(theme: HslTheme) {
   };
 }
 
-export function getNativewindVars(themeId: ColorThemeId, scheme: ColorSchemeName) {
+export function getNativewindVars(
+  themeId: ColorThemeId,
+  scheme: ColorSchemeName
+) {
   const theme = THEME_HSL[themeId][scheme];
+
   return {
     '--background': theme.background,
     '--foreground': theme.foreground,
@@ -180,8 +221,12 @@ export function getNativewindVars(themeId: ColorThemeId, scheme: ColorSchemeName
   };
 }
 
-export function getNavTheme(scheme: ColorSchemeName, colors: ColorTokens): Theme {
+export function getNavTheme(
+  scheme: ColorSchemeName,
+  colors: ColorTokens
+): Theme {
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+
   return {
     ...base,
     colors: {
@@ -209,6 +254,7 @@ export const NAV_THEME: Record<'light' | 'dark', Theme> = {
       text: THEME.light.foreground,
     },
   },
+
   dark: {
     ...DarkTheme,
     colors: {

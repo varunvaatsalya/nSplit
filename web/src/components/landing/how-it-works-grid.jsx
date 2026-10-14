@@ -95,7 +95,7 @@ export default function HowItWorksGrid() {
       <section id="how-it-works" className="relative py-24 border-t border-border/60 overflow-hidden">
         
         {/* Glow */}
-        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 -z-10 h-[300px] w-[300px] rounded-full bg-primary/5 blur-3xl opacity-40" />
+        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-primary/5 blur-3xl opacity-40" />
 
         <div className="mx-auto w-full max-w-5xl px-6 text-center">
           
@@ -131,7 +131,7 @@ export default function HowItWorksGrid() {
                   <h4 className="text-sm font-extrabold text-foreground tracking-tight">
                     {step.title}
                   </h4>
-                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed max-w-[200px]">
+                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed max-w-50">
                     {step.desc}
                   </p>
                 </div>
@@ -146,7 +146,7 @@ export default function HowItWorksGrid() {
       <section id="use-cases" className="relative py-24 border-t border-border/60 overflow-hidden">
         
         {/* Glow */}
-        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 -z-10 h-[300px] w-[300px] rounded-full bg-primary/5 blur-3xl opacity-40" />
+        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-primary/5 blur-3xl opacity-40" />
 
         <div className="mx-auto w-full max-w-5xl px-6 text-center">
           

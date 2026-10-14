@@ -11,6 +11,8 @@ export type LedgerExportInput = {
   expenses: Expense[];
   transfers: Transfer[];
   balance: GroupBalance | null;
+  /** Chosen export window; when set it is shown as the period instead of the record span. */
+  range?: { from: Date | null; to: Date | null };
 };
 
 function escapeHtml(value: string) {
@@ -25,6 +27,31 @@ function parseDate(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function expenseDate(expense: Expense) {
+  return parseDate(expense.expenseDate || expense.createdAt);
+}
+
+export function transferDate(transfer: Transfer) {
+  return parseDate(transfer.transferDate || transfer.createdAt);
+}
+
+/** Keep records dated within [from, to] (inclusive). A null bound is open-ended. */
+export function filterByRange(
+  expenses: Expense[],
+  transfers: Transfer[],
+  from: Date | null,
+  to: Date | null
+) {
+  const inRange = (date: Date | null) =>
+    Boolean(date) &&
+    (!from || date!.getTime() >= from.getTime()) &&
+    (!to || date!.getTime() <= to.getTime());
+  return {
+    expenses: expenses.filter((e) => inRange(expenseDate(e))),
+    transfers: transfers.filter((t) => inRange(transferDate(t))),
+  };
 }
 
 export function ledgerPeriod(expenses: Expense[], transfers: Transfer[]) {
@@ -59,10 +86,14 @@ function netLabel(net: number, currency: string) {
   return formatMinor(0, currency);
 }
 
-export function buildGroupLedgerHtml({ group, expenses, transfers, balance }: LedgerExportInput) {
+export function buildGroupLedgerHtml({ group, expenses, transfers, balance, range }: LedgerExportInput) {
   const members = group.members || [];
   const currency = group.currency || 'INR';
-  const period = ledgerPeriod(expenses, transfers);
+  const span = ledgerPeriod(expenses, transfers);
+  const period = {
+    from: range?.from ?? span.from,
+    to: range?.to ?? span.to,
+  };
   const generated = new Date();
   const totalExpense = expenses.reduce((sum, item) => sum + (item.amountMinor || 0), 0);
   const rows: { at: number; html: string }[] = [];
@@ -133,6 +164,7 @@ export function buildGroupLedgerHtml({ group, expenses, transfers, balance }: Le
     period.from && period.to
       ? `${formatLongDate(period.from)} – ${formatLongDate(period.to)}`
       : 'No dated records yet';
+  const scoped = Boolean(range?.from || range?.to);
 
   return `<!DOCTYPE html>
 <html>
@@ -193,10 +225,10 @@ export function buildGroupLedgerHtml({ group, expenses, transfers, balance }: Le
           <thead><tr><th>Date</th><th>Particulars</th><th style="text-align:right">Amount</th></tr></thead>
           <tbody>${rows.map((row) => row.html).join('')}</tbody>
         </table>`
-      : `<div class="empty">No expenses or transfers in this group yet.</div>`
+      : `<div class="empty">No expenses or transfers ${scoped ? 'in this period' : 'in this group yet'}.</div>`
   }
 
-  <h2>Member balances</h2>
+  <h2>Member balances${scoped ? ' · this period' : ''}</h2>
   <table class="grid">
     <thead><tr><th>Member</th><th style="text-align:right">Paid</th><th style="text-align:right">Share</th><th style="text-align:right">Net</th></tr></thead>
     <tbody>${balanceRows.join('') || '<tr><td colspan="4" class="muted">No members</td></tr>'}</tbody>

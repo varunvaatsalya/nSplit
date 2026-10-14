@@ -82,7 +82,7 @@ export default function GroupSettingsScreen() {
     return {
       pathname: `/group/[id]/settings/${screen}`,
       params: { id: String(id) },
-    };
+    } as const;
   }
 
   async function saveDetails() {
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   overlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  backdrop: { ...StyleSheet.absoluteFill },
   sheet: {
     borderRadius: 16,
     borderWidth: 1,

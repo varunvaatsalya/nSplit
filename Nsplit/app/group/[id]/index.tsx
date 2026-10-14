@@ -3,7 +3,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
-  InteractionManager,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -17,7 +16,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AddNotes from "@/assets/illustrations/add-notes-amico.svg";
 import BalanceAmico from "@/assets/illustrations/balence-amico.svg";
 import { BalanceView } from "@/components/balance/balance-view";
-import { ExportLedgerSheet } from "@/components/balance/export-ledger-sheet";
 import { OfflineBanner } from "@/components/offline-banner";
 import { RecordDetailModal } from "@/components/records/record-detail-modal";
 import { UserAvatar } from "@/components/user-avatar";
@@ -40,6 +38,7 @@ import {
   formatRowTime,
   memberName,
 } from "@/src/lib/format";
+import { buildLedger } from "@/src/lib/ledger";
 import { getExpenseEmoji, getGroupEmoji } from "@/src/lib/icons";
 import { isSelfMember, resolveMyMember } from "@/src/lib/members";
 
@@ -190,7 +189,6 @@ export default function GroupScreen() {
   const [ready, setReady] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
-  const [exportOpen, setExportOpen] = useState(false);
   const { width } = useWindowDimensions();
   const artWidth = Math.min(260, Math.round(width * 0.62));
   const artHeight = artWidth;
@@ -217,10 +215,10 @@ export default function GroupScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const task = InteractionManager.runAfterInteractions(() => {
+      const handle = requestIdleCallback(() => {
         load();
       });
-      return () => task.cancel();
+      return () => cancelIdleCallback(handle);
     }, [load]),
   );
 
@@ -234,6 +232,7 @@ export default function GroupScreen() {
   }
 
   const members = group?.members || [];
+  const ledger = useMemo(() => buildLedger(expenses, transfers), [expenses, transfers]);
   const grouped = useMemo(
     () => groupFeedItems(expenses, transfers),
     [expenses, transfers],
@@ -319,15 +318,17 @@ export default function GroupScreen() {
         >
           {group.name}
         </Text>
-        {!feedEmpty ? (
+        {/* {!feedEmpty ? (
           <Pressable
-            onPress={() => setExportOpen(true)}
+            onPress={() =>
+              router.push({ pathname: "/group/[id]/export", params: { id: String(id) } })
+            }
             hitSlop={10}
             style={styles.iconBtn}
           >
             <MaterialIcons name="ios-share" size={22} color={colors.text} />
           </Pressable>
-        ) : null}
+        ) : null} */}
         <Pressable
           onPress={() =>
             router.push({
@@ -409,10 +410,13 @@ export default function GroupScreen() {
           <BalanceView
             group={group}
             balance={balance}
+            ledger={ledger}
             currentUserId={me?._id}
             myMemberId={myMember?._id}
             onPaid={load}
-            onExport={() => setExportOpen(true)}
+            onExport={() =>
+              router.push({ pathname: "/group/[id]/export", params: { id: String(id) } })
+            }
           />
         ) : (
           grouped.map((section) => (
@@ -565,16 +569,6 @@ export default function GroupScreen() {
         </Pressable>
       ) : null}
 
-      {group ? (
-        <ExportLedgerSheet
-          open={exportOpen}
-          onOpenChange={setExportOpen}
-          group={group}
-          expenses={expenses}
-          transfers={transfers}
-          balance={balance}
-        />
-      ) : null}
 
       {group ? (
         <RecordDetailModal
@@ -586,6 +580,7 @@ export default function GroupScreen() {
           group={group}
           currentUserId={me?._id}
           myMemberId={myMember?._id}
+          ledger={ledger}
           onEditExpense={(item) => {
             setDetailOpen(false);
             router.push({
@@ -717,7 +712,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   whoBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   whoSheet: {
     borderRadius: 16,

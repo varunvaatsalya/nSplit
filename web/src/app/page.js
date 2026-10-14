@@ -154,7 +154,7 @@ export default async function HomePage() {
                 {isLoggedIn ? "Go to groups" : "Get Started"}
               </Link>
               <Link
-                href="/how-it-works"
+                href="#how-it-works"
                 className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-6 py-3.5 text-sm font-semibold text-foreground hover:bg-muted/50 hover:scale-[1.02] active:scale-98 transition-all cursor-pointer"
               >
                 <Play className="h-4 w-4 fill-current text-foreground" />

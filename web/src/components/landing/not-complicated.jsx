@@ -8,7 +8,7 @@ function ExpenseNotComplicated() {
           {/* Left Column: Floating mockup chat & calculations sheet */}
           <div className="lg:col-span-6 relative flex flex-col gap-6 items-center lg:items-start select-none">
             {/* Card 1: Chat bubble 1 (Multiple Payers problem) */}
-            <div className="relative bg-card border border-border rounded-2xl p-4 shadow-md max-w-[275px] w-full self-start transition-transform duration-300 hover:rotate-0 hover:scale-105 cursor-pointer animate-float-chat-1">
+            <div className="relative bg-card border border-border rounded-2xl p-4 shadow-md max-w-68.5 w-full self-start transition-transform duration-300 hover:rotate-0 hover:scale-105 cursor-pointer animate-float-chat-1">
               <p className="text-xs font-semibold text-foreground leading-snug">
                 "For the &#8377;4,000 hotel room, Aman paid &#8377;2,500 and
                 Nidhi paid &#8377;1,500. How do we log multiple payers?"
@@ -19,7 +19,7 @@ function ExpenseNotComplicated() {
             </div>
 
             {/* Card 2: Chat bubble 2 (Offsets / Cab & Drinks problem) */}
-            <div className="relative bg-primary/5 border border-primary/10 rounded-2xl p-4 shadow-md max-w-[275px] w-full self-end lg:mr-8 transition-transform duration-300 hover:rotate-0 hover:scale-105 cursor-pointer animate-float-chat-2">
+            <div className="relative bg-primary/5 border border-primary/10 rounded-2xl p-4 shadow-md max-w-68.5 w-full self-end lg:mr-8 transition-transform duration-300 hover:rotate-0 hover:scale-105 cursor-pointer animate-float-chat-2">
               <p className="text-xs font-semibold text-foreground leading-snug">
                 "I paid for the cab, but Nidhi paid for drinks, so I think I owe
                 Aman &#8377;200?"

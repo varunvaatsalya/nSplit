@@ -36,7 +36,7 @@ function FAQ() {
       {/* 2. Frequently Asked Questions Section */}
       <section id="faq" className="relative py-24 border-t border-border/60 overflow-hidden">
         {/* Glow */}
-        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 -z-10 h-[300px] w-[300px] rounded-full bg-primary/5 blur-3xl opacity-15 dark:opacity-35" />
+        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-primary/5 blur-3xl opacity-15 dark:opacity-35" />
 
         <div className="mx-auto w-full max-w-3xl px-6 text-center">
           {/* Header */}

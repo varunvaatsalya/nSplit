@@ -107,7 +107,7 @@ export function WhenField({
             value={value}
             mode={iosMode}
             display="spinner"
-            themeVariant={colorScheme}
+            themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
             onChange={onPicker}
           />
         </View>
@@ -118,7 +118,7 @@ export function WhenField({
           value={value}
           mode={androidMode}
           display="default"
-          themeVariant={colorScheme}
+          themeVariant={colorScheme === 'dark' ? 'dark' : 'light'}
           onChange={onPicker}
         />
       ) : null}

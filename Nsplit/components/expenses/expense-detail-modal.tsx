@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 
+import { formatSignedMinor } from '@/components/balance/member-ledger-sheet';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 import { UserAvatar } from '@/components/user-avatar';
@@ -16,6 +17,7 @@ import type { Expense, GroupDetail, GroupMember } from '@/src/api/types';
 import { deleteExpense } from '@/src/db/expenses';
 import { formatMinor } from '@/src/lib/format';
 import { getExpenseEmoji } from '@/src/lib/icons';
+import type { Ledger } from '@/src/lib/ledger';
 import { memberListLabel, sortMembersByName } from '@/src/lib/members';
 
 const SPLIT_LABELS: Record<string, string> = {
@@ -45,6 +47,7 @@ export function ExpenseDetailPage({
   group,
   currentUserId,
   myMemberId,
+  ledger,
   onEdit,
   onDeleted,
 }: {
@@ -52,6 +55,7 @@ export function ExpenseDetailPage({
   group: GroupDetail;
   currentUserId?: string | null;
   myMemberId?: string | null;
+  ledger?: Ledger;
   onEdit: (expense: Expense) => void;
   onDeleted: () => void;
 }) {
@@ -62,6 +66,22 @@ export function ExpenseDetailPage({
   const currency = expense.currency || group?.currency || 'INR';
   const payers = [...(expense.payers || [])];
   const splits = (expense.splits || []).filter((s) => (s.amountMinor || 0) > 0);
+  const impactLines = ledger?.byRecordId[`expense:${expense._id}`]?.lines || {};
+  const splitIds = new Set(splits.map((s) => s.memberId));
+
+  /** Small "Balance −₹26 → −₹37" line; the after amount is what the eye should land on. */
+  function balanceLine(memberId: string) {
+    const line = impactLines[memberId];
+    if (!line) return null;
+    const after = line.afterMinor;
+    const tone = after > 0 ? colors.success : after < 0 ? colors.danger : colors.textSecondary;
+    return (
+      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }} numberOfLines={1}>
+        Balance {formatSignedMinor(line.beforeMinor, currency)} →{' '}
+        <Text style={{ color: tone, fontWeight: '700' }}>{formatSignedMinor(after, currency)}</Text>
+      </Text>
+    );
+  }
 
   async function confirmDelete() {
     if (deleting) return;
@@ -127,6 +147,7 @@ export function ExpenseDetailPage({
               <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
                 {payers.length === 1 ? 'Paid full amount' : 'Paid part'}
               </Text>
+              {splitIds.has(p.memberId) ? null : balanceLine(p.memberId)}
             </View>
             <Text style={{ color: colors.text, fontWeight: '600' }}>
               {formatMinor(p.amountMinor, currency)}
@@ -155,7 +176,12 @@ export function ExpenseDetailPage({
               seed={m?.userId || m?._id || s.memberId}
               size={32}
             />
-            <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }}>{name}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: colors.text, fontWeight: '600' }} numberOfLines={1}>
+                {name}
+              </Text>
+              {balanceLine(s.memberId)}
+            </View>
             <Text style={{ color: isYou ? colors.primary : colors.text, fontWeight: '600' }}>
               {formatMinor(s.amountMinor, currency)}
             </Text>

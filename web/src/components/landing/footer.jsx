@@ -25,7 +25,7 @@ export default function Footer() {
               <Logo className="h-6 w-6 text-primary" />
               <span className="text-md font-black tracking-tight text-white">nSplit</span>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed max-w-[280px]">
+            <p className="text-xs text-slate-400 leading-relaxed max-w-70">
               The simplest way to split expenses and track balances with friends, family, and roommates.
             </p>
             {/* Social Icons list */}

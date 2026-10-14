@@ -1396,7 +1396,7 @@ const styles = StyleSheet.create({
   splitAll: { flexDirection: "row", alignItems: "center", gap: 8 },
   sheetOverlay: { flex: 1, justifyContent: "flex-end" },
   sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   sheet: {
     borderTopLeftRadius: 20,

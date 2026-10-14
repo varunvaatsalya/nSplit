@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   dropdownBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   dropdownSheet: {
     borderRadius: 16,

@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { MemberLedgerSheet } from '@/components/balance/member-ledger-sheet';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { UserAvatar } from '@/components/user-avatar';
 import { useColors } from '@/hooks/use-colors';
@@ -13,11 +14,13 @@ import type {
 } from '@/src/api/types';
 import { saveTransfer } from '@/src/db/transfers';
 import { formatMinor, memberName } from '@/src/lib/format';
+import { memberTotals, type Ledger } from '@/src/lib/ledger';
 import { isSelfMember, memberListLabel } from '@/src/lib/members';
 
 export function BalanceView({
   group,
   balance,
+  ledger,
   currentUserId,
   myMemberId,
   onPaid,
@@ -25,6 +28,7 @@ export function BalanceView({
 }: {
   group: GroupDetail;
   balance: GroupBalance | null;
+  ledger: Ledger;
   currentUserId?: string | null;
   myMemberId?: string | null;
   onPaid: () => Promise<void> | void;
@@ -35,6 +39,7 @@ export function BalanceView({
   const currency = group.currency || 'INR';
   const [pending, setPending] = useState<Pairwise | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sheetMemberId, setSheetMemberId] = useState<string | null>(null);
 
   const memberById = useMemo(
     () => Object.fromEntries(members.map((m) => [m._id, m])),
@@ -84,10 +89,12 @@ export function BalanceView({
       kind === 'owe' ? `−${formatMinor(-net, currency)}` : kind === 'get' ? `+${formatMinor(net, currency)}` : formatMinor(0, currency);
     const subtitle =
       kind === 'owe' ? 'Needs to pay' : kind === 'get' ? 'Gets back' : 'Settled up';
+    const totals = memberTotals(ledger, m._id);
 
     return (
-      <View
+      <Pressable
         key={m._id}
+        onPress={() => setSheetMemberId(m._id)}
         style={[
           styles.row,
           {
@@ -106,9 +113,13 @@ export function BalanceView({
             {memberListLabel(member || m, currentUserId, myMemberId)}
           </Text>
           <Text style={{ color: tone, fontSize: 12, fontWeight: '600', marginTop: 2 }}>{subtitle}</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+            Paid {formatMinor(totals.paidMinor, currency)} · Share {formatMinor(totals.shareMinor, currency)}
+          </Text>
         </View>
         <Text style={[styles.amount, { color: tone }]}>{amount}</Text>
-      </View>
+        <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
+      </Pressable>
     );
   }
 
@@ -139,6 +150,10 @@ export function BalanceView({
         </View>
         <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
       </Pressable>
+
+      <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: -8, paddingHorizontal: 2 }}>
+        Tap a member to see their balance sheet.
+      </Text>
 
       {owe.length ? (
         <View>
@@ -209,6 +224,15 @@ export function BalanceView({
           </View>
         )}
       </View>
+
+      <MemberLedgerSheet
+        member={sheetMemberId ? memberById[sheetMemberId] || null : null}
+        ledger={ledger}
+        currency={currency}
+        currentUserId={currentUserId}
+        myMemberId={myMemberId}
+        onClose={() => setSheetMemberId(null)}
+      />
 
       <ConfirmDialog
         open={Boolean(pending)}

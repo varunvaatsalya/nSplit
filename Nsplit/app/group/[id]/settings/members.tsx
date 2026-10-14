@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   overlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  backdrop: { ...StyleSheet.absoluteFill },
   sheet: {
     borderRadius: 16,
     borderWidth: 1,

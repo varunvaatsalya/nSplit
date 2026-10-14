@@ -17,7 +17,7 @@ export default function LessMath() {
       {/* 1. Less Money Math Section */}
       <section className="relative py-24 border-t border-border/60 overflow-hidden bg-background">
         {/* Glow */}
-        <div className="absolute top-1/2 left-0 -translate-y-1/2 -z-10 h-[300px] w-[300px] rounded-full bg-primary/5 blur-3xl opacity-15 dark:opacity-35" />
+        <div className="absolute top-1/2 left-0 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-primary/5 blur-3xl opacity-15 dark:opacity-35" />
 
         <div className="mx-auto grid w-full max-w-5xl items-center gap-16 px-6 grid-cols-1 lg:grid-cols-12">
           {/* Left Column: Copywriting content */}
@@ -39,7 +39,7 @@ export default function LessMath() {
               {BENEFIT_ITEMS.map((item) => (
                 <div key={item} className="flex items-center gap-3">
                   <div className="h-5 w-5 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shrink-0">
-                    <Check className="h-3 w-3 stroke-[3]" />
+                    <Check className="h-3 w-3 stroke-3" />
                   </div>
                   <span className="text-xs sm:text-sm font-semibold text-foreground">
                     {item}
@@ -51,10 +51,10 @@ export default function LessMath() {
 
           {/* Right Column: Premium High-Fidelity Settle-Up Visual Mockup */}
           <div className="lg:col-span-6 flex justify-center items-center relative w-full">
-            <div className="bg-card/60 border border-border rounded-[32px] p-8 shadow-2xl backdrop-blur-md w-full max-w-sm relative flex items-center justify-between h-[210px] select-none overflow-hidden">
+            <div className="bg-card/60 border border-border rounded-[32px] p-8 shadow-2xl backdrop-blur-md w-full max-w-sm relative flex items-center justify-between h-52.5 select-none overflow-hidden">
               {/* Aman Avatar (Sender) */}
               <div className="flex flex-col items-center gap-2.5 z-10">
-                <div className="relative h-14 w-14 rounded-full bg-gradient-to-tr from-rose-500 to-orange-400 text-xs font-black text-white flex items-center justify-center border-2 border-rose-500/60 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+                <div className="relative h-14 w-14 rounded-full bg-linear-to-tr from-rose-500 to-orange-400 text-xs font-black text-white flex items-center justify-center border-2 border-rose-500/60 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
                   Aman
                   <div className="absolute -bottom-1 h-3.5 w-3.5 rounded-full bg-rose-600 border-2 border-slate-950 flex items-center justify-center text-[7px]">
                     ⬆
@@ -66,7 +66,7 @@ export default function LessMath() {
               </div>
 
               {/* Glowing Dynamic Settle Line */}
-              <div className="flex-1 h-[2px] bg-slate-900 border-t border-dashed border-slate-800 mx-3 relative flex items-center justify-center">
+              <div className="flex-1 h-0.5 bg-slate-900 border-t border-dashed border-slate-800 mx-3 relative flex items-center justify-center">
                 {/* Active Settled Green Overlay */}
                 <motion.div
                   initial={{ width: "0%" }}

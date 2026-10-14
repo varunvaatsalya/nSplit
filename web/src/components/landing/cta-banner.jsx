@@ -5,11 +5,11 @@ import { FaGooglePlay } from "react-icons/fa";
 
 function CTABanner({ ctaHref }) {
   return (
-    <section className="relative py-24 border-t border-border overflow-hidden w-full bg-primary-foreground z-12">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 h-[280px] w-[280px] rounded-full bg-emerald-500/5 blur-3xl opacity-15 dark:opacity-35" />
+    <section className="relative py-24 border-t border-border overflow-hidden w-full bg-primary-foreground dark:bg-card z-12">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 h-70 w-70 rounded-full bg-emerald-500/5 blur-3xl opacity-15 dark:opacity-35" />
 
       <div className="mx-auto w-full max-w-3xl px-6 text-center flex flex-col items-center select-none">
-        <div className="mb-6 flex items-center justify-center rounded-2xl bg-background p-2.5 -rotate-12 border border-primary text-primary shadow-lg">
+        <div className="mb-6 flex items-center justify-center rounded-2xl bg-white p-2.5 -rotate-12 border border-primary text-primary shadow-lg">
           <div className="p-1 rounded-xl bg-primary text-white">
             <Logo className="h-10 w-10" />
           </div>

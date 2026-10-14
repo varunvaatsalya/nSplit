@@ -121,7 +121,7 @@ export function EmojiPickerModal({
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   sheet: {
     borderTopLeftRadius: 20,
