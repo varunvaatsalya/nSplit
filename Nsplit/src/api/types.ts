@@ -27,6 +27,7 @@ export type GroupMember = {
   userId?: string | null;
   displayName?: string | null;
   email?: string | null;
+  upiId?: string | null;
   permission?: string;
   avatar?: Avatar | null;
   user?: {

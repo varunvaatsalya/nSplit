@@ -74,3 +74,14 @@ export function assertCan(permission, action) {
 export function isAtLeast(permission, minimum) {
   return permissionRank(permission) >= permissionRank(minimum);
 }
+
+/**
+ * Creator can change their own record if they can still add.
+ * Admins can change any record. VIEW_ONLY cannot.
+ */
+export function canMutateCreatedRecord(permission, createdById, userId) {
+  if (permission === MemberPermission.ADMIN) return true;
+  if (!can(permission, Actions.ADD_EXPENSE)) return false;
+  if (createdById == null || userId == null) return false;
+  return String(createdById) === String(userId);
+}

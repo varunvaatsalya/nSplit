@@ -15,6 +15,7 @@ import {
   listGroups,
   type CreateGroupInput,
 } from '@/src/db/groups';
+import { remoteChanges } from '@/src/sync/events';
 
 type GroupsContextValue = {
   ready: boolean;
@@ -48,6 +49,9 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [reload]);
+
+  // Groups added, renamed or removed by sync.
+  useEffect(() => remoteChanges.subscribe(() => void reload().catch(() => {})), [reload]);
 
   const createGroup = useCallback(
     async (input: CreateGroupInput) => {

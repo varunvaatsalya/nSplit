@@ -107,7 +107,7 @@ export function networkError(message?: string): ApiError {
 
 export async function apiFetch<T = unknown>(
   path: string,
-  options: RequestInit = {}
+  { timeoutMs = 6000, ...options }: RequestInit & { timeoutMs?: number } = {}
 ): Promise<{ ok: boolean; status: number; data: T | null; error: ApiError }> {
   if (!(await isOnline())) {
     return { ok: false, status: 0, data: null, error: networkError() };
@@ -121,7 +121,7 @@ export async function apiFetch<T = unknown>(
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(`${getApiBase()}${path}`, {
       ...options,

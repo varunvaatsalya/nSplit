@@ -30,13 +30,15 @@ export function AddRecordModal({
   group,
   onCreated,
   editExpense = null,
+  editTransfer = null,
   onEditClose,
   currentUserId = null,
   canAdd = true,
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("expense");
-  const isEdit = Boolean(editExpense?._id);
+  const editingTransfer = Boolean(editTransfer?._id);
+  const isEdit = Boolean(editExpense?._id) || editingTransfer;
 
   function openCreate() {
     setTab("expense");
@@ -44,10 +46,10 @@ export function AddRecordModal({
   }
 
   useEffect(() => {
-    if (!editExpense?._id) return;
-    setTab("expense");
+    if (!editExpense?._id && !editTransfer?._id) return;
+    setTab(editTransfer?._id ? "transfer" : "expense");
     setOpen(true);
-  }, [editExpense?._id]);
+  }, [editExpense?._id, editTransfer?._id]);
 
   useEffect(() => {
     function onKeyDown(e) {
@@ -120,16 +122,16 @@ export function AddRecordModal({
         <DialogContent className="flex max-h-[min(90vh,720px)] max-w-lg flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 border-b border-border px-4 py-3 pr-10">
             <DialogTitle className="sr-only">
-              {isEdit ? "Edit expense" : "Add record"}
+              {isEdit ? (editingTransfer ? "Edit transfer" : "Edit expense") : "Add record"}
             </DialogTitle>
             <DialogDescription className="sr-only">
               {isEdit
-                ? "Update expense details."
+                ? "Update record details."
                 : "Create an expense or transfer."}
             </DialogDescription>
             {isEdit ? (
               <div className="text-sm font-semibold tracking-tight">
-                Edit expense
+                {editingTransfer ? "Edit transfer" : "Edit expense"}
               </div>
             ) : (
               <div className="flex justify-start">
@@ -163,7 +165,7 @@ export function AddRecordModal({
             )}
           </DialogHeader>
 
-          {tab === "expense" || isEdit ? (
+          {tab === "expense" && !editingTransfer ? (
             <ExpenseForm
               key={
                 isEdit
@@ -175,7 +177,7 @@ export function AddRecordModal({
               group={group}
               expense={editExpense}
               embedded
-              active={open && (tab === "expense" || isEdit)}
+              active={open && tab === "expense"}
               currentUserId={currentUserId}
               onClose={() => handleOpenChange(false)}
               onCreated={handleSaved}
@@ -183,12 +185,15 @@ export function AddRecordModal({
             />
           ) : (
             <TransferForm
+              key={editingTransfer ? `edit-${editTransfer._id}` : "create"}
               group={group}
+              transfer={editTransfer}
               embedded
               active={open && tab === "transfer"}
               currentUserId={currentUserId}
               onClose={() => handleOpenChange(false)}
               onCreated={handleSaved}
+              onUpdated={handleSaved}
             />
           )}
         </DialogContent>

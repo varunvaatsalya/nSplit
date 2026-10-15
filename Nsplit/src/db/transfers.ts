@@ -1,4 +1,6 @@
 import type { Transfer } from '@/src/api/types';
+import { enqueue } from '@/src/sync/outbox';
+
 import { getDb, runInTransaction } from './client';
 import { getGroup } from './groups';
 import { createId } from './ids';
@@ -141,6 +143,7 @@ export async function saveTransfer(
       );
     }
     await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, group._id]);
+    await enqueue(db, 'transfer', transfer._id, group._id);
   });
 
   return transfer;
@@ -155,5 +158,6 @@ export async function deleteTransfer(groupId: string, transferId: string) {
       [now, now, transferId, groupId]
     );
     await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, groupId]);
+    await enqueue(db, 'transfer', transferId, groupId);
   });
 }

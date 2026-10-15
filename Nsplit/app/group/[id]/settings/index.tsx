@@ -78,7 +78,7 @@ export default function GroupSettingsScreen() {
     SPLIT_METHODS.find((item) => item.value === normalizeSplitMethod(group?.settings?.defaultSplitMethod))
       ?.label || 'Equally';
 
-  function settingsPath(screen: 'members' | 'split' | 'delete') {
+  function settingsPath(screen: 'members' | 'split' | 'delete' | 'share') {
     return {
       pathname: `/group/[id]/settings/${screen}`,
       params: { id: String(id) },
@@ -174,6 +174,23 @@ export default function GroupSettingsScreen() {
               style={styles.prefRow}>
               <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }}>Default split</Text>
               <Text style={{ color: colors.textSecondary, marginRight: 6 }}>{methodLabel}</Text>
+              <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <Text style={[styles.section, { color: colors.textSecondary }]}>Sharing</Text>
+          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <Pressable
+              onPress={() => router.push(settingsPath('share'))}
+              className="flex-row items-center gap-3"
+              style={styles.prefRow}>
+              <MaterialIcons name="link" size={20} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: '600' }}>Share link</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                  Read-only ledger anyone in the group can open
+                </Text>
+              </View>
               <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
             </Pressable>
           </View>

@@ -1,5 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 
+import { enqueueEverything } from '@/src/sync/outbox';
+
+import { migrateIdsToObjectIds } from './migrate-ids';
 import { LOCAL_SCHEMA_SQL, RESET_LEGACY_SQL, SCHEMA_VERSION } from './schema';
 
 export type SqlExecutor = SQLite.SQLiteDatabase;
@@ -43,6 +46,15 @@ async function migrate(database: SqlExecutor) {
   await database.execAsync(LOCAL_SCHEMA_SQL);
   await addColumnIfMissing(database, 'groups', 'my_member_id', 'TEXT');
   await addColumnIfMissing(database, 'groups', 'settings_json', 'TEXT');
+  // 1 once the server is known to hold this group (pushed or pulled).
+  await addColumnIfMissing(database, 'groups', 'synced', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing(database, 'group_members', 'upi_id', 'TEXT');
+  if (version > 0 && version < 5) {
+    // Upgrading from a version without sync: give records server-compatible ids,
+    // then queue everything so the first sync uploads it.
+    await migrateIdsToObjectIds(database);
+    await enqueueEverything(database);
+  }
   await database.runAsync(
     `INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`,
     ['schema_version', String(SCHEMA_VERSION)]

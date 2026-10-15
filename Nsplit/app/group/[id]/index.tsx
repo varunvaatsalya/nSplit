@@ -1,6 +1,6 @@
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -32,6 +32,8 @@ import { groupBalance, listExpenses } from "@/src/db/expenses";
 import { getGroup } from "@/src/db/groups";
 import { listTransfers } from "@/src/db/transfers";
 import { useIdentity } from "@/src/identity/identity-context";
+import { remoteChanges } from "@/src/sync/events";
+import { useSync } from "@/src/sync/sync-context";
 import {
   dateHeaderLabel,
   formatMinor,
@@ -177,6 +179,7 @@ export default function GroupScreen() {
   const router = useRouter();
   const colors = useColors();
   const { user } = useAuth();
+  const { syncNow } = useSync();
   const { name: myName, matchByName } = useIdentity();
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -222,9 +225,13 @@ export default function GroupScreen() {
     }, [load]),
   );
 
+  // Another device (or the web) changed this group.
+  useEffect(() => remoteChanges.subscribe(() => void load().catch(() => {})), [load]);
+
   async function onRefresh() {
     setRefreshing(true);
     try {
+      await syncNow().catch(() => {});
       await load();
     } finally {
       setRefreshing(false);

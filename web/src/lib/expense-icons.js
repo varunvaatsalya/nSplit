@@ -2,6 +2,7 @@ import {
   CATEGORIES,
   getCategoryByKey,
   getDefaultExpenseCategory,
+  matchCategory,
 } from "@/shared/categories/index.js";
 
 /** Extra picker emojis beyond category defaults */
@@ -135,4 +136,41 @@ export function getExpenseEmoji(iconOrEmoji, categoryKey) {
 export function categoryKeyForEmoji(emoji) {
   const match = CATEGORIES.find((c) => c.emoji === emoji);
   return match?.key || "other";
+}
+
+/** Icon picker sections, grouped by theme (same as the app). */
+export const ICON_SECTIONS = [
+  {
+    label: "Food & drinks",
+    emojis: ["🍽️", "🍕", "🍔", "🍟", "🌮", "🍣", "🍜", "🍛", "🥗", "🍰", "🍦", "🍪", "☕", "🧃", "🍺", "🍷", "🍹"],
+  },
+  {
+    label: "Groceries & home",
+    emojis: ["🛒", "🍎", "🥦", "🥛", "🥖", "🧺", "🧴", "🧹", "🏠", "🛋️", "🔑", "🔧"],
+  },
+  {
+    label: "Travel & transport",
+    emojis: ["🚗", "🚕", "🛺", "🚌", "🚇", "🚆", "🏍️", "⛽", "🅿️", "✈️", "🧳", "🏨", "🏖️", "🏔️", "🗺️", "🚢"],
+  },
+  {
+    label: "Fun & shopping",
+    emojis: ["🎬", "🎮", "🎵", "🎧", "🎤", "🎟️", "🎉", "🎳", "🛍️", "👗", "👟", "⌚", "📱", "💻"],
+  },
+  {
+    label: "Bills & money",
+    emojis: ["💡", "🔌", "📶", "💧", "🔥", "📺", "🧾", "💸", "💰", "💵", "💳", "🏦", "↩️"],
+  },
+  {
+    label: "Health & people",
+    emojis: ["💊", "🏥", "🦷", "💪", "🧘", "💇", "🎁", "🎂", "💐", "❤️", "🐶", "🐱", "👶"],
+  },
+  {
+    label: "Study & work",
+    emojis: ["📚", "✏️", "🎓", "🖨️", "💼", "📦", "📮", "⭐", "👍"],
+  },
+];
+
+/** Category for an expense title, from the shared keyword engine. */
+export function suggestCategory(title) {
+  return matchCategory(title).category;
 }

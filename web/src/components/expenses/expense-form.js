@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, Minus, Plus, Users, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Minus, Plus, Tag, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,12 +28,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { calculateSplit } from "@/shared/split/index.js";
-import { EmojiPicker } from "@/components/emoji-picker";
-import { suggestEmojiFromText } from "@/lib/emoji-icons";
-import {
-  categoryKeyForEmoji,
-  getExpenseEmoji,
-} from "@/lib/expense-icons";
+import { CategoryPicker } from "@/components/expenses/category-picker";
+import { IconPicker } from "@/components/expenses/icon-picker";
+import { getExpenseEmoji, suggestCategory } from "@/lib/expense-icons";
+import { getCategoryByKey } from "@/shared/categories/index.js";
 import { cn } from "@/lib/utils";
 import { sortMembersByName, memberListLabel } from "@/lib/members";
 
@@ -221,7 +219,11 @@ export function ExpenseForm({
   const [amount, setAmount] = useState("");
   const [title, setTitle] = useState("");
   const [categoryKey, setCategoryKey] = useState("other");
+  // Set once the user picks a category; title edits then stop re-suggesting.
+  const [categoryManual, setCategoryManual] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [icon, setIcon] = useState(() => getExpenseEmoji(null, "other"));
+  // A custom icon; otherwise the icon follows the category.
   const [iconManual, setIconManual] = useState(false);
   const [iconsOpen, setIconsOpen] = useState(false);
   const [showDesc, setShowDesc] = useState(false);
@@ -250,17 +252,25 @@ export function ExpenseForm({
   const [payerFieldErrors, setPayerFieldErrors] = useState([]);
   const [payerShakeKey, setPayerShakeKey] = useState(0);
 
+  const category = getCategoryByKey(categoryKey);
+  const suggestedCategory = suggestCategory(title);
+
   function applyTitleSuggestion(nextTitle) {
-    if (iconManual) return;
-    const suggested = suggestEmojiFromText(nextTitle);
-    setCategoryKey(suggested.categoryKey || "other");
-    setIcon(suggested.emoji);
+    if (categoryManual) return;
+    const next = suggestCategory(nextTitle);
+    setCategoryKey(next.key);
+    if (!iconManual) setIcon(next.emoji);
+  }
+
+  function pickCategory(next) {
+    setCategoryKey(next.key);
+    setCategoryManual(true);
+    if (!iconManual) setIcon(next.emoji);
   }
 
   function pickIcon(item) {
     setIcon(item.emoji);
-    setCategoryKey(item.categoryKey || categoryKeyForEmoji(item.emoji));
-    setIconManual(true);
+    setIconManual(item.emoji !== category.emoji);
   }
 
   function bumpShake() {
@@ -277,8 +287,9 @@ export function ExpenseForm({
     setTitle("");
     setDescription("");
     setShowDesc(false);
-    const fallback = suggestEmojiFromText("");
-    setCategoryKey(fallback.categoryKey || "other");
+    const fallback = getCategoryByKey("other");
+    setCategoryKey(fallback.key);
+    setCategoryManual(false);
     setIcon(fallback.emoji);
     setIconManual(false);
     setExactInputs({});
@@ -306,9 +317,13 @@ export function ExpenseForm({
     const desc = exp.description || "";
     setDescription(desc);
     setShowDesc(Boolean(desc));
-    setCategoryKey(exp.categoryKey || "other");
-    setIcon(getExpenseEmoji(exp.icon, exp.categoryKey || "other"));
-    setIconManual(Boolean(exp.icon));
+    const savedCategory = getCategoryByKey(exp.categoryKey);
+    const savedIcon = getExpenseEmoji(exp.icon, savedCategory.key);
+    setCategoryKey(savedCategory.key);
+    // A saved expense keeps its category even if the title is edited.
+    setCategoryManual(true);
+    setIcon(savedIcon);
+    setIconManual(savedIcon !== savedCategory.emoji);
     const method = normalizeSplitMethod(exp.splitMethod);
     setSplitMethod(method);
 
@@ -905,45 +920,54 @@ export function ExpenseForm({
           />
         </div>
 
-        {!showDesc ? (
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowDesc(true)}
-              className="text-sm text-primary dark:text-primary-foreground/70 hover:text-primary/80 dark:hover:text-primary-foreground cursor-pointer"
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setCategoryOpen(true)}
+            className="inline-flex min-w-0 shrink cursor-pointer items-center gap-1.5 rounded-full bg-soft px-2.5 py-1 text-xs font-semibold hover:bg-muted-foreground/15"
+            aria-label="Change category"
+          >
+            {/* The emoji already sits beside the title; the chip only names the category. */}
+            <Tag className="h-3 w-3 shrink-0 text-muted" />
+            <span
+              className={cn(
+                "truncate",
+                categoryManual || title.trim() ? "text-foreground" : "text-muted",
+              )}
             >
-              + Add description
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-muted">
-                Description
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDesc(false);
-                  setDescription("");
-                }}
-                className="inline-flex items-center gap-1 text-xs text-muted hover:text-foreground cursor-pointer"
-                aria-label="Remove description"
-              >
-                <X className="h-3.5 w-3.5" />
-                Remove
-              </button>
-            </div>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional note"
-              rows={3}
-              className="min-h-18 resize-y"
-              autoFocus
-            />
-          </div>
-        )}
+              {categoryManual || title.trim() ? category.label : "Category"}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (showDesc) {
+                setShowDesc(false);
+                setDescription("");
+              } else {
+                setShowDesc(true);
+              }
+            }}
+            className={cn(
+              "shrink-0 cursor-pointer text-sm font-semibold",
+              showDesc ? "text-muted hover:text-foreground" : "text-primary hover:text-primary/80 dark:text-primary-foreground/80",
+            )}
+          >
+            {showDesc ? "Remove description" : "+ Add description"}
+          </button>
+        </div>
+
+        {showDesc ? (
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optional note"
+            rows={3}
+            className="min-h-18 resize-y"
+            autoFocus
+          />
+        ) : null}
 
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -1200,12 +1224,24 @@ export function ExpenseForm({
         </DialogContent>
       </Dialog>
 
-      <EmojiPicker
+      <IconPicker
         open={iconsOpen}
         onOpenChange={setIconsOpen}
         value={icon}
         onSelect={pickIcon}
-        description="Tap an emoji for this expense."
+        categoryIcon={{ emoji: category.emoji, label: category.label }}
+        onUseCategoryIcon={() => {
+          setIcon(category.emoji);
+          setIconManual(false);
+        }}
+      />
+
+      <CategoryPicker
+        open={categoryOpen}
+        onOpenChange={setCategoryOpen}
+        value={categoryKey}
+        suggestedKey={suggestedCategory.key}
+        onSelect={pickCategory}
       />
 
       <Dialog open={whenOpen} onOpenChange={setWhenOpen}>

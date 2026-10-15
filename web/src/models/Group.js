@@ -5,6 +5,7 @@ import {
   SplitMethod,
 } from "./_utils.js";
 import { createGroupCode } from "@/lib/group-id.js";
+import { clientUpdatedAtPlugin } from "./_sync-plugin.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -24,6 +25,8 @@ const GroupMemberEmbedded = new Schema(
     permission: { type: String, enum: MemberPermission, default: "ADD" },
     displayName: { type: String, required: true, trim: true },
     avatar: { type: AvatarEmbedded, default: () => ({}) },
+    // Where others can pay this member (shown with a "Pay via UPI" button on share links).
+    upiId: { type: String, default: null, trim: true, lowercase: true },
     joinedAt: { type: Date, default: Date.now },
     leftAt: { type: Date, default: null },
   },
@@ -72,12 +75,29 @@ const GroupSchema = new Schema(
     },
     members: { type: [GroupMemberEmbedded], default: [] },
     invitations: { type: [GroupInvitationEmbedded], default: [] },
+    // Read-only public link (/s/<token>). Absent when sharing is off.
+    share: {
+      type: new Schema(
+        {
+          token: { type: String, required: true },
+          createdAt: { type: Date, default: Date.now },
+          createdById: { type: Schema.Types.ObjectId, ref: "User", default: null },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
   },
   { timestamps: true }
 );
 
+GroupSchema.plugin(clientUpdatedAtPlugin);
 GroupSchema.index({ "members.userId": 1 });
 GroupSchema.index({ "members.email": 1 });
+GroupSchema.index(
+  { "share.token": 1 },
+  { unique: true, partialFilterExpression: { "share.token": { $type: "string" } } }
+);
 
 if (models.Group) {
   delete models.Group;
@@ -136,6 +156,7 @@ export function serializeMember(m, user = null) {
     displayName: m.displayName,
     avatar,
     permission: m.permission,
+    upiId: m.upiId || null,
     joinedAt: m.joinedAt,
     leftAt: m.leftAt || null,
     user: user

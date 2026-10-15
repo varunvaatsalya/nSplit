@@ -14,6 +14,7 @@ function serializeExpense(doc) {
   e.participants = (e.participants || []).map((p) => ({
     memberId: String(p.memberId),
     included: p.included !== false,
+    inputValue: p.inputValue ?? null,
   }));
   e.splits = (e.splits || []).map((s) => ({
     memberId: String(s.memberId),

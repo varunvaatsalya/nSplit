@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { SplitMethod } from "./_utils.js";
+import { clientUpdatedAtPlugin } from "./_sync-plugin.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -15,6 +16,7 @@ const ParticipantSchema = new Schema(
   {
     memberId: { type: Schema.Types.ObjectId, required: true },
     included: { type: Boolean, default: true },
+    inputValue: { type: Number, default: null },
   },
   { _id: false }
 );
@@ -62,7 +64,9 @@ const ExpenseSchema = new Schema(
   { timestamps: true }
 );
 
+ExpenseSchema.plugin(clientUpdatedAtPlugin);
 ExpenseSchema.index({ groupId: 1, deletedAt: 1, expenseDate: -1 });
+ExpenseSchema.index({ groupId: 1, updatedAt: 1 });
 
 if (models.Expense) {
   delete models.Expense;

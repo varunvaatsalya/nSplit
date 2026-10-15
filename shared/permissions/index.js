@@ -5,4 +5,5 @@ export {
   can,
   assertCan,
   isAtLeast,
+  canMutateCreatedRecord,
 } from "./roles.js";

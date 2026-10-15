@@ -3,8 +3,11 @@ import { allocateMemberAvatar } from '@/src/lib/avatar';
 import { normalizeSplitMethod } from '@/src/lib/expense-form-utils';
 import { compareMembersByName, resolveMyMember } from '@/src/lib/members';
 
+import { enqueue } from '@/src/sync/outbox';
+
 import { getDb, runInTransaction } from './client';
 import { createGroupCode, createId } from './ids';
+import { isValidUpiId, normalizeUpiId } from '@nsplit/shared/upi';
 
 type GroupRow = {
   id: string;
@@ -28,6 +31,7 @@ type MemberRow = {
   permission: string;
   avatar_letters: string | null;
   avatar_bg: string | null;
+  upi_id?: string | null;
 };
 
 export type CreateGroupInput = {
@@ -81,6 +85,7 @@ function mapMember(row: MemberRow): GroupMember {
     userId: row.user_id,
     displayName: row.display_name,
     email: row.email,
+    upiId: row.upi_id || null,
     permission: row.permission,
     avatar: {
       url: null,
@@ -140,7 +145,7 @@ export async function getGroup(idOrCode: string): Promise<GroupDetail | null> {
   if (!group) return null;
 
   const memberRows = await db.getAllAsync<MemberRow>(
-    `SELECT id, group_id, display_name, user_id, email, permission, avatar_letters, avatar_bg
+    `SELECT id, group_id, display_name, user_id, email, permission, avatar_letters, avatar_bg, upi_id
      FROM group_members
      WHERE group_id = ? AND left_at IS NULL`,
     [group.id]
@@ -253,6 +258,7 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
         ]
       );
     }
+    await enqueue(db, 'group', id, id);
   });
 
   const created = await getGroup(id);
@@ -276,16 +282,19 @@ export async function updateGroup(
   const group = await getGroup(groupId);
   if (!group) throw new Error('Group not found');
   const db = await getDb();
-  await db.runAsync(
-    `UPDATE groups SET name = ?, icon = ?, currency = ?, updated_at = ? WHERE id = ?`,
-    [
-      (input.name ?? group.name).trim(),
-      input.icon ?? group.icon ?? null,
-      input.currency ?? group.currency ?? 'INR',
-      new Date().toISOString(),
-      group._id,
-    ]
-  );
+  await runInTransaction(db, async () => {
+    await db.runAsync(
+      `UPDATE groups SET name = ?, icon = ?, currency = ?, updated_at = ? WHERE id = ?`,
+      [
+        (input.name ?? group.name).trim(),
+        input.icon ?? group.icon ?? null,
+        input.currency ?? group.currency ?? 'INR',
+        new Date().toISOString(),
+        group._id,
+      ]
+    );
+    await enqueue(db, 'group', group._id, group._id);
+  });
 }
 
 export async function updateGroupSettings(groupId: string, patch: Partial<GroupSettings>) {
@@ -298,11 +307,14 @@ export async function updateGroupSettings(groupId: string, patch: Partial<GroupS
   };
   if (next.defaultSplitMethod !== 'SHARES') next.defaultSplitConfig = null;
   const db = await getDb();
-  await db.runAsync(`UPDATE groups SET settings_json = ?, updated_at = ? WHERE id = ?`, [
-    serializeSettings(next),
-    new Date().toISOString(),
-    group._id,
-  ]);
+  await runInTransaction(db, async () => {
+    await db.runAsync(`UPDATE groups SET settings_json = ?, updated_at = ? WHERE id = ?`, [
+      serializeSettings(next),
+      new Date().toISOString(),
+      group._id,
+    ]);
+    await enqueue(db, 'group', group._id, group._id);
+  });
 }
 
 export async function addGroupMember(groupId: string, name: string) {
@@ -341,26 +353,43 @@ export async function addGroupMember(groupId: string, name: string) {
     } else {
       await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, group._id]);
     }
+    await enqueue(db, 'group', group._id, group._id);
   });
 }
 
-export async function renameGroupMember(groupId: string, memberId: string, name: string) {
-  const displayName = name.trim();
+/** True once the server holds this group (needed before it can be shared). */
+export async function isGroupSynced(groupId: string) {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ synced: number }>(`SELECT synced FROM groups WHERE id = ?`, [groupId]);
+  return Boolean(row?.synced);
+}
+
+export async function updateGroupMember(
+  groupId: string,
+  memberId: string,
+  input: { name: string; upiId?: string | null }
+) {
+  const displayName = input.name.trim();
   if (!displayName) throw new Error('Name required');
+  const upiId = input.upiId ? normalizeUpiId(input.upiId) : null;
+  if (upiId && !isValidUpiId(upiId)) throw new Error('That UPI ID does not look right');
   const group = await getGroup(groupId);
   if (!group) throw new Error('Group not found');
   const member = (group.members || []).find((m) => m._id === memberId);
   if (!member) throw new Error('Member not found');
 
   const db = await getDb();
-  await db.runAsync(
-    `UPDATE group_members SET display_name = ? WHERE id = ? AND group_id = ?`,
-    [displayName, memberId, group._id]
-  );
-  await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [
-    new Date().toISOString(),
-    group._id,
-  ]);
+  await runInTransaction(db, async () => {
+    await db.runAsync(
+      `UPDATE group_members SET display_name = ?, upi_id = ? WHERE id = ? AND group_id = ?`,
+      [displayName, upiId, memberId, group._id]
+    );
+    await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [
+      new Date().toISOString(),
+      group._id,
+    ]);
+    await enqueue(db, 'group', group._id, group._id);
+  });
 }
 
 export async function removeGroupMember(groupId: string, memberId: string) {
@@ -388,15 +417,20 @@ export async function removeGroupMember(groupId: string, memberId: string) {
       now,
       group._id,
     ]);
+    await enqueue(db, 'group', group._id, group._id);
   });
 }
 
 export async function deleteGroup(groupId: string) {
   const db = await getDb();
-  await db.runAsync(`UPDATE groups SET deleted_at = ?, updated_at = ? WHERE id = ?`, [
-    new Date().toISOString(),
-    new Date().toISOString(),
-    groupId,
-  ]);
+  const now = new Date().toISOString();
+  await runInTransaction(db, async () => {
+    await db.runAsync(`UPDATE groups SET deleted_at = ?, updated_at = ? WHERE id = ?`, [
+      now,
+      now,
+      groupId,
+    ]);
+    await enqueue(db, 'group', groupId, groupId);
+  });
 }
 

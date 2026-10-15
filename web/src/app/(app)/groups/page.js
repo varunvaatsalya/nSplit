@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -402,20 +402,21 @@ export default function GroupsPage() {
               <li key={g._id}>
                 <Link
                   href={`/groups/${g.code}`}
-                  className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-4 transition-colors hover:border-primary/30 hover:bg-soft/40"
+                  className="flex items-center gap-3.5 rounded-[18px] border border-border bg-surface p-3.5 transition-colors hover:border-primary/30 hover:bg-soft/40"
                 >
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-soft text-xl">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-soft text-[22px]">
                     {iconMeta.emoji}
                   </span>
-                  <div className="min-w-0">
-                    <div className="truncate text-base font-semibold tracking-tight">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-bold">
                       {g.name}
                     </div>
-                    <div className="text-sm text-muted">
+                    <div className="text-[13px] text-muted">
                       {g.memberCount || 0} member
                       {(g.memberCount || 0) === 1 ? "" : "s"}
                     </div>
                   </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-muted" />
                 </Link>
               </li>
             );

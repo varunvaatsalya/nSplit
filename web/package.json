@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/sync-shared.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/sync-shared.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "pretest": "node scripts/sync-shared.mjs",
     "test": "node --test \"./src/shared/**/*.test.js\""
   },
   "dependencies": {

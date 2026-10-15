@@ -12,7 +12,7 @@ export function OfflineBanner() {
     <View style={[styles.banner, { backgroundColor: colors.softSurface, borderColor: colors.border }]}>
       <Text style={[styles.text, { color: colors.text }]}>Offline</Text>
       <Text style={[styles.sub, { color: colors.textSecondary }]}>
-        Your profile, groups, and expenses stay on this phone. You can keep adding bills.
+        Keep adding bills. Everything is saved on this phone and syncs when you are back online.
       </Text>
     </View>
   );

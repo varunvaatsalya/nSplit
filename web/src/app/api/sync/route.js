@@ -1,33 +1,45 @@
-import { connectDb, withTransaction } from "@/lib/db";
-import {
-  Group,
-  Income,
-  MutationLog,
-  Transfer,
-} from "@/models";
-import { fail, ok, zodError } from "@/lib/api-response";
-import { requireAuth } from "@/lib/auth/require-auth";
-import { buildExpenseCreateData } from "@/lib/expenses/service";
-import { recordActivity } from "@/lib/activity";
-import { requireGroupPermission } from "@/lib/permissions";
-import { Actions } from "@/shared/permissions/index.js";
-import { calculateSplit } from "@/shared/split/index.js";
 import { z } from "zod";
 
-const mutationSchema = z.object({
-  mutationId: z.string().uuid(),
-  type: z.string().min(1),
-  entity: z.string().min(1),
-  payload: z.record(z.string(), z.any()),
-  clientTimestamp: z.string().datetime().optional(),
-  baseVersion: z.number().int().optional(),
+import { fail, ok, zodError } from "@/lib/api-response";
+import { requireAuth } from "@/lib/auth/require-auth";
+import { connectDb } from "@/lib/db";
+import { OBJECT_ID, SyncError, applyChange, pullChanges, serverCopy } from "@/lib/sync";
+import { MutationLog } from "@/models";
+
+const objectId = z.string().regex(OBJECT_ID, "Expected a 24-char hex id");
+
+const changeSchema = z.object({
+  mutationId: z.string().min(8).max(64),
+  entity: z.enum(["group", "expense", "transfer"]),
+  op: z.enum(["upsert", "delete"]),
+  id: objectId,
+  groupId: objectId.optional(),
+  clientUpdatedAt: z.string().datetime(),
+  data: z.record(z.string(), z.any()).optional(),
 });
 
 const syncSchema = z.object({
   deviceId: z.string().trim().max(128).optional(),
-  mutations: z.array(mutationSchema).max(100),
+  since: z.string().datetime().nullable().optional(),
+  knownGroupIds: z.array(objectId).max(1000).default([]),
+  changes: z.array(changeSchema).max(100).default([]),
 });
 
+/** Re-fetching a few seconds back is harmless (applies are idempotent) and covers clock jitter. */
+const CURSOR_OVERLAP_MS = 5000;
+
+function mergeInto(target, extra) {
+  for (const key of ["groups", "expenses", "transfers"]) {
+    for (const row of extra?.[key] || []) {
+      if (!target[key].some((r) => r.id === row.id)) target[key].push(row);
+    }
+  }
+}
+
+/**
+ * One round trip: apply the device's pending changes, then return everything that
+ * changed on the server since its cursor.
+ */
 export async function POST(request) {
   const auth = await requireAuth();
   if (auth.error) return auth.error;
@@ -41,288 +53,55 @@ export async function POST(request) {
 
   const parsed = syncSchema.safeParse(body);
   if (!parsed.success) return zodError(parsed.error);
+  const { deviceId, since, knownGroupIds, changes } = parsed.data;
 
   await connectDb();
+  const user = auth.user;
   const results = [];
+  const corrections = [];
 
-  for (const mutation of parsed.data.mutations) {
-    const existing = await MutationLog.findOne({
-      mutationId: mutation.mutationId,
-    }).lean();
-
-    if (existing) {
-      results.push({
-        mutationId: mutation.mutationId,
-        status: "DUPLICATE",
-        serverEntityId: existing.serverEntityId,
-      });
+  for (const change of changes) {
+    const seen = await MutationLog.findOne({ mutationId: change.mutationId }).lean();
+    if (seen) {
+      results.push({ mutationId: change.mutationId, status: "DUPLICATE" });
       continue;
     }
 
+    let status;
+    let error = null;
     try {
-      const applied = await applyMutation({
-        mutation,
-        user: auth.user,
-        deviceId: parsed.data.deviceId,
-      });
-      results.push(applied);
+      ({ status } = await applyChange({ change, user }));
     } catch (e) {
-      const status = e.code === "CONFLICT" ? "CONFLICT" : "REJECTED";
-      try {
-        await MutationLog.create({
-          mutationId: mutation.mutationId,
-          userId: auth.user._id,
-          deviceId: parsed.data.deviceId ?? null,
-          type: mutation.type,
-          entity: mutation.entity,
-          status,
-          conflictReason: e.message,
-          clientTimestamp: mutation.clientTimestamp
-            ? new Date(mutation.clientTimestamp)
-            : null,
-        });
-      } catch {
-        // ignore duplicate log races
-      }
-
-      results.push({
-        mutationId: mutation.mutationId,
-        status,
-        error: e.message,
-      });
-    }
-  }
-
-  return ok({ results });
-}
-
-async function applyMutation({ mutation, user, deviceId }) {
-  const { type, payload } = mutation;
-
-  if (type === "expense.create") {
-    const membership = await requireGroupPermission(user._id, payload.groupId, Actions.ADD_EXPENSE);
-    const group = await Group.findById(membership.groupId).lean();
-    if (!group) throw Object.assign(new Error("Group not found"), { status: 404 });
-    const groupId = membership.groupId;
-
-    const result = await withTransaction(async (session) => {
-      const { expense, duplicate } = await buildExpenseCreateData({
-        group,
-        userId: user._id,
-        input: { ...payload, clientMutationId: mutation.mutationId },
-        session,
-      });
-
-      if (!duplicate) {
-        await recordActivity({
-          session,
-          groupId,
-          actorId: user._id,
-          action: "EXPENSE_CREATED",
-          entityType: "expense",
-          entityId: expense._id,
-          metadata: { title: expense.title, amountMinor: expense.amountMinor },
-        });
-      }
-
-      const opts = session ? { session } : {};
-      await MutationLog.updateOne(
-        { mutationId: mutation.mutationId },
-        {
-          $setOnInsert: {
-            mutationId: mutation.mutationId,
-            userId: user._id,
-            deviceId: deviceId ?? null,
-            type,
-            entity: "expense",
-            entityId: expense._id,
-            status: duplicate ? "DUPLICATE" : "APPLIED",
-            serverEntityId: expense._id,
-            clientTimestamp: mutation.clientTimestamp
-              ? new Date(mutation.clientTimestamp)
-              : null,
-            processedAt: new Date(),
-          },
-        },
-        { upsert: true, ...opts }
-      );
-
-      return { expense, duplicate };
-    });
-
-    return {
-      mutationId: mutation.mutationId,
-      status: result.duplicate ? "DUPLICATE" : "APPLIED",
-      serverEntityId: result.expense._id,
-      entity: result.expense,
-    };
-  }
-
-  if (type === "transfer.create") {
-    const membership = await requireGroupPermission(user._id, payload.groupId, Actions.ADD_TRANSFER);
-    const group = await Group.findById(membership.groupId).lean();
-    if (!group) throw Object.assign(new Error("Group not found"), { status: 404 });
-    const groupId = membership.groupId;
-
-    const transfer = await withTransaction(async (session) => {
-      const opts = session ? { session } : {};
-      const existing = await Transfer.findOne({
-        clientMutationId: mutation.mutationId,
-      })
-        .session(session || null)
-        .lean();
-      if (existing) return { row: existing, duplicate: true };
-
-      const [row] = await Transfer.create(
-        [
-          {
-            groupId,
-            fromMemberId: payload.fromMemberId,
-            toMemberId: payload.toMemberId,
-            amountMinor: payload.amountMinor,
-            currency: payload.currency || group.currency,
-            title: payload.title ?? null,
-            icon: payload.icon ?? null,
-            note: payload.note ?? payload.title ?? null,
-            createdById: user._id,
-            clientMutationId: mutation.mutationId,
-            transferDate: payload.transferDate
-              ? new Date(payload.transferDate)
-              : new Date(),
-          },
-        ],
-        opts
-      );
-
-      await recordActivity({
-        session,
-        groupId,
-        actorId: user._id,
-        action: "TRANSFER_CREATED",
-        entityType: "transfer",
-        entityId: row._id,
-        metadata: {
-          title: row.title,
-          amountMinor: row.amountMinor,
-          fromMemberId: String(row.fromMemberId),
-          toMemberId: String(row.toMemberId),
-        },
-      });
-
-      await MutationLog.create(
-        [
-          {
-            mutationId: mutation.mutationId,
-            userId: user._id,
-            deviceId: deviceId ?? null,
-            type,
-            entity: "transfer",
-            entityId: String(row._id),
-            status: "APPLIED",
-            serverEntityId: String(row._id),
-          },
-        ],
-        opts
-      );
-
-      return { row, duplicate: false };
-    });
-
-    return {
-      mutationId: mutation.mutationId,
-      status: transfer.duplicate ? "DUPLICATE" : "APPLIED",
-      serverEntityId: String(transfer.row._id),
-      entity: transfer.row,
-    };
-  }
-
-  if (type === "income.create") {
-    const membership = await requireGroupPermission(user._id, payload.groupId, Actions.ADD_INCOME);
-    const group = await Group.findById(membership.groupId).lean();
-    if (!group) throw Object.assign(new Error("Group not found"), { status: 404 });
-    const groupId = membership.groupId;
-
-    const splitResult = calculateSplit({
-      method: payload.splitMethod || "EQUAL",
-      totalMinor: payload.amountMinor,
-      participants: (payload.receivers || []).map((r) => ({
-        memberId: r.memberId,
-        inputValue: r.inputValue ?? r.amountMinor,
-      })),
-    });
-    if (!splitResult.valid) {
-      throw Object.assign(new Error(splitResult.errors.join("; ")), {
-        status: 422,
-      });
+      status = "REJECTED";
+      error = e instanceof SyncError ? e.message : "Could not apply change";
+      if (!(e instanceof SyncError)) console.error("[sync] apply failed", e);
     }
 
-    const income = await withTransaction(async (session) => {
-      const opts = session ? { session } : {};
-      const existing = await Income.findOne({
-        clientMutationId: mutation.mutationId,
-      })
-        .session(session || null)
-        .lean();
-      if (existing) return { row: existing, duplicate: true };
+    if (status !== "APPLIED") corrections.push(change);
+    results.push({ mutationId: change.mutationId, status, ...(error ? { error } : {}) });
 
-      const [row] = await Income.create(
-        [
-          {
-            groupId,
-            title: payload.title,
-            description: payload.description ?? null,
-            amountMinor: payload.amountMinor,
-            currency: payload.currency || group.currency,
-            splitMethod: payload.splitMethod || "EQUAL",
-            createdById: user._id,
-            clientMutationId: mutation.mutationId,
-            receivers: splitResult.splits.map((s) => ({
-              memberId: s.memberId,
-              amountMinor: s.amountMinor,
-            })),
-          },
-        ],
-        opts
-      );
-
-      await recordActivity({
-        session,
-        groupId,
-        actorId: user._id,
-        action: "INCOME_CREATED",
-        entityType: "income",
-        entityId: row._id,
-        metadata: { title: row.title, amountMinor: row.amountMinor },
-      });
-
-      await MutationLog.create(
-        [
-          {
-            mutationId: mutation.mutationId,
-            userId: user._id,
-            deviceId: deviceId ?? null,
-            type,
-            entity: "income",
-            entityId: String(row._id),
-            status: "APPLIED",
-            serverEntityId: String(row._id),
-          },
-        ],
-        opts
-      );
-
-      return { row, duplicate: false };
-    });
-
-    return {
-      mutationId: mutation.mutationId,
-      status: income.duplicate ? "DUPLICATE" : "APPLIED",
-      serverEntityId: String(income.row._id),
-      entity: income.row,
-    };
+    await MutationLog.create({
+      mutationId: change.mutationId,
+      userId: user._id,
+      deviceId: deviceId ?? null,
+      type: `${change.entity}.${change.op}`,
+      entity: change.entity,
+      entityId: change.id,
+      status: status === "STALE" ? "CONFLICT" : status,
+      serverEntityId: change.id,
+      conflictReason: error,
+      clientTimestamp: new Date(change.clientUpdatedAt),
+    }).catch(() => {});
   }
 
-  throw Object.assign(new Error(`Unsupported mutation type: ${type}`), {
-    status: 400,
-  });
+  const cursor = new Date(Date.now() - CURSOR_OVERLAP_MS).toISOString();
+  const pulled = await pullChanges({ user, since, knownGroupIds });
+
+  // A stale or rejected push must be overwritten on the device by the server copy,
+  // even when that copy is older than the cursor.
+  for (const change of corrections) {
+    mergeInto(pulled, await serverCopy(change));
+  }
+
+  return ok({ results, ...pulled, cursor });
 }

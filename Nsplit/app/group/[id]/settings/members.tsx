@@ -25,7 +25,7 @@ import {
   addGroupMember,
   getGroup,
   removeGroupMember,
-  renameGroupMember,
+  updateGroupMember,
   setGroupMyMember,
 } from '@/src/db/groups';
 import { useIdentity } from '@/src/identity/identity-context';
@@ -43,6 +43,8 @@ export default function ManageMembersScreen() {
   const [addingMember, setAddingMember] = useState(false);
   const [editMember, setEditMember] = useState<GroupMember | null>(null);
   const [editName, setEditName] = useState('');
+  const [editUpi, setEditUpi] = useState('');
+  const [editError, setEditError] = useState('');
   const [savingMember, setSavingMember] = useState(false);
   const [removeMember, setRemoveMember] = useState<GroupMember | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -91,11 +93,11 @@ export default function ManageMembersScreen() {
     if (!group || !editMember || !editName.trim()) return;
     setSavingMember(true);
     try {
-      await renameGroupMember(group._id, editMember._id, editName);
+      await updateGroupMember(group._id, editMember._id, { name: editName, upiId: editUpi.trim() || null });
       setEditMember(null);
       await load();
-    } catch {
-      setError('Could not update member');
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'Could not update member');
     } finally {
       setSavingMember(false);
     }
@@ -188,13 +190,20 @@ export default function ManageMembersScreen() {
                   seed={member.userId || member._id}
                   size={32}
                 />
-                <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }} numberOfLines={1}>
-                  {memberListLabel(member, user?._id, myMember?._id)}
-                </Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: colors.text, fontWeight: '600' }} numberOfLines={1}>
+                    {memberListLabel(member, user?._id, myMember?._id)}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }} numberOfLines={1}>
+                    {member.upiId ? `UPI · ${member.upiId}` : 'No UPI ID'}
+                  </Text>
+                </View>
                 <Pressable
                   onPress={() => {
                     setEditMember(member);
                     setEditName(member.displayName || '');
+                    setEditUpi(member.upiId || '');
+                    setEditError('');
                   }}
                   hitSlop={8}
                   style={styles.iconBtn}>
@@ -250,6 +259,30 @@ export default function ManageMembersScreen() {
                 { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
               ]}
             />
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 12, marginBottom: 6 }}>
+              UPI ID (optional) · lets people pay them from a shared link
+            </Text>
+            <TextInput
+              value={editUpi}
+              onChangeText={(next) => {
+                setEditUpi(next);
+                setEditError('');
+              }}
+              placeholder="name@okhdfcbank"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              style={[
+                styles.input,
+                {
+                  color: colors.text,
+                  borderColor: editError ? colors.danger : colors.border,
+                  backgroundColor: colors.background,
+                },
+              ]}
+            />
+            {editError ? <Text style={{ color: colors.danger, fontSize: 12, marginTop: 6 }}>{editError}</Text> : null}
             <View className="flex-row gap-2" style={{ marginTop: 12 }}>
               <Pressable
                 onPress={() => setEditMember(null)}

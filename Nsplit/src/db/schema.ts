@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const LOCAL_SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -70,6 +70,19 @@ CREATE TABLE IF NOT EXISTS transfers (
   FOREIGN KEY (group_id) REFERENCES groups(id)
 );
 
+-- Records waiting to be pushed to the server. One row per record: later edits
+-- refresh mutation_id, so a push acked for an older mutation never drops a newer edit.
+CREATE TABLE IF NOT EXISTS outbox (
+  entity TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  group_id TEXT,
+  mutation_id TEXT NOT NULL,
+  enqueued_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  PRIMARY KEY (entity, entity_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_groups_updated ON groups(deleted_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_members_group ON group_members(group_id, left_at);
 CREATE INDEX IF NOT EXISTS idx_expenses_group ON expenses(group_id, deleted_at, expense_date);
@@ -78,6 +91,7 @@ CREATE INDEX IF NOT EXISTS idx_transfers_group ON transfers(group_id, deleted_at
 
 export const RESET_LEGACY_SQL = `
 DROP TABLE IF EXISTS sync_queue;
+DROP TABLE IF EXISTS outbox;
 DROP TABLE IF EXISTS conflicts;
 DROP TABLE IF EXISTS activities;
 DROP TABLE IF EXISTS incomes;

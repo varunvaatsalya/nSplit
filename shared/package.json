@@ -30,6 +30,16 @@
       "require": "./balance/index.js",
       "default": "./balance/index.js"
     },
+    "./ledger": {
+      "import": "./ledger/index.js",
+      "require": "./ledger/index.js",
+      "default": "./ledger/index.js"
+    },
+    "./upi": {
+      "import": "./upi/index.js",
+      "require": "./upi/index.js",
+      "default": "./upi/index.js"
+    },
     "./categories": {
       "import": "./categories/index.js",
       "require": "./categories/index.js",

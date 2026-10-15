@@ -24,7 +24,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { EmojiPicker } from "@/components/emoji-picker";
+import { IconPicker } from "@/components/expenses/icon-picker";
 import { suggestEmojiFromText } from "@/lib/emoji-icons";
 import { cn } from "@/lib/utils";
 import { memberListLabel, sortMembersByName } from "@/lib/members";
@@ -68,11 +68,14 @@ function formatWhenLabel(date) {
 }
 
 /**
- * Transfer create UI - embed inside Add Record, or standalone.
+ * Transfer create / edit UI - embed inside Add Record, or standalone.
+ * Pass `transfer` to edit an existing one.
  */
 export function TransferForm({
   group,
+  transfer = null,
   onCreated,
+  onUpdated,
   onClose,
   embedded = false,
   active = false,
@@ -133,11 +136,25 @@ export function TransferForm({
     setToMemberId("");
   }
 
+  const isEdit = Boolean(transfer?._id);
+
+  function hydrateFromTransfer(t) {
+    setTitle(t.title || "");
+    setIcon(t.icon || DEFAULT_TRANSFER_EMOJI);
+    setIconManual(Boolean(t.icon));
+    setAmount(((t.amountMinor || 0) / 100).toString());
+    setTransferAt(new Date(t.transferDate || t.createdAt || Date.now()));
+    setFieldErrors({ amount: false, title: false, from: false, to: false });
+    setFromMemberId(t.fromMemberId || "");
+    setToMemberId(t.toMemberId || "");
+  }
+
   useEffect(() => {
     if (!active || !members.length) return;
-    resetForm();
+    if (transfer?._id) hydrateFromTransfer(transfer);
+    else resetForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, group?._id]);
+  }, [active, group?._id, transfer?._id]);
 
   function openWhenModal() {
     setDraftDate(toLocalDateValue(transferAt));
@@ -172,8 +189,12 @@ export function TransferForm({
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/groups/${group.code}/transfers`, {
-        method: "POST",
+      const res = await fetch(
+        isEdit
+          ? `/api/groups/${group.code}/transfers/${transfer._id}`
+          : `/api/groups/${group.code}/transfers`,
+        {
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
@@ -184,14 +205,16 @@ export function TransferForm({
           transferDate: transferAt.toISOString(),
           currency,
         }),
-      });
+        },
+      );
       const json = await res.json();
       if (!res.ok) {
         setShakeKey((k) => k + 1);
         return;
       }
       onClose?.();
-      onCreated?.(json.data?.transfer);
+      if (isEdit) onUpdated?.(json.data?.transfer);
+      else onCreated?.(json.data?.transfer);
     } catch {
       setShakeKey((k) => k + 1);
     } finally {
@@ -347,17 +370,16 @@ export function TransferForm({
 
         <div className="shrink-0 border-t border-border bg-surface p-4">
           <Button type="submit" className="w-full" disabled={saving}>
-            {saving ? "Saving…" : "Record transfer"}
+            {saving ? "Saving…" : isEdit ? "Save changes" : "Record transfer"}
           </Button>
         </div>
       </form>
 
-      <EmojiPicker
+      <IconPicker
         open={iconsOpen}
         onOpenChange={setIconsOpen}
         value={icon}
         onSelect={pickIcon}
-        description="Tap an emoji for this transfer."
       />
 
       <Dialog open={whenOpen} onOpenChange={setWhenOpen}>

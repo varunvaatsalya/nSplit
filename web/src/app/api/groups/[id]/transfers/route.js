@@ -1,4 +1,4 @@
-import { connectDb, toJSON, withTransaction } from "@/lib/db";
+import { connectDb, withTransaction } from "@/lib/db";
 import { Group, MutationLog, Transfer, findActiveMemberById } from "@/models";
 import { created, fail, ok, zodError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/require-auth";
@@ -6,15 +6,8 @@ import { recordActivity } from "@/lib/activity";
 import { requireGroupPermission } from "@/lib/permissions";
 import { Actions } from "@/shared/permissions/index.js";
 import { createTransferSchema } from "@/lib/validations/records";
+import { serializeTransfer } from "@/lib/transfers/serialize";
 
-function serializeTransfer(doc) {
-  const t = toJSON(doc);
-  t.groupId = String(t.groupId);
-  t.fromMemberId = String(t.fromMemberId);
-  t.toMemberId = String(t.toMemberId);
-  t.createdById = String(t.createdById);
-  return t;
-}
 
 export async function GET(_request, { params }) {
   const auth = await requireAuth();

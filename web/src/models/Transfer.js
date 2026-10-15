@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { clientUpdatedAtPlugin } from "./_sync-plugin.js";
 
 const { Schema, models, model } = mongoose;
 
@@ -21,7 +22,9 @@ const TransferSchema = new Schema(
   { timestamps: true }
 );
 
+TransferSchema.plugin(clientUpdatedAtPlugin);
 TransferSchema.index({ groupId: 1, deletedAt: 1, transferDate: -1 });
+TransferSchema.index({ groupId: 1, updatedAt: 1 });
 
 if (models.Transfer) {
   delete models.Transfer;

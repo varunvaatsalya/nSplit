@@ -16,6 +16,7 @@ import { AuthProvider } from "@/src/auth/auth-context";
 import { GroupsProvider, useGroups } from "@/src/groups/groups-context";
 import { IdentityProvider } from "@/src/identity/identity-context";
 import { OfflineProvider } from "@/src/offline/offline-context";
+import { SyncProvider } from "@/src/sync/sync-context";
 import { AppearanceProvider, useAppearance } from "@/src/theme/appearance-context";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -74,7 +75,9 @@ export default function RootLayout() {
         <AuthProvider>
           <IdentityProvider>
             <GroupsProvider>
-              <RootNavigator />
+              <SyncProvider>
+                <RootNavigator />
+              </SyncProvider>
             </GroupsProvider>
           </IdentityProvider>
         </AuthProvider>

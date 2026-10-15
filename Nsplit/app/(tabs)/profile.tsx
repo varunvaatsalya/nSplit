@@ -6,16 +6,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppearanceSettings } from '@/components/profile/appearance-settings';
 import { OfflineBanner } from '@/components/offline-banner';
 import { Field } from '@/components/ui/field';
+import { SyncStatusCard } from '@/components/sync/sync-status-card';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { UserAvatar } from '@/components/user-avatar';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/src/auth/auth-context';
 import { useIdentity } from '@/src/identity/identity-context';
+import { useSync } from '@/src/sync/sync-context';
 
 export default function ProfileScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { user, logout, pending } = useAuth();
+  const { user, pending } = useAuth();
+  const { signOut } = useSync();
+  const [signingOut, setSigningOut] = useState(false);
   const { name: storedName, matchByName, setName, setMatchByName } = useIdentity();
   const [draftName, setDraftName] = useState(storedName);
 
@@ -23,11 +27,36 @@ export default function ProfileScreen() {
     setDraftName(storedName);
   }, [storedName]);
 
-  async function onLogout() {
+  async function forceLogout() {
+    setSigningOut(true);
     try {
-      await logout();
+      await signOut({ force: true });
     } catch {
       Alert.alert('Could not log out', 'Try again.');
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  async function onLogout() {
+    setSigningOut(true);
+    try {
+      // Logging out clears this phone, so upload everything first.
+      const { unsynced } = await signOut();
+      if (unsynced > 0) {
+        Alert.alert(
+          'Some changes are not backed up',
+          `${unsynced} change${unsynced === 1 ? ' has' : 's have'} not reached the server yet. Logging out now will delete ${unsynced === 1 ? 'it' : 'them'} from this phone.`,
+          [
+            { text: 'Stay logged in', style: 'cancel' },
+            { text: 'Log out anyway', style: 'destructive', onPress: () => void forceLogout() },
+          ]
+        );
+      }
+    } catch {
+      Alert.alert('Could not log out', 'Try again.');
+    } finally {
+      setSigningOut(false);
     }
   }
 
@@ -61,11 +90,13 @@ export default function ProfileScreen() {
             </Text>
             <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
               {storedName.trim()
-                ? 'Saved on this phone. Log in later if you want a backup.'
-                : 'Log in later to back them up.'}
+                ? 'Saved on this phone. Log in to back up and sync across devices.'
+                : 'Log in to back them up and sync across devices.'}
             </Text>
           </View>
         )}
+
+        <SyncStatusCard />
 
         <AppearanceSettings />
 
@@ -101,8 +132,8 @@ export default function ProfileScreen() {
         <View style={{ paddingHorizontal: 20, marginTop: 16, gap: 10 }}>
           {user ? (
             <PrimaryButton
-              title={pending ? 'Logging out…' : 'Log out'}
-              loading={pending}
+              title={pending || signingOut ? 'Logging out…' : 'Log out'}
+              loading={pending || signingOut}
               onPress={onLogout}
             />
           ) : (

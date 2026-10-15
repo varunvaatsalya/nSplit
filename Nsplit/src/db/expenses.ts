@@ -2,6 +2,8 @@ import type { Expense, GroupBalance, GroupDetail, Transfer } from '@/src/api/typ
 import { computeGroupBalances } from '@/src/lib/balance';
 import { calculateSplit } from '@/src/lib/split';
 
+import { enqueue } from '@/src/sync/outbox';
+
 import { getDb, runInTransaction } from './client';
 import { getGroup } from './groups';
 import { createId } from './ids';
@@ -206,6 +208,7 @@ export async function saveExpense(
     }
 
     await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, group._id]);
+    await enqueue(db, 'expense', expense._id, group._id);
   });
 
   return expense;
@@ -214,11 +217,14 @@ export async function saveExpense(
 export async function deleteExpense(groupId: string, expenseId: string) {
   const db = await getDb();
   const now = new Date().toISOString();
-  await db.runAsync(
-    `UPDATE expenses SET deleted_at = ?, updated_at = ? WHERE id = ? AND group_id = ? AND deleted_at IS NULL`,
-    [now, now, expenseId, groupId]
-  );
-  await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, groupId]);
+  await runInTransaction(db, async () => {
+    await db.runAsync(
+      `UPDATE expenses SET deleted_at = ?, updated_at = ? WHERE id = ? AND group_id = ? AND deleted_at IS NULL`,
+      [now, now, expenseId, groupId]
+    );
+    await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [now, groupId]);
+    await enqueue(db, 'expense', expenseId, groupId);
+  });
 }
 
 export function groupBalance(
