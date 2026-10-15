@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, Copy, Eye, Smartphone } from "lucide-react";
+import { Check, ChevronRight, Copy, Eye, Plus, Smartphone } from "lucide-react";
 import { BalanceView } from "@/components/balance/balance-view";
 import { GroupFeed, buildFeed } from "@/components/groups/group-feed";
 import { RecordDetailDialog } from "@/components/records/record-detail-dialog";
+import { RequestFormDialog } from "@/components/requests/request-form-dialog";
+import { RequestSummary } from "@/components/requests/request-summary";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatMinor, memberName } from "@/lib/format";
 import { groupBalance } from "@/lib/group-balance";
@@ -40,6 +42,23 @@ function writeMe(token, value) {
   }
 }
 
+let memoryViewerKey = null;
+
+/** Random id for this browser, so a viewer can follow their own requests. */
+function viewerKey() {
+  try {
+    let key = window.localStorage.getItem("nsplit-viewer-key");
+    if (!key) {
+      key = crypto.randomUUID().replace(/-/g, "");
+      window.localStorage.setItem("nsplit-viewer-key", key);
+    }
+    return key;
+  } catch {
+    memoryViewerKey = memoryViewerKey || crypto.randomUUID().replace(/-/g, "");
+    return memoryViewerKey;
+  }
+}
+
 function Brand() {
   return (
     <Link href="/" className="text-lg font-extrabold tracking-tight text-primary dark:text-primary-foreground">
@@ -56,14 +75,30 @@ function Shell({ children }) {
   );
 }
 
-function UpiPay({ payee, amountMinor, currency, groupName }) {
+function PaidAlready({ onReport }) {
+  if (!onReport) return null;
+  return (
+    <button
+      type="button"
+      onClick={onReport}
+      className="mx-auto mt-2 block cursor-pointer text-xs font-bold text-primary hover:underline dark:text-primary-foreground"
+    >
+      Already paid? Tell the group
+    </button>
+  );
+}
+
+function UpiPay({ payee, amountMinor, currency, groupName, onReport }) {
   const [copied, setCopied] = useState(false);
-  if (currency !== "INR") return null;
+  if (currency !== "INR") return <PaidAlready onReport={onReport} />;
   if (!payee?.upiId) {
     return (
-      <p className="mt-2 text-center text-xs text-muted">
-        {memberName(payee)} hasn&apos;t added a UPI ID yet. Ask them for it.
-      </p>
+      <>
+        <p className="mt-2 text-center text-xs text-muted">
+          {memberName(payee)} hasn&apos;t added a UPI ID yet. Ask them for it.
+        </p>
+        <PaidAlready onReport={onReport} />
+      </>
     );
   }
   const href = buildUpiLink({
@@ -99,6 +134,7 @@ function UpiPay({ payee, amountMinor, currency, groupName }) {
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
       </button>
       <p className="mt-1 text-center text-[11px] text-muted">The button opens your UPI app on a phone.</p>
+      <PaidAlready onReport={onReport} />
     </div>
   );
 }
@@ -143,7 +179,7 @@ function WhoAreYou({ group, onPick }) {
   );
 }
 
-function MySummary({ me, balance, memberById, currency, groupName }) {
+function MySummary({ me, balance, memberById, currency, groupName, onReportPayment }) {
   const row = balance.members.find((m) => m._id === me._id);
   const net = row?.netMinor || 0;
   const iPay = balance.pairwise.filter((p) => p.from === me._id);
@@ -167,7 +203,13 @@ function MySummary({ me, balance, memberById, currency, groupName }) {
           <p className="text-center text-sm font-semibold">
             Pay {memberName(memberById[p.to])} {formatMinor(p.amountMinor, currency)}
           </p>
-          <UpiPay payee={memberById[p.to]} amountMinor={p.amountMinor} currency={currency} groupName={groupName} />
+          <UpiPay
+            payee={memberById[p.to]}
+            amountMinor={p.amountMinor}
+            currency={currency}
+            groupName={groupName}
+            onReport={() => onReportPayment(p)}
+          />
         </div>
       ))}
       {paysMe.length ? (
@@ -192,6 +234,8 @@ export default function SharedLedgerPage() {
   const [view, setView] = useState("expenses");
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
+  const [myRequests, setMyRequests] = useState([]);
+  const [form, setForm] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,6 +278,24 @@ export default function SharedLedgerPage() {
     writeMe(token, id);
     setMeId(id);
   }
+
+  async function loadMyRequests() {
+    try {
+      const res = await fetch(`/api/share/${token}/requests?viewerKey=${viewerKey()}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (res.ok) setMyRequests(json.data.requests || []);
+    } catch {
+      // Not critical: the list just stays as it was.
+    }
+  }
+
+  useEffect(() => {
+    if (!data) return;
+    // Fetching from the API is the external system this effect syncs with.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadMyRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, token]);
 
   if (error) {
     return (
@@ -307,7 +369,25 @@ export default function SharedLedgerPage() {
       </div>
 
       {me && balance ? (
-        <MySummary me={me} balance={balance} memberById={memberById} currency={currency} groupName={group.name} />
+        <MySummary
+          me={me}
+          balance={balance}
+          memberById={memberById}
+          currency={currency}
+          groupName={group.name}
+          onReportPayment={(p) => setForm({ kind: "payment", toMemberId: p.to, amountMinor: p.amountMinor })}
+        />
+      ) : null}
+
+      {myRequests.length ? (
+        <div className="mb-5">
+          <div className="mb-2 text-[11px] font-bold tracking-[0.06em] text-muted">YOUR REQUESTS</div>
+          <div className="space-y-2">
+            {myRequests.slice(0, 5).map((r) => (
+              <RequestSummary key={r._id} request={r} byId={memberById} currency={currency} />
+            ))}
+          </div>
+        </div>
       ) : null}
 
       <div className="mb-5 flex justify-start">
@@ -342,7 +422,13 @@ export default function SharedLedgerPage() {
           canSettle={false}
           payAction={(p) =>
             me && p.from === me._id ? (
-              <UpiPay payee={memberById[p.to]} amountMinor={p.amountMinor} currency={currency} groupName={group.name} />
+              <UpiPay
+                payee={memberById[p.to]}
+                amountMinor={p.amountMinor}
+                currency={currency}
+                groupName={group.name}
+                onReport={() => setForm({ kind: "payment", toMemberId: p.to, amountMinor: p.amountMinor })}
+              />
             ) : null
           }
         />
@@ -371,7 +457,35 @@ export default function SharedLedgerPage() {
         currentUserId={me?._id}
       />
 
-      <p className="mt-10 text-center text-xs text-muted">
+      <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40">
+        <div className="mx-auto flex max-w-3xl justify-end px-4 sm:px-6">
+          <button
+            type="button"
+            onClick={() => (me ? setForm({ kind: "expense" }) : pick(null))}
+            className="pointer-events-auto flex h-12 cursor-pointer items-center gap-2 rounded-full bg-primary px-5 font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-transform hover:scale-105 active:scale-95"
+          >
+            <Plus className="h-5 w-5" />
+            {me ? "Add expense or payment" : "Pick your name to add"}
+          </button>
+        </div>
+      </div>
+
+      {me && form ? (
+        <RequestFormDialog
+          key={JSON.stringify(form)}
+          open
+          onOpenChange={(open) => !open && setForm(null)}
+          token={token}
+          viewerKey={viewerKey()}
+          me={me}
+          members={group.members}
+          currency={currency}
+          preset={form}
+          onSent={() => loadMyRequests()}
+        />
+      ) : null}
+
+      <p className="mb-16 mt-10 text-center text-xs text-muted">
         Kept with{" "}
         <Link href="/" className="font-bold text-primary dark:text-primary-foreground">
           nSplit

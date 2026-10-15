@@ -93,7 +93,7 @@ export default function ShareGroupScreen() {
 
   async function shareLink(url: string) {
     await Share.share({
-      message: `${group?.name || 'Our group'}: see the full hisaab and what you owe on nSplit\n${url}`,
+      message: `${group?.name || 'Our group'}: see every expense and what you owe on nSplit\n${url}`,
     });
   }
 

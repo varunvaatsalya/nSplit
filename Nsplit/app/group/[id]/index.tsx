@@ -29,7 +29,9 @@ import type {
 } from "@/src/api/types";
 import { useAuth } from "@/src/auth/auth-context";
 import { groupBalance, listExpenses } from "@/src/db/expenses";
-import { getGroup } from "@/src/db/groups";
+import { listPendingRequests } from "@/src/api/requests";
+import { getGroup, isGroupSynced } from "@/src/db/groups";
+import { useOffline } from "@/src/offline/offline-context";
 import { listTransfers } from "@/src/db/transfers";
 import { useIdentity } from "@/src/identity/identity-context";
 import { remoteChanges } from "@/src/sync/events";
@@ -225,6 +227,24 @@ export default function GroupScreen() {
     }, [load]),
   );
 
+  const { online } = useOffline();
+  const [pendingRequests, setPendingRequests] = useState(0);
+
+  // Requests from the share link live on the server; only check when that can work.
+  const refreshRequests = useCallback(async () => {
+    if (!user || !online || !id) return;
+    const local = await getGroup(String(id));
+    if (!local || !(await isGroupSynced(local._id))) return;
+    const res = await listPendingRequests(local.code);
+    if (res.ok && res.data) setPendingRequests(res.data.pending);
+  }, [id, user, online]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshRequests().catch(() => {});
+    }, [refreshRequests]),
+  );
+
   // Another device (or the web) changed this group.
   useEffect(() => remoteChanges.subscribe(() => void load().catch(() => {})), [load]);
 
@@ -232,7 +252,7 @@ export default function GroupScreen() {
     setRefreshing(true);
     try {
       await syncNow().catch(() => {});
-      await load();
+      await Promise.all([load(), refreshRequests().catch(() => {})]);
     } finally {
       setRefreshing(false);
     }
@@ -349,6 +369,31 @@ export default function GroupScreen() {
           <Feather name="settings" size={22} color={colors.text} />
         </Pressable>
       </View>
+
+      {pendingRequests > 0 ? (
+        <Pressable
+          onPress={() =>
+            router.push({ pathname: "/group/[id]/requests", params: { id: String(id) } })
+          }
+          style={[
+            styles.requestsBanner,
+            { borderColor: colors.primary, backgroundColor: colors.softSurface },
+          ]}
+        >
+          <View style={[styles.requestsIcon, { backgroundColor: colors.primary }]}>
+            <MaterialIcons name="inbox" size={18} color={colors.primaryForeground} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.text, fontWeight: "700" }}>
+              {pendingRequests} request{pendingRequests === 1 ? "" : "s"} waiting for approval
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }}>
+              Sent from your share link
+            </Text>
+          </View>
+          <Text style={{ color: colors.primary, fontWeight: "700" }}>Review</Text>
+        </Pressable>
+      ) : null}
 
       <View style={styles.toggleWrap}>
         <View style={[styles.toggle, { backgroundColor: colors.softSurface }]}>
@@ -665,6 +710,23 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontWeight: "600",
+  },
+  requestsBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 10,
+  },
+  requestsIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   dateHead: {
     fontSize: 14,

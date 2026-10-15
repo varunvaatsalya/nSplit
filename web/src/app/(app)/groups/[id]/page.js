@@ -9,6 +9,7 @@ import { BalanceView } from "@/components/balance/balance-view";
 import { GroupActivityDialog } from "@/components/groups/group-activity-dialog";
 import { GroupFeed, buildFeed } from "@/components/groups/group-feed";
 import { RecordDetailDialog } from "@/components/records/record-detail-dialog";
+import { RequestsBanner, RequestsInbox } from "@/components/requests/requests-inbox";
 import { Button } from "@/components/ui/button";
 import { groupBalance } from "@/lib/group-balance";
 import { getGroupIcon } from "@/lib/group-options";
@@ -51,13 +52,21 @@ export default function GroupDashboardPage() {
   const [detailIndex, setDetailIndex] = useState(0);
   const [editExpense, setEditExpense] = useState(null);
   const [editTransfer, setEditTransfer] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const [inboxOpen, setInboxOpen] = useState(false);
 
   async function reload() {
-    const [gRes, rRes, meRes] = await Promise.all([
+    const [gRes, rRes, meRes, qRes] = await Promise.all([
       fetch(`/api/groups/${id}`),
       fetch(`/api/groups/${id}/records`),
       fetch("/api/auth/me"),
+      fetch(`/api/groups/${id}/requests`),
     ]);
+    // Only members who can add records may review requests; others get 403.
+    if (qRes.ok) {
+      const qJson = await qRes.json().catch(() => null);
+      setPendingRequests(qJson?.data?.pending || 0);
+    }
     const [gJson, rJson, meJson] = await Promise.all([gRes.json(), rRes.json(), meRes.json()]);
     if (!gRes.ok) {
       setError(gJson?.error?.message || "Failed to load group");
@@ -137,6 +146,8 @@ export default function GroupDashboardPage() {
         </div>
       </div>
 
+      <RequestsBanner count={pendingRequests} onOpen={() => setInboxOpen(true)} />
+
       <div className="mb-5 flex justify-start">
         <div className="inline-flex rounded-full bg-muted-foreground/10 p-1">
           {[
@@ -195,6 +206,8 @@ export default function GroupDashboardPage() {
       />
 
       <GroupActivityDialog groupId={id} open={activityOpen} onOpenChange={setActivityOpen} />
+
+      <RequestsInbox open={inboxOpen} onOpenChange={setInboxOpen} group={group} onReviewed={reload} />
 
       <RecordDetailDialog
         open={detailOpen}
