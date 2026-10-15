@@ -7,14 +7,17 @@ export type SqlExecutor = SQLite.SQLiteDatabase;
 let dbPromise: Promise<SqlExecutor> | null = null;
 
 async function readSchemaVersion(database: SqlExecutor) {
-  try {
-    const row = await database.getFirstAsync<{ value: string }>(
-      `SELECT value FROM meta WHERE key = 'schema_version'`
-    );
-    return Number(row?.value || 0);
-  } catch {
-    return 0;
-  }
+  // Version 0 triggers RESET_LEGACY_SQL, which drops every table. Only report 0 when
+  // the meta table truly lacks a version; any read error must throw instead, or a
+  // transient failure (e.g. a locked database) would wipe the user's only copy of their data.
+  const meta = await database.getFirstAsync<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'meta'`
+  );
+  if (!meta) return 0;
+  const row = await database.getFirstAsync<{ value: string }>(
+    `SELECT value FROM meta WHERE key = 'schema_version'`
+  );
+  return Number(row?.value || 0);
 }
 
 async function tableHasColumn(database: SqlExecutor, table: string, column: string) {

@@ -22,7 +22,7 @@ import { Text as UIText } from '@/components/ui/text';
 import { useColors } from '@/hooks/use-colors';
 import type { GroupDetail, GroupMember, Transfer } from '@/src/api/types';
 import { saveTransfer } from '@/src/db/transfers';
-import { suggestEmojiFromText } from '@/src/lib/expense-icons';
+import { matchCategory } from '@/src/lib/expense-icons';
 import { memberListLabel, sortMembersByName } from '@/src/lib/members';
 
 const DEFAULT_TRANSFER_EMOJI = '💸';
@@ -133,12 +133,8 @@ export function TransferForm({
 
   function applyTitleSuggestion(nextTitle: string) {
     if (iconManual) return;
-    const suggested = suggestEmojiFromText(nextTitle);
-    if (!nextTitle.trim() || suggested.categoryKey === 'other') {
-      setIcon(DEFAULT_TRANSFER_EMOJI);
-      return;
-    }
-    setIcon(suggested.emoji);
+    const { category, score } = matchCategory(nextTitle);
+    setIcon(score ? category.emoji : DEFAULT_TRANSFER_EMOJI);
   }
 
   function resetForm() {

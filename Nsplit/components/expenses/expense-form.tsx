@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CategoryPickerSheet } from "@/components/expenses/category-picker-sheet";
 import { EmojiPickerModal } from "@/components/expenses/emoji-picker-modal";
 import { WhenField } from "@/components/expenses/when-field";
 import { Button } from "@/components/ui/button";
@@ -33,11 +34,9 @@ import { UserAvatar } from "@/components/user-avatar";
 import { useColors } from "@/hooks/use-colors";
 import { cn } from "@/lib/utils";
 import type { Expense, GroupDetail, GroupMember } from "@/src/api/types";
+import { getCategoryMemory, rememberCategory } from "@/src/db/category-memory";
 import { saveExpense } from "@/src/db/expenses";
-import {
-  categoryKeyForEmoji,
-  suggestEmojiFromText,
-} from "@/src/lib/expense-icons";
+import { getCategoryByKey, suggestCategory } from "@/src/lib/expense-icons";
 import {
   exactMapFromTotal,
   includedFromExactMap,
@@ -143,7 +142,12 @@ export function ExpenseForm({
   const [amount, setAmount] = useState("");
   const [title, setTitle] = useState("");
   const [categoryKey, setCategoryKey] = useState("other");
+  // Set once the user picks a category; title edits then stop re-suggesting.
+  const [categoryManual, setCategoryManual] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categoryMemory, setCategoryMemory] = useState<Record<string, string>>({});
   const [icon, setIcon] = useState(() => getExpenseEmoji(null, "other"));
+  // A custom icon; otherwise the icon follows the category.
   const [iconManual, setIconManual] = useState(false);
   const [iconsOpen, setIconsOpen] = useState(false);
   const [showDesc, setShowDesc] = useState(false);
@@ -208,11 +212,33 @@ export function ExpenseForm({
   const iosAccessoryId =
     Platform.OS === "ios" ? KEYBOARD_ACCESSORY_ID : undefined;
 
+  const category = getCategoryByKey(categoryKey);
+  const suggestedCategory = suggestCategory(title, categoryMemory);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCategoryMemory()
+      .then((memory) => {
+        if (!cancelled) setCategoryMemory(memory);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function applyTitleSuggestion(nextTitle: string) {
-    if (iconManual) return;
-    const suggested = suggestEmojiFromText(nextTitle);
-    setCategoryKey(suggested.categoryKey || "other");
-    setIcon(suggested.emoji);
+    if (categoryManual) return;
+    const next = suggestCategory(nextTitle, categoryMemory);
+    setCategoryKey(next.key);
+    if (!iconManual) setIcon(next.emoji);
+  }
+
+  function pickCategory(key: string) {
+    const next = getCategoryByKey(key);
+    setCategoryKey(next.key);
+    setCategoryManual(true);
+    if (!iconManual) setIcon(next.emoji);
   }
 
   function resetForm() {
@@ -221,8 +247,9 @@ export function ExpenseForm({
     setTitle("");
     setDescription("");
     setShowDesc(false);
-    const fallback = suggestEmojiFromText("");
-    setCategoryKey(fallback.categoryKey || "other");
+    const fallback = getCategoryByKey("other");
+    setCategoryKey(fallback.key);
+    setCategoryManual(false);
     setIcon(fallback.emoji);
     setIconManual(false);
     setExactInputs({});
@@ -250,9 +277,13 @@ export function ExpenseForm({
     const desc = exp.description || "";
     setDescription(desc);
     setShowDesc(Boolean(desc));
-    setCategoryKey(exp.categoryKey || "other");
-    setIcon(getExpenseEmoji(exp.icon, exp.categoryKey || "other"));
-    setIconManual(Boolean(exp.icon));
+    const savedCategory = getCategoryByKey(exp.categoryKey);
+    const savedIcon = getExpenseEmoji(exp.icon, savedCategory.key);
+    setCategoryKey(savedCategory.key);
+    // A saved expense keeps its category even if the title is edited.
+    setCategoryManual(true);
+    setIcon(savedIcon);
+    setIconManual(savedIcon !== savedCategory.emoji);
     const method = normalizeSplitMethod(exp.splitMethod);
     setSplitMethod(method);
 
@@ -723,6 +754,10 @@ export function ExpenseForm({
         { ...payload, createdById: currentUserId },
         expense?._id,
       );
+      // Learn from corrections: same title, same category next time.
+      if (categoryManual && categoryKey !== suggestCategory(title, categoryMemory).key) {
+        rememberCategory(title, categoryKey).catch(() => {});
+      }
       Keyboard.dismiss();
       onSaved();
     } catch {
@@ -814,52 +849,74 @@ export function ExpenseForm({
           />
         </View>
 
-        {!showDesc ? (
+        <View style={styles.categoryLine}>
           <Pressable
-            onPress={() => setShowDesc(true)}
-            style={{ alignSelf: "flex-end" }}
+            onPress={() => {
+              Keyboard.dismiss();
+              setCategoryOpen(true);
+            }}
+            hitSlop={6}
+            style={[styles.categoryChip, { backgroundColor: colors.softSurface }]}
+          >
+            {/* The emoji already sits beside the title; the chip only names the category. */}
+            <Feather name="tag" size={12} color={colors.textSecondary} />
+            <Text
+              numberOfLines={1}
+              style={{
+                flexShrink: 1,
+                fontSize: 12,
+                fontWeight: "600",
+                color:
+                  categoryManual || title.trim()
+                    ? colors.text
+                    : colors.textSecondary,
+              }}
+            >
+              {categoryManual || title.trim() ? category.label : "Category"}
+            </Text>
+            <Feather name="chevron-down" size={14} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            hitSlop={6}
+            onPress={() => {
+              if (showDesc) {
+                setShowDesc(false);
+                setDescription("");
+              } else {
+                setShowDesc(true);
+              }
+            }}
           >
             <Text
-              style={{ color: colors.primary, fontWeight: "600", fontSize: 13 }}
+              style={{
+                color: showDesc ? colors.textSecondary : colors.primary,
+                fontWeight: "600",
+                fontSize: 13,
+              }}
             >
-              + Add description
+              {showDesc ? "Remove description" : "+ Add description"}
             </Text>
           </Pressable>
-        ) : (
-          <View style={{ gap: 6 }}>
-            <View style={styles.descHead}>
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                Description
-              </Text>
-              <Pressable
-                onPress={() => {
-                  setShowDesc(false);
-                  setDescription("");
-                }}
-              >
-                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                  Remove
-                </Text>
-              </Pressable>
-            </View>
-            <TextInput
-              ref={descriptionRef}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Optional note"
-              placeholderTextColor={colors.textSecondary}
-              multiline
-              style={[
-                styles.desc,
-                {
-                  color: colors.text,
-                  borderColor: colors.border,
-                  backgroundColor: colors.background,
-                },
-              ]}
-            />
-          </View>
-        )}
+        </View>
+
+        {showDesc ? (
+          <TextInput
+            ref={descriptionRef}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Optional note"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            style={[
+              styles.desc,
+              {
+                color: colors.text,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+              },
+            ]}
+          />
+        ) : null}
 
         <View style={styles.metaRow}>
           <Pressable
@@ -1137,11 +1194,23 @@ export function ExpenseForm({
         open={iconsOpen}
         onClose={() => setIconsOpen(false)}
         value={icon}
+        categoryIcon={{ emoji: category.emoji, label: category.label }}
+        onUseCategoryIcon={() => {
+          setIcon(category.emoji);
+          setIconManual(false);
+        }}
         onSelect={(item) => {
           setIcon(item.emoji);
-          setCategoryKey(item.categoryKey || categoryKeyForEmoji(item.emoji));
-          setIconManual(true);
+          setIconManual(item.emoji !== category.emoji);
         }}
+      />
+
+      <CategoryPickerSheet
+        open={categoryOpen}
+        onClose={() => setCategoryOpen(false)}
+        value={categoryKey}
+        suggestedKey={suggestedCategory.key}
+        onSelect={(next) => pickCategory(next.key)}
       />
 
       <Modal
@@ -1368,7 +1437,21 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     fontSize: 16,
   },
-  descHead: { flexDirection: "row", justifyContent: "space-between" },
+  categoryLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  categoryChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flexShrink: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
   desc: {
     minHeight: 72,
     borderWidth: 1,

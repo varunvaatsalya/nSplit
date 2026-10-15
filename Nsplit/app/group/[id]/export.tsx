@@ -139,10 +139,6 @@ export default function ExportScreen() {
     [expenses, transfers]
   );
 
-  useEffect(() => {
-    setVisible(PAGE);
-  }, [rows]);
-
   const currency = group?.currency || 'INR';
   const totalSpend = expenses.reduce((sum, e) => sum + (e.amountMinor || 0), 0);
   const scoped = preset !== 'all';
@@ -160,6 +156,7 @@ export default function ExportScreen() {
   /** Set one end of the custom range, pushing the other end so from ≤ to always holds. */
   function applyDate(which: 'from' | 'to', event: DateTimePickerEvent, selected?: Date) {
     if (event.type === 'dismissed' || !selected) return;
+    setVisible(PAGE);
     const day = startOfDay(selected);
     if (which === 'from') {
       setCustomFrom(day);
@@ -183,8 +180,12 @@ export default function ExportScreen() {
     try {
       if (kind === 'share') await shareGroupLedgerPdf(input);
       else await printGroupLedgerPdf(input);
-    } catch {
-      Alert.alert('Could not export', 'Try again in a moment.');
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      Alert.alert(
+        kind === 'share' ? 'Could not share' : 'Could not export',
+        reason || 'Try again in a moment.'
+      );
     } finally {
       setBusy(null);
     }
@@ -214,7 +215,10 @@ export default function ExportScreen() {
                 return (
                   <Pressable
                     key={p.key}
-                    onPress={() => setPreset(p.key)}
+                    onPress={() => {
+                      setPreset(p.key);
+                      setVisible(PAGE);
+                    }}
                     style={[
                       styles.chip,
                       {
