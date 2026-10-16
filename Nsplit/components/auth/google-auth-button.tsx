@@ -66,10 +66,10 @@ export function GoogleAuthButton() {
           {
             borderColor: colors.border,
             backgroundColor: pressed ? colors.softSurface : colors.surface,
-            opacity: disabled ? 0.6 : 1,
+            opacity: disabled && !busy ? 0.6 : 1,
           },
         ]}>
-        {busy ? <ActivityIndicator size="small" color={colors.text} /> : <GoogleLogo />}
+        {busy ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <GoogleLogo />}
         <Text style={[styles.label, { color: colors.text }]}>{busy ? 'Signing you in…' : 'Continue with Google'}</Text>
       </Pressable>
       {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
@@ -84,16 +84,18 @@ export function GoogleAuthButton() {
 
 const styles = StyleSheet.create({
   wrap: { gap: 10, marginBottom: 6 },
+  // Same size, corners and border as the email/password fields below it.
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    height: 52,
-    borderWidth: 1,
+    minHeight: 52,
+    borderWidth: 1.5,
     borderRadius: 14,
+    paddingHorizontal: 14,
   },
-  label: { fontSize: 16, fontWeight: '700' },
+  label: { fontSize: 15, fontWeight: '600' },
   error: { fontSize: 14, textAlign: 'center' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   line: { flex: 1, height: StyleSheet.hairlineWidth },

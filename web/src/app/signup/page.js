@@ -69,7 +69,7 @@ export default function SignupPage() {
         </>
       }
     >
-      <GoogleButton text="signup_with" />
+      <GoogleButton label="Sign up with Google" />
       <AuthDivider />
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <AuthField

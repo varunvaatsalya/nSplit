@@ -100,6 +100,9 @@ export default function ProfileScreen() {
                 ? 'Saved on this phone. Log in to back up and sync across devices.'
                 : 'Log in to back them up and sync across devices.'}
             </Text>
+            <View style={{ alignSelf: 'stretch', marginTop: 8 }}>
+              <PrimaryButton title="Log in" onPress={() => router.push('/login')} />
+            </View>
           </View>
         )}
 
@@ -139,8 +142,8 @@ export default function ProfileScreen() {
           <FeedbackRow source="profile" />
         </View>
 
-        <View style={{ paddingHorizontal: 20, marginTop: 24, alignItems: 'center' }}>
-          {user ? (
+        {user ? (
+          <View style={{ paddingHorizontal: 20, marginTop: 24, alignItems: 'center' }}>
             <Pressable
               onPress={confirmLogout}
               disabled={pending || signingOut}
@@ -154,12 +157,8 @@ export default function ProfileScreen() {
                 {pending || signingOut ? 'Logging out…' : 'Log out'}
               </Text>
             </Pressable>
-          ) : (
-            <View style={{ alignSelf: 'stretch' }}>
-              <PrimaryButton title="Log in" onPress={() => router.push('/login')} />
-            </View>
-          )}
-        </View>
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );

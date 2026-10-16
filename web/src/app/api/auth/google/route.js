@@ -59,12 +59,18 @@ export async function POST(request) {
         name,
         email: google.email,
         emailVerified: new Date(),
-        avatar: await allocateUserAvatar(name),
+        avatar: { ...(await allocateUserAvatar(name)), url: google.picture },
         oauthAccounts: [account],
       });
       user = created.toObject();
       isNew = true;
     }
+  }
+
+  // Use the Google photo unless the account already has one.
+  if (!isNew && google.picture && !user.avatar?.url) {
+    await User.updateOne({ _id: user._id }, { $set: { "avatar.url": google.picture } });
+    user = { ...user, avatar: { ...(user.avatar || {}), url: google.picture } };
   }
 
   const headerStore = await headers();

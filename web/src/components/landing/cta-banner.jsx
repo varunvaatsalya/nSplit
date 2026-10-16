@@ -2,6 +2,7 @@ import React from "react";
 import { Logo } from "../brand/logo";
 import Link from "next/link";
 import { FaGooglePlay } from "react-icons/fa";
+import DownloadDialog from "./download-dialog";
 
 function CTABanner({ ctaHref }) {
   return (
@@ -20,7 +21,7 @@ function CTABanner({ ctaHref }) {
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground font-light max-w-lg mb-8 leading-relaxed">
           Create your first group today and stop worrying about who owes what.
-          It's completely free to start.
+          It&apos;s completely free to start.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 justify-center">
@@ -30,13 +31,13 @@ function CTABanner({ ctaHref }) {
           >
             Get Started for Free
           </Link>
-          <div className="flex items-center gap-2.5 rounded-xl bg-foreground border border-border text-muted-foreground px-6 py-3.5 text-xs font-extrabold shadow-md">
+          <DownloadDialog className="flex cursor-pointer items-center gap-2.5 rounded-xl bg-foreground border border-border px-6 py-3.5 text-xs font-extrabold shadow-md transition-opacity hover:opacity-90">
             <FaGooglePlay className="text-background size-4" />
             <div className="text-background text-sm flex flex-col">
               <div className="text-xs text-background/70 text-start font-medium">Android App</div>
-              <div className="font-bold">Coming Soon</div>
+              <div className="font-bold text-start">Download</div>
             </div>
-          </div>
+          </DownloadDialog>
         </div>
       </div>
     </section>

@@ -21,7 +21,7 @@ export function UserAvatar({
   return (
     <Avatar className={className} title={title || name}>
       {avatar?.url ? (
-        <AvatarImage src={avatar.url} alt={name || "User"} />
+        <AvatarImage src={avatar.url} alt={name || "User"} referrerPolicy="no-referrer" />
       ) : null}
       <AvatarFallback
         className={cn("bg-transparent text-xs font-semibold select-none", fallbackClassName)}

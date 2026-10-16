@@ -12,7 +12,8 @@
     "lint": "expo lint",
     "android:debug": "npx expo prebuild && cd android && gradlew assembleDebug",
     "android:release": "npx expo prebuild && cd android && gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a",
-    "android:bundle": "npx expo prebuild && cd android && gradlew bundleRelease"
+    "android:bundle": "npx expo prebuild && cd android && gradlew bundleRelease",
+    "release:info": "node scripts/release-info.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

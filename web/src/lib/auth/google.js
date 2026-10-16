@@ -37,5 +37,12 @@ export async function verifyGoogleIdToken(idToken) {
     sub: String(payload.sub),
     email: String(payload.email).toLowerCase(),
     name: typeof payload.name === "string" && payload.name.trim() ? payload.name.trim() : null,
+    picture: profilePhoto(payload.picture),
   };
+}
+
+/** Google's profile photo at a size that stays sharp in avatars (it sends 96px by default). */
+function profilePhoto(url) {
+  if (typeof url !== "string" || !url.startsWith("https://")) return null;
+  return /=s\d+(-c)?$/.test(url) ? url.replace(/=s\d+(-c)?$/, "=s256-c") : url;
 }

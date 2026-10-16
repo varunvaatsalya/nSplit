@@ -7,6 +7,7 @@ import HowItWorksGrid from "@/components/landing/how-it-works-grid";
 import { Logo } from "@/components/brand/logo";
 import {
   Check,
+  Download,
   Play,
   ReceiptText,
   Calculator,
@@ -18,6 +19,7 @@ import FAQ from "@/components/landing/faq";
 import LessMath from "@/components/landing/less-math";
 import Footer from "@/components/landing/footer";
 import CTABanner from "@/components/landing/cta-banner";
+import DownloadDialog from "@/components/landing/download-dialog";
 
 export default async function HomePage() {
   const session = await getSessionUser();
@@ -160,6 +162,10 @@ export default async function HomePage() {
                 <Play className="h-4 w-4 fill-current text-foreground" />
                 See How It Works
               </Link>
+              <DownloadDialog className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-6 py-3.5 text-sm font-semibold text-foreground transition-all hover:scale-[1.02] hover:bg-muted/50 active:scale-98">
+                <Download className="h-4 w-4" />
+                Download app
+              </DownloadDialog>
             </div>
 
             {/* Verification Subtext */}

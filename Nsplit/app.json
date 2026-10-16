@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nsplit",
     "slug": "Nsplit",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nsplit",
@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.varunvaatsalya.nsplit",
+      "versionCode": 2,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

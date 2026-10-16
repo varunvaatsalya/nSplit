@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import DownloadDialog from "./download-dialog";
 import Link from "next/link";
 import { Instagram, Linkedin, Globe, Twitter } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
@@ -86,9 +87,9 @@ export default function Footer() {
             <Link href="/signup" className="text-xs text-slate-450 hover:text-white transition-colors">
               Get Started
             </Link>
-            <span className="text-xs text-slate-500 cursor-not-allowed">
+            <DownloadDialog className="cursor-pointer text-left text-xs text-slate-450 hover:text-white transition-colors">
               Download App
-            </span>
+            </DownloadDialog>
           </div>
 
           {/* Legal links */}
