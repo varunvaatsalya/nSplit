@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { Lock, Mail } from "lucide-react";
 import { AuthField } from "@/components/auth/auth-field";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { Button } from "@/components/ui/button";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -51,43 +52,47 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-4">
-      <AuthField
-        label="Email"
-        icon={Mail}
-        type="email"
-        autoComplete="email"
-        placeholder="you@example.com"
-        value={email}
-        onChange={(e) => {
-          setEmail(e.target.value);
-          setErrors((x) => ({ ...x, email: null, form: null }));
-        }}
-        error={errors.email}
-        autoFocus
-      />
-      <AuthField
-        label="Password"
-        icon={Lock}
-        password
-        autoComplete="current-password"
-        placeholder="Your password"
-        value={password}
-        onChange={(e) => {
-          setPassword(e.target.value);
-          setErrors((x) => ({ ...x, password: null, form: null }));
-        }}
-        error={errors.password}
-      />
-      {errors.form ? (
-        <p className="rounded-xl bg-danger/10 px-3 py-2.5 text-sm text-danger" role="alert">
-          {errors.form}
-        </p>
-      ) : null}
-      <Button type="submit" disabled={loading} className="h-12 w-full rounded-xl text-[15px] font-bold">
-        {loading ? "Logging in…" : "Log in"}
-      </Button>
-    </form>
+    <>
+      <GoogleButton next={next} />
+      <AuthDivider />
+      <form onSubmit={onSubmit} noValidate className="space-y-4">
+        <AuthField
+          label="Email"
+          icon={Mail}
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setErrors((x) => ({ ...x, email: null, form: null }));
+          }}
+          error={errors.email}
+          autoFocus
+        />
+        <AuthField
+          label="Password"
+          icon={Lock}
+          password
+          autoComplete="current-password"
+          placeholder="Your password"
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setErrors((x) => ({ ...x, password: null, form: null }));
+          }}
+          error={errors.password}
+        />
+        {errors.form ? (
+          <p className="rounded-xl bg-danger/10 px-3 py-2.5 text-sm text-danger" role="alert">
+            {errors.form}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={loading} className="h-12 w-full rounded-xl text-[15px] font-bold">
+          {loading ? "Logging in…" : "Log in"}
+        </Button>
+      </form>
+    </>
   );
 }
 

@@ -10,6 +10,7 @@ import {
 import { AppState } from 'react-native';
 
 import { apiFetch, errorMessage, getToken, setToken } from '@/src/api/client';
+import { getGoogleIdToken, googleSignOut } from '@/src/auth/google';
 import type { User } from '@/src/api/types';
 import { getCachedUser, patchCachedUser, setCachedUser } from '@/src/db/session';
 import { isOnline, subscribeOnline } from '@/src/lib/network';
@@ -20,6 +21,8 @@ type AuthContextValue = {
   pending: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  /** Resolves false if the user closed Google's account picker. */
+  loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   updateLocalUser: (patch: Partial<Pick<User, 'name' | 'email' | 'avatar'>>) => Promise<void>;
@@ -139,6 +142,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyUser]
   );
 
+  const loginWithGoogle = useCallback(async () => {
+    if (!(await isOnline())) {
+      throw new Error('You’re offline. Connect to log in.');
+    }
+    const idToken = await getGoogleIdToken();
+    if (!idToken) return false;
+    setPending(true);
+    try {
+      const res = await apiFetch<{ user: User; token: string }>('/api/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ idToken }),
+      });
+      if (!res.ok || !res.data?.token) {
+        throw new Error(errorMessage(res.error, 'Google sign-in failed'));
+      }
+      await setToken(res.data.token);
+      await applyUser(res.data.user);
+      return true;
+    } finally {
+      setPending(false);
+    }
+  }, [applyUser]);
+
   const logout = useCallback(async () => {
     setPending(true);
     try {
@@ -147,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       await setToken(null);
       await applyUser(null);
+      await googleSignOut();
     } finally {
       setPending(false);
     }
@@ -164,11 +191,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pending,
       login,
       register,
+      loginWithGoogle,
       logout,
       refresh,
       updateLocalUser,
     }),
-    [user, loading, pending, login, register, logout, refresh, updateLocalUser]
+    [user, loading, pending, login, register, loginWithGoogle, logout, refresh, updateLocalUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

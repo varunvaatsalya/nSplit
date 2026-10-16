@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CheckCircle2, Circle, Lock, Mail, User } from "lucide-react";
 import { AuthField } from "@/components/auth/auth-field";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +69,8 @@ export default function SignupPage() {
         </>
       }
     >
+      <GoogleButton text="signup_with" />
+      <AuthDivider />
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <AuthField
           label="Your name"

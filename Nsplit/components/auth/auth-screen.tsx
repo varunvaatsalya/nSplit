@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoogleAuthButton } from '@/components/auth/google-auth-button';
 import { NsplitBrand } from '@/components/nsplit-logo';
 import { useColors } from '@/hooks/use-colors';
 
@@ -52,6 +53,7 @@ export function AuthScreen({
           <NsplitBrand color={colors.primary} logoSize={40} fontSize={30} align="center" />
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
+          <GoogleAuthButton />
           <View style={styles.form}>{children}</View>
           <View style={styles.footer}>{footer}</View>
           <Text style={[styles.local, { color: colors.textSecondary }]}>
