@@ -1,5 +1,6 @@
 "use client";
 
+import { ShareLinkCard } from "@/components/groups/share-link-card";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -30,7 +31,6 @@ import {
   ManageMembersDialog,
   permissionLabel,
 } from "@/components/groups/manage-members-dialog";
-import { ShareLinkCard } from "@/components/groups/share-link-card";
 import { GroupLoadError, groupErrorFrom } from "@/components/groups/group-load-error";
 import { EmojiPicker } from "@/components/emoji-picker";
 import {

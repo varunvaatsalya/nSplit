@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Link2 } from "lucide-react";
+import { Check, Copy, ExternalLink, Link2, Link2Off, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -73,19 +73,20 @@ export function ShareLinkCard({ groupCode }) {
               <span className="h-2 w-2 rounded-full bg-success" />
               Link is on
             </div>
-            <div className="flex gap-2">
-              <input
-                readOnly
-                value={share.url}
-                onFocus={(e) => e.target.select()}
-                className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-soft px-3 text-sm outline-none"
-                aria-label="Share link"
-              />
-              <Button type="button" size="sm" className="h-9" onClick={copy}>
+            <p className="text-sm text-muted">Anyone with this link can view expenses and balances, and ask to join.</p>
+
+            {/* The link as a quiet chip: readable, selectable, copy right next to it. */}
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-soft py-1 pl-3 pr-1">
+              <Link2 className="h-4 w-4 shrink-0 text-muted" />
+              <span className="min-w-0 flex-1 select-all truncate text-sm text-muted" title={share.url}>
+                {share.url.replace(/^https?:\/\//, "")}
+              </span>
+              <Button type="button" size="sm" className="h-8 shrink-0" onClick={copy}>
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {copied ? "Copied" : "Copy"}
               </Button>
             </div>
+
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" asChild>
                 <a href={share.url} target="_blank" rel="noreferrer">
@@ -94,6 +95,7 @@ export function ShareLinkCard({ groupCode }) {
                 </a>
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirm("rotate")}>
+                <RefreshCw className="h-4 w-4" />
                 New link
               </Button>
               <Button
@@ -103,14 +105,18 @@ export function ShareLinkCard({ groupCode }) {
                 className="border-danger/40 text-danger hover:bg-danger/10 hover:text-danger"
                 onClick={() => setConfirm("off")}
               >
+                <Link2Off className="h-4 w-4" />
                 Turn off
               </Button>
             </div>
+            <p className="text-xs text-muted">
+              To remove someone&apos;s view access, turn off the link or make a new one. Members who joined stay in the group.
+            </p>
           </>
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted">
-              A read-only ledger anyone in the group can open in a browser. No app or login needed.
+              Create a link so others can view expenses and balances in a browser, and ask to join.
             </p>
             <Button type="button" className="shrink-0" disabled={busy === "create"} onClick={() => change("create")}>
               <Link2 className="h-4 w-4" />
@@ -128,8 +134,8 @@ export function ShareLinkCard({ groupCode }) {
         title={confirm === "off" ? "Turn off the link?" : "Make a new link?"}
         description={
           confirm === "off"
-            ? "Anyone with the current link loses access right away. You can turn sharing on again later."
-            : "The current link stops working right away. Send the new one to your group."
+            ? "People viewing with this link lose access right away. Members who joined keep their access. You can turn it on again later."
+            : "The current link stops working, so people viewing with it lose access. Members who joined keep their access. Share the new link with your group."
         }
         confirmLabel={confirm === "off" ? "Turn off" : "New link"}
         cancelLabel="Cancel"

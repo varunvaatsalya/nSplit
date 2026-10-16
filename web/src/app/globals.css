@@ -7,6 +7,7 @@
   color-scheme: light;
   --surface: #ffffff;
   --soft-surface: #f1f5f9;
+  --soft-surface-hover: #e8edf3;
   --border: #e2e8f0;
   --primary: oklch(0.457 0.24 277.023);
   --primary-foreground: oklch(0.962 0.018 272.314);
@@ -51,6 +52,7 @@
   --foreground: #f8fafc;
   --surface: #131926;
   --soft-surface: #1e293b;
+  --soft-surface-hover: #253348;
   --border: #1e293b;
   --primary: oklch(0.398 0.195 277.366);
   --primary-foreground: oklch(0.962 0.018 272.314);
@@ -91,6 +93,7 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-soft: var(--soft-surface);
+  --color-soft-hover: var(--soft-surface-hover);
   --color-border: var(--border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
@@ -223,8 +226,8 @@ body {
 }
 /*
  * Quiet backdrop for the signed-in app and shared group pages: a faint primary
- * glow at the top and a dot grid that fades out, so content cards stand out
- * without the background competing for attention.
+ * glow at the top and a faint pattern of expense doodles across the page, so
+ * content cards stand out without the background competing for attention.
  */
 .nsplit-backdrop {
   position: relative;
@@ -250,13 +253,12 @@ body {
 }
 
 .nsplit-backdrop::after {
-  background-image: radial-gradient(
-    color-mix(in oklch, var(--foreground) 9%, transparent) 1px,
-    transparent 1.2px
-  );
-  background-size: 22px 22px;
-  mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 0%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 0%, transparent 75%);
+  /* Expense doodles (receipts, wallets, coffee, travel…) scattered over the
+     whole page. The SVG is only a mask, so the colour follows the theme. */
+  background-color: var(--foreground);
+  opacity: 0.06;
+  mask: url("/bg-doodle.svg") 0 0 / 480px 480px repeat;
+  -webkit-mask: url("/bg-doodle.svg") 0 0 / 480px 480px repeat;
 }
 
 .dark .nsplit-backdrop::before {
@@ -268,10 +270,7 @@ body {
 }
 
 .dark .nsplit-backdrop::after {
-  background-image: radial-gradient(
-    color-mix(in oklch, var(--foreground) 7%, transparent) 1px,
-    transparent 1.2px
-  );
+  opacity: 0.05;
 }
 
 @media (prefers-reduced-transparency: reduce) {

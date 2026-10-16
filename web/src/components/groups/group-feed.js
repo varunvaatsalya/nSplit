@@ -52,7 +52,7 @@ function FeedRow({ icon, title, amount, meta, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-soft px-2.5 py-2.5 text-left transition-colors hover:bg-muted-foreground/15"
+      className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-soft px-2.5 py-2.5 text-left transition-colors hover:bg-soft-hover"
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-2xl">{icon}</span>
       <span className="min-w-0 flex-1">

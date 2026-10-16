@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { UserAvatar } from "@/components/user-avatar";
 import { Logo } from "@/components/brand/logo";
-import { BellIcon } from "lucide-react";
 
 export function AppShell({ user, children }) {
   return (
@@ -17,13 +16,6 @@ export function AppShell({ user, children }) {
             </div>
           </Link>
           <div className="flex items-center gap-3">
-            <Link
-              href="/notifications"
-              className="flex shrink-0 items-center gap-2 border border-primary-foreground/20 p-2 rounded-full transition-opacity hover:bg-primary-foreground/5"
-              aria-label="Notifications"
-            >
-              <BellIcon className="h-5 w-5 text-primary-foreground" />
-            </Link>
             <Link
               href="/profile"
               className="flex shrink-0 items-center gap-2 rounded-full transition-opacity hover:opacity-90"

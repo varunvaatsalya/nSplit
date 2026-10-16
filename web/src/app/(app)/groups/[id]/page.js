@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Bell, Check, History, Settings } from "lucide-react";
+import { ArrowLeft, Check, Inbox, Settings, X } from "lucide-react";
 import { AddRecordModal } from "@/components/records/add-record-modal";
 import { BalanceView } from "@/components/balance/balance-view";
-import { GroupActivityDialog } from "@/components/groups/group-activity-dialog";
 import { GroupFeed, buildFeed } from "@/components/groups/group-feed";
 import { RecordDetailDialog } from "@/components/records/record-detail-dialog";
 import { GroupLoadError, groupErrorFrom } from "@/components/groups/group-load-error";
@@ -48,7 +47,6 @@ export default function GroupDashboardPage() {
   const [me, setMe] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [view, setView] = useState("expenses");
-  const [activityOpen, setActivityOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState(0);
   const [editExpense, setEditExpense] = useState(null);
@@ -132,23 +130,13 @@ export default function GroupDashboardPage() {
         <div className="flex shrink-0 items-center gap-2">
           <Button type="button" size="icon" variant="outline" className="relative rounded-full" asChild>
             <Link href={`/groups/${id}/requests`} aria-label={pendingRequests ? `Requests (${pendingRequests} waiting)` : "Requests"}>
-              <Bell className="h-4 w-4" />
+              <Inbox className="h-4 w-4" />
               {pendingRequests ? (
                 <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
                   {pendingRequests > 9 ? "9+" : pendingRequests}
                 </span>
               ) : null}
             </Link>
-          </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="rounded-full"
-            onClick={() => setActivityOpen(true)}
-            aria-label="Activity"
-          >
-            <History className="h-4 w-4" />
           </Button>
           <Button type="button" size="icon" variant="outline" className="rounded-full" asChild>
             <Link href={`/groups/${id}/settings`} aria-label="Settings">
@@ -160,8 +148,16 @@ export default function GroupDashboardPage() {
 
       {requestSent ? (
         <div className="mb-5 flex items-center gap-2 rounded-2xl bg-success/10 px-3.5 py-2.5 text-sm font-semibold text-success" role="status">
-          <Check className="h-4 w-4" />
-          Sent for approval. You can follow it under Requests.
+          <Check className="h-4 w-4 shrink-0" />
+          <span className="flex-1">Sent for approval. You can follow it under Requests.</span>
+          <button
+            type="button"
+            onClick={() => setRequestSent(false)}
+            className="-my-1 -mr-1.5 cursor-pointer rounded-lg p-1.5 hover:bg-success/15"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       ) : null}
 
@@ -230,7 +226,6 @@ export default function GroupDashboardPage() {
         }}
       />
 
-      <GroupActivityDialog groupId={id} open={activityOpen} onOpenChange={setActivityOpen} />
 
 
       <RecordDetailDialog
