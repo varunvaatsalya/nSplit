@@ -29,7 +29,7 @@ type Status =
 const CAN_SEE = [
   'Every expense and payment, with who paid and each person’s share',
   'Balances and suggested settlements',
-  'Each member’s UPI ID, with a “Pay via UPI” button',
+  'Suggest an expense or a settlement for you to approve',
 ];
 const CANNOT = ['Edit or delete anything', 'See emails or phone numbers'];
 
@@ -96,8 +96,6 @@ export default function ShareGroupScreen() {
       message: `${group?.name || 'Our group'}: see every expense and what you owe on nSplit\n${url}`,
     });
   }
-
-  const missingUpi = (group?.members || []).filter((m) => !m.upiId).length;
 
   function Notice({ icon, title, body, action }: { icon: keyof typeof MaterialIcons.glyphMap; title: string; body: string; action?: React.ReactNode }) {
     return (
@@ -184,18 +182,6 @@ export default function ShareGroupScreen() {
               </View>
             )}
 
-            {missingUpi ? (
-              <Pressable
-                onPress={() => router.push({ pathname: '/group/[id]/settings/members', params: { id: String(id) } })}
-                style={[styles.card, styles.upiNote, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <MaterialIcons name="currency-rupee" size={20} color={colors.primary} />
-                <Text style={{ flex: 1, color: colors.text, lineHeight: 19 }}>
-                  {missingUpi} member{missingUpi === 1 ? ' has' : 's have'} no UPI ID. Add one so others can pay them
-                  straight from the link.
-                </Text>
-                <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
-              </Pressable>
-            ) : null}
           </>
         );
       }
@@ -266,7 +252,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  upiNote: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
   section: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginTop: 22, marginBottom: 8 },
   bullet: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginBottom: 8 },
 });

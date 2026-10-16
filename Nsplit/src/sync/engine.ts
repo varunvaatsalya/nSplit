@@ -38,6 +38,7 @@ type ServerGroup = {
   id: string;
   code: string;
   name: string;
+  description?: string | null;
   icon: string | null;
   currency: string;
   settings: unknown;
@@ -155,9 +156,10 @@ async function snapshot(db: SQLiteDatabase, row: OutboxRow): Promise<Change | nu
       currency: string;
       my_member_id: string | null;
       settings_json: string | null;
+      description: string | null;
       updated_at: string;
       deleted_at: string | null;
-    }>(`SELECT code, name, icon, currency, my_member_id, settings_json, updated_at, deleted_at FROM groups WHERE id = ?`, [
+    }>(`SELECT code, name, icon, currency, my_member_id, settings_json, description, updated_at, deleted_at FROM groups WHERE id = ?`, [
       row.entity_id,
     ]);
     if (!g) return null;
@@ -182,6 +184,7 @@ async function snapshot(db: SQLiteDatabase, row: OutboxRow): Promise<Change | nu
       data: {
         code: g.code,
         name: g.name,
+        description: g.description,
         icon: g.icon,
         currency: g.currency,
         settings: parseJson(g.settings_json, null),
@@ -286,12 +289,13 @@ async function applyGroup(db: SQLiteDatabase, g: ServerGroup, userId: string) {
   // Codes are unique locally too; never let a stale local row block the server's code.
   await db.runAsync(`UPDATE groups SET code = code || '-' || substr(id, 1, 4) WHERE code = ? AND id != ?`, [g.code, g.id]);
   await db.runAsync(
-    `INSERT INTO groups (id, code, name, icon, currency, settings_json, created_at, updated_at, deleted_at, synced)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 1)
+    `INSERT INTO groups (id, code, name, description, icon, currency, settings_json, created_at, updated_at, deleted_at, synced)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 1)
      ON CONFLICT(id) DO UPDATE SET
-       code = excluded.code, name = excluded.name, icon = excluded.icon, currency = excluded.currency,
-       settings_json = excluded.settings_json, updated_at = excluded.updated_at, deleted_at = NULL, synced = 1`,
-    [g.id, g.code, g.name, g.icon, g.currency || 'INR', JSON.stringify(g.settings ?? null), stamp, stamp]
+       code = excluded.code, name = excluded.name, description = excluded.description, icon = excluded.icon,
+       currency = excluded.currency, settings_json = excluded.settings_json, updated_at = excluded.updated_at,
+       deleted_at = NULL, synced = 1`,
+    [g.id, g.code, g.name, g.description ?? null, g.icon, g.currency || 'INR', JSON.stringify(g.settings ?? null), stamp, stamp]
   );
   for (const m of g.members) {
     await db.runAsync(
@@ -501,7 +505,8 @@ export async function wipeLocalData() {
     await db.runAsync(`DELETE FROM transfers`);
     await db.runAsync(`DELETE FROM group_members`);
     await db.runAsync(`DELETE FROM groups`);
-    for (const key of [META.cursor, META.owner, META.lastSyncedAt, META.lastRejected]) {
+    // saved_shares_cache: groups this account added by link.
+    for (const key of [META.cursor, META.owner, META.lastSyncedAt, META.lastRejected, 'saved_shares_cache']) {
       await setMeta(db, key, null);
     }
   });

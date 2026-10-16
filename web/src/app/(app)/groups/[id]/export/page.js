@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, Copy, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GroupLoadError, groupErrorFrom } from "@/components/groups/group-load-error";
 import { UserAvatar } from "@/components/user-avatar";
 import { getExpenseEmoji } from "@/lib/expense-icons";
 import { formatLongDate, formatMinor, formatSignedMinor, memberName, toneClass } from "@/lib/format";
@@ -89,7 +90,7 @@ export default function ExportPage() {
       const [gJson, rJson] = await Promise.all([gRes.json(), rRes.json()]);
       if (cancelled) return;
       if (!gRes.ok || !rRes.ok) {
-        setError(gJson?.error?.message || rJson?.error?.message || "Failed to load group");
+        setError(gRes.ok ? groupErrorFrom(rRes, rJson) : groupErrorFrom(gRes, gJson));
         return;
       }
       setGroup({ ...gJson.data.group, members: sortMembersByName(gJson.data.group?.members || []) });
@@ -135,7 +136,7 @@ export default function ExportPage() {
     [expenses, transfers],
   );
 
-  if (error) return <p className="text-danger">{error}</p>;
+  if (error) return <GroupLoadError error={error} onRetry={() => window.location.reload()} />;
 
   const currency = group?.currency || "INR";
   const scoped = preset !== "all";

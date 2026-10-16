@@ -41,6 +41,8 @@ export default function GroupSettingsScreen() {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('👥');
   const [currency, setCurrency] = useState('INR');
+  const [description, setDescription] = useState('');
+  const [showDesc, setShowDesc] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [iconsOpen, setIconsOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -58,6 +60,8 @@ export default function GroupSettingsScreen() {
     setName(local.name || '');
     setIcon(local.icon || '👥');
     setCurrency(local.currency || 'INR');
+    setDescription(local.description || '');
+    setShowDesc(Boolean(local.description));
   }, [id]);
 
   useFocusEffect(
@@ -85,6 +89,11 @@ export default function GroupSettingsScreen() {
     } as const;
   }
 
+  // Icon and currency save on pick; only name/description wait for "Save details".
+  const detailsChanged =
+    Boolean(group) &&
+    (name.trim() !== (group?.name || '') || description.trim() !== (group?.description || ''));
+
   async function saveDetails() {
     if (!group || !name.trim()) {
       setError('Give the group a name');
@@ -92,7 +101,7 @@ export default function GroupSettingsScreen() {
     }
     setSavingDetails(true);
     try {
-      await updateGroup(group._id, { name: name.trim(), icon, currency });
+      await updateGroup(group._id, { name: name.trim(), icon, currency, description: description.trim() || null });
       await reloadGroups();
       await load();
     } catch {
@@ -119,6 +128,56 @@ export default function GroupSettingsScreen() {
       <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
         <SettingsHeader title="Settings" />
         {error ? <Text style={{ color: colors.danger, padding: 20 }}>{error}</Text> : null}
+      </SafeAreaView>
+    );
+  }
+
+  // Members who joined via the link can look, not change.
+  if (group.myPermission === 'VIEW_ONLY') {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
+        <SettingsHeader title="Group info" />
+        <ScrollView contentContainerStyle={styles.body}>
+          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <View className="flex-row items-center gap-3">
+              <View style={[styles.iconPick, { borderColor: colors.border, backgroundColor: colors.softSurface }]}>
+                <Text style={{ fontSize: 22 }}>{getGroupEmoji(group.icon)}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontSize: 17, fontWeight: '700' }}>{group.name}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>
+                  {selectedCurrency.flag} {selectedCurrency.code} · {methodLabel}
+                </Text>
+              </View>
+            </View>
+            {group.description ? (
+              <Text style={{ color: colors.text, lineHeight: 20 }}>{group.description}</Text>
+            ) : null}
+          </View>
+
+          <Text style={[styles.section, { color: colors.textSecondary }]}>Members</Text>
+          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            {members.map((member) => (
+              <View key={member._id} className="flex-row items-center gap-2.5" style={styles.memberRow}>
+                <UserAvatar
+                  name={memberListLabel(member, user?._id, myMember?._id)}
+                  avatar={member.avatar}
+                  seed={member.userId || member._id}
+                  size={32}
+                />
+                <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }} numberOfLines={1}>
+                  {memberListLabel(member, user?._id, myMember?._id)}
+                </Text>
+                {member.permission === 'ADMIN' && member.userId ? (
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Admin</Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginTop: 16 }}>
+            Only the group’s admins can change its settings or members.
+          </Text>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -150,10 +209,41 @@ export default function GroupSettingsScreen() {
                 ]}
               />
             </View>
+            {showDesc ? (
+              <View style={{ gap: 6 }}>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="What is this group for?"
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                  maxLength={2000}
+                  autoFocus={!description}
+                  style={[
+                    styles.input,
+                    styles.desc,
+                    { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
+                  ]}
+                />
+                <Pressable
+                  onPress={() => {
+                    setShowDesc(false);
+                    setDescription('');
+                  }}
+                  hitSlop={6}
+                  style={{ alignSelf: 'flex-end' }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>Remove description</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable onPress={() => setShowDesc(true)} hitSlop={6} style={{ alignSelf: 'flex-end' }}>
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>+ Add description</Text>
+              </Pressable>
+            )}
             <PrimaryButton
               title={savingDetails ? 'Saving…' : 'Save details'}
               loading={savingDetails}
-              disabled={!name.trim()}
+              disabled={!name.trim() || !detailsChanged || savingDetails}
               onPress={saveDetails}
             />
           </View>
@@ -197,8 +287,12 @@ export default function GroupSettingsScreen() {
 
           <View style={styles.sectionRow}>
             <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>Members</Text>
-            <Pressable onPress={() => router.push(settingsPath('members'))} hitSlop={8}>
+            <Pressable
+              onPress={() => router.push(settingsPath('members'))}
+              hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14 }}>Manage</Text>
+              <MaterialIcons name="chevron-right" size={20} color={colors.primary} />
             </Pressable>
           </View>
           <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
@@ -312,6 +406,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     fontSize: 16,
   },
+  desc: { minHeight: 72, textAlignVertical: 'top' },
   prefRow: { paddingVertical: 10, paddingHorizontal: 4 },
   memberRow: {
     paddingVertical: 8,

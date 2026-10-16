@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, History, Settings } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Bell, Check, History, Settings } from "lucide-react";
 import { AddRecordModal } from "@/components/records/add-record-modal";
 import { BalanceView } from "@/components/balance/balance-view";
 import { GroupActivityDialog } from "@/components/groups/group-activity-dialog";
 import { GroupFeed, buildFeed } from "@/components/groups/group-feed";
 import { RecordDetailDialog } from "@/components/records/record-detail-dialog";
-import { RequestsBanner, RequestsInbox } from "@/components/requests/requests-inbox";
+import { GroupLoadError, groupErrorFrom } from "@/components/groups/group-load-error";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { groupBalance } from "@/lib/group-balance";
 import { getGroupIcon } from "@/lib/group-options";
 import { cn } from "@/lib/utils";
@@ -45,7 +46,7 @@ export default function GroupDashboardPage() {
   const [expenses, setExpenses] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [me, setMe] = useState(null);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(null);
   const [view, setView] = useState("expenses");
   const [activityOpen, setActivityOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -53,7 +54,8 @@ export default function GroupDashboardPage() {
   const [editExpense, setEditExpense] = useState(null);
   const [editTransfer, setEditTransfer] = useState(null);
   const [pendingRequests, setPendingRequests] = useState(0);
-  const [inboxOpen, setInboxOpen] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const addRef = useRef(null);
 
   async function reload() {
     const [gRes, rRes, meRes, qRes] = await Promise.all([
@@ -62,17 +64,17 @@ export default function GroupDashboardPage() {
       fetch("/api/auth/me"),
       fetch(`/api/groups/${id}/requests`),
     ]);
-    // Only members who can add records may review requests; others get 403.
+    // Reviewers get the pending count; members get only their own requests.
     if (qRes.ok) {
       const qJson = await qRes.json().catch(() => null);
       setPendingRequests(qJson?.data?.pending || 0);
     }
     const [gJson, rJson, meJson] = await Promise.all([gRes.json(), rRes.json(), meRes.json()]);
     if (!gRes.ok) {
-      setError(gJson?.error?.message || "Failed to load group");
+      setLoadError(groupErrorFrom(gRes, gJson));
       return;
     }
-    setError("");
+    setLoadError(null);
     setGroup({ ...gJson.data.group, members: sortMembersByName(gJson.data.group?.members || []) });
     if (rRes.ok) {
       setExpenses(rJson.data.expenses || []);
@@ -107,7 +109,7 @@ export default function GroupDashboardPage() {
     setDetailOpen(true);
   }
 
-  if (error) return <p className="text-danger">{error}</p>;
+  if (loadError) return <GroupLoadError error={loadError} onRetry={reload} />;
   if (!group) return <GroupPageSkeleton />;
 
   const iconMeta = getGroupIcon(group.icon);
@@ -128,6 +130,16 @@ export default function GroupDashboardPage() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <Button type="button" size="icon" variant="outline" className="relative rounded-full" asChild>
+            <Link href={`/groups/${id}/requests`} aria-label={pendingRequests ? `Requests (${pendingRequests} waiting)` : "Requests"}>
+              <Bell className="h-4 w-4" />
+              {pendingRequests ? (
+                <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+                  {pendingRequests > 9 ? "9+" : pendingRequests}
+                </span>
+              ) : null}
+            </Link>
+          </Button>
           <Button
             type="button"
             size="icon"
@@ -146,7 +158,12 @@ export default function GroupDashboardPage() {
         </div>
       </div>
 
-      <RequestsBanner count={pendingRequests} onOpen={() => setInboxOpen(true)} />
+      {requestSent ? (
+        <div className="mb-5 flex items-center gap-2 rounded-2xl bg-success/10 px-3.5 py-2.5 text-sm font-semibold text-success" role="status">
+          <Check className="h-4 w-4" />
+          Sent for approval. You can follow it under Requests.
+        </div>
+      ) : null}
 
       <div className="mb-5 flex justify-start">
         <div className="inline-flex rounded-full bg-muted-foreground/10 p-1">
@@ -170,14 +187,19 @@ export default function GroupDashboardPage() {
       </div>
 
       {feed.length === 0 ? (
-        <div className="flex flex-col items-center px-6 py-14 text-center">
-          <p className="text-xl font-bold">{view === "balance" ? "No balances yet" : "No expenses yet"}</p>
-          <p className="mt-1.5 max-w-xs text-sm leading-5 text-muted">
-            {view === "balance"
-              ? "Balances appear here after you add an expense to this group."
-              : "Add the first expense to start splitting with this group."}
-          </p>
-        </div>
+        <EmptyState
+          illustration={view === "balance" ? "/illustrations/balence-amico.svg" : "/illustrations/add-notes-amico.svg"}
+          title={view === "balance" ? "No balances yet" : "Nothing here yet"}
+          actions={
+            <Button type="button" variant="link" onClick={() => addRef.current?.openCreate()}>
+              Add expense
+            </Button>
+          }
+        >
+          {view === "balance"
+            ? "Balances appear here after you add an expense to this group."
+            : "Add the first expense to start splitting with this group."}
+        </EmptyState>
       ) : view === "balance" ? (
         <BalanceView
           group={group}
@@ -193,9 +215,12 @@ export default function GroupDashboardPage() {
       )}
 
       <AddRecordModal
+        ref={addRef}
         group={group}
         currentUserId={me?._id}
         canAdd={canAdd}
+        requestMode={!canAdd}
+        onRequested={() => setRequestSent(true)}
         onCreated={reload}
         editExpense={editExpense}
         editTransfer={editTransfer}
@@ -207,7 +232,6 @@ export default function GroupDashboardPage() {
 
       <GroupActivityDialog groupId={id} open={activityOpen} onOpenChange={setActivityOpen} />
 
-      <RequestsInbox open={inboxOpen} onOpenChange={setInboxOpen} group={group} onReviewed={reload} />
 
       <RecordDetailDialog
         open={detailOpen}

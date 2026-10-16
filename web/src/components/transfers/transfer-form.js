@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,8 @@ export function TransferForm({
   embedded = false,
   active = false,
   currentUserId = null,
+  // Members can't record directly: the same form sends it to an admin for approval.
+  requestMode = false,
 }) {
   const members = useMemo(
     () => sortMembersByName(group?.members || []),
@@ -88,6 +90,7 @@ export function TransferForm({
   const currency = group?.currency || "INR";
 
   const [title, setTitle] = useState("");
+  const titleRef = useRef(null);
   const [icon, setIcon] = useState(DEFAULT_TRANSFER_EMOJI);
   const [iconManual, setIconManual] = useState(false);
   const [iconsOpen, setIconsOpen] = useState(false);
@@ -189,24 +192,30 @@ export function TransferForm({
 
     setSaving(true);
     try {
-      const res = await fetch(
-        isEdit
-          ? `/api/groups/${group.code}/transfers/${transfer._id}`
-          : `/api/groups/${group.code}/transfers`,
-        {
-        method: isEdit ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          icon,
-          amountMinor: Math.round(n * 100),
-          fromMemberId,
-          toMemberId,
-          transferDate: transferAt.toISOString(),
-          currency,
-        }),
-        },
-      );
+      const record = {
+        title: title.trim(),
+        icon,
+        amountMinor: Math.round(n * 100),
+        fromMemberId,
+        toMemberId,
+        transferDate: transferAt.toISOString(),
+      };
+      const res = requestMode
+        ? await fetch(`/api/groups/${group.code}/requests`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind: "payment", payment: record }),
+          })
+        : await fetch(
+            isEdit
+              ? `/api/groups/${group.code}/transfers/${transfer._id}`
+              : `/api/groups/${group.code}/transfers`,
+            {
+              method: isEdit ? "PATCH" : "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...record, currency }),
+            },
+          );
       const json = await res.json();
       if (!res.ok) {
         setShakeKey((k) => k + 1);
@@ -236,6 +245,13 @@ export function TransferForm({
         <div className="nsplit-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3">
           <div key={`amount-${shakeKey}`}>
             <Input
+              onKeyDown={(e) => {
+                // Enter after the amount moves on to the title instead of submitting a nameless record.
+                if (e.key === "Enter" && !title.trim()) {
+                  e.preventDefault();
+                  titleRef.current?.focus();
+                }
+              }}
               inputMode="decimal"
               placeholder="0.00"
               value={amount}
@@ -261,6 +277,7 @@ export function TransferForm({
               {icon}
             </button>
             <Input
+              ref={titleRef}
               placeholder="Title"
               value={title}
               onChange={(e) => {
@@ -370,7 +387,15 @@ export function TransferForm({
 
         <div className="shrink-0 border-t border-border bg-surface p-4">
           <Button type="submit" className="w-full" disabled={saving}>
-            {saving ? "Saving…" : isEdit ? "Save changes" : "Record transfer"}
+            {saving
+              ? requestMode
+                ? "Sending…"
+                : "Saving…"
+              : requestMode
+                ? "Send for approval"
+                : isEdit
+                  ? "Save changes"
+                  : "Record transfer"}
           </Button>
         </div>
       </form>

@@ -3,109 +3,126 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CheckCircle2, Circle, Lock, Mail, User } from "lucide-react";
+import { AuthField } from "@/components/auth/auth-field";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD = 8;
 
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const longEnough = password.length >= MIN_PASSWORD;
+
+  function clear(field) {
+    setErrors((x) => ({ ...x, [field]: null, form: null }));
+  }
 
   async function onSubmit(e) {
     e.preventDefault();
+    const found = {};
+    if (!name.trim()) found.name = "Enter your name";
+    if (!EMAIL.test(email.trim())) found.email = "Enter a valid email address";
+    if (!longEnough) found.password = `Use at least ${MIN_PASSWORD} characters`;
+    setErrors(found);
+    if (found.name || found.email || found.password) return;
+
     setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json?.error?.message || "Signup failed");
+        setErrors({ form: json?.error?.message || "Could not create your account. Try again." });
         return;
       }
-      router.push(
-        json.data?.invitations?.pending > 0 ? "/notifications" : "/groups"
-      );
+      router.push(json.data?.invitations?.pending > 0 ? "/notifications" : "/groups");
       router.refresh();
     } catch {
-      setError("Something went wrong");
+      setErrors({ form: "Could not reach nSplit. Check your connection and try again." });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
-      <Link href="/" className="mb-8 text-xl font-semibold text-primary">
-        Nsplit
-      </Link>
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
-        <p className="mt-1 text-sm text-muted">Start splitting with Nsplit</p>
-
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <label className="block text-sm">
-            <span className="mb-1.5 block text-muted">Name</span>
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 outline-none ring-primary focus:ring-2"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1.5 block text-muted">Email</span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 outline-none ring-primary focus:ring-2"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1.5 block text-muted">Password</span>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 outline-none ring-primary focus:ring-2"
-            />
-          </label>
-
-          {error ? <p className="text-sm text-danger">{error}</p> : null}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
-          >
-            {loading ? "Creating…" : "Sign up"}
-          </button>
-        </form>
-
-        <button
-          type="button"
-          disabled
-          title="Google authentication will be available later"
-          className="mt-3 w-full cursor-not-allowed rounded-lg border border-border py-2.5 text-sm text-muted"
-        >
-          Continue with Google · Coming soon
-        </button>
-
-        <p className="mt-4 text-center text-sm text-muted">
+    <AuthShell
+      title="Create your account"
+      subtitle="Free, and it takes a few seconds."
+      footer={
+        <>
           Already have an account?{" "}
-          <Link href="/login" className="text-primary hover:underline">
+          <Link href="/login" className="font-bold text-primary hover:underline dark:text-primary-foreground">
             Log in
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form onSubmit={onSubmit} noValidate className="space-y-4">
+        <AuthField
+          label="Your name"
+          icon={User}
+          autoComplete="name"
+          placeholder="How your group knows you"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            clear("name");
+          }}
+          error={errors.name}
+          autoFocus
+        />
+        <AuthField
+          label="Email"
+          icon={Mail}
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            clear("email");
+          }}
+          error={errors.email}
+        />
+        <AuthField
+          label="Password"
+          icon={Lock}
+          password
+          autoComplete="new-password"
+          placeholder="Create a password"
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            clear("password");
+          }}
+          error={errors.password}
+          hint={
+            <span className={cn("flex items-center gap-1.5", longEnough && "text-success")}>
+              {longEnough ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+              At least {MIN_PASSWORD} characters
+            </span>
+          }
+        />
+        {errors.form ? (
+          <p className="rounded-xl bg-danger/10 px-3 py-2.5 text-sm text-danger" role="alert">
+            {errors.form}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={loading} className="h-12 w-full rounded-xl text-[15px] font-bold">
+          {loading ? "Creating account…" : "Create account"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

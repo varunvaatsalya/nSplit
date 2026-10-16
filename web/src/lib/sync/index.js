@@ -61,6 +61,7 @@ export function serializeGroup(group) {
     id: String(group._id),
     code: group.code,
     name: group.name,
+    description: group.description ?? null,
     icon: group.icon ?? null,
     currency: group.currency || "INR",
     createdById: str(group.createdById),
@@ -204,6 +205,7 @@ async function applyGroup({ change, user, clientUpdatedAt }) {
       _id: change.id,
       code,
       name,
+      description: String(data.description || "").trim().slice(0, 2000) || null,
       icon: data.icon || null,
       currency: data.currency || "INR",
       createdById: user._id,
@@ -229,6 +231,10 @@ async function applyGroup({ change, user, clientUpdatedAt }) {
   if (isStale(existing, clientUpdatedAt)) return { status: "STALE" };
 
   existing.name = name;
+  // Older app versions don't send a description: leave the server's copy alone.
+  if (Object.prototype.hasOwnProperty.call(data, "description")) {
+    existing.description = String(data.description || "").trim().slice(0, 2000) || null;
+  }
   existing.icon = data.icon ?? existing.icon;
   existing.currency = data.currency || existing.currency;
   existing.settings = incomingSettings(data.settings);

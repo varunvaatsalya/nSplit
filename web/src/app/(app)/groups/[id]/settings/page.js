@@ -30,6 +30,8 @@ import {
   ManageMembersDialog,
   permissionLabel,
 } from "@/components/groups/manage-members-dialog";
+import { ShareLinkCard } from "@/components/groups/share-link-card";
+import { GroupLoadError, groupErrorFrom } from "@/components/groups/group-load-error";
 import { EmojiPicker } from "@/components/emoji-picker";
 import {
   CURRENCIES,
@@ -148,6 +150,7 @@ export default function GroupSettingsPage() {
   const router = useRouter();
   const [group, setGroup] = useState(null);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState("users");
@@ -176,9 +179,10 @@ export default function GroupSettingsPage() {
     ]);
     const [json, meJson] = await Promise.all([gRes.json(), meRes.json()]);
     if (!gRes.ok) {
-      setError(json?.error?.message || "Failed to load");
+      setLoadError(groupErrorFrom(gRes, json));
       return;
     }
+    setLoadError(null);
     const g = json.data.group;
     setGroup(g);
     setName(g.name || "");
@@ -226,6 +230,11 @@ export default function GroupSettingsPage() {
   const canDeleteGroup =
     Boolean(me?._id && group?.createdById) &&
     String(group.createdById) === String(me._id);
+
+  // Only offer "Save details" when the name or description actually changed.
+  const detailsChanged =
+    Boolean(group) &&
+    (name.trim() !== (group.name || "") || description.trim() !== (group.description || ""));
 
   async function saveDetails() {
     if (!group) return;
@@ -332,7 +341,7 @@ export default function GroupSettingsPage() {
     }
   }
 
-  if (error && !group) return <p className="text-danger">{error}</p>;
+  if (loadError) return <GroupLoadError error={loadError} onRetry={load} />;
   if (!group) return <SettingsPageSkeleton groupId={id} />;
 
   const iconMeta = getGroupIcon(icon);
@@ -397,7 +406,7 @@ export default function GroupSettingsPage() {
                   type="button"
                   size="sm"
                   onClick={saveDetails}
-                  disabled={savingDetails || !name.trim()}
+                  disabled={savingDetails || !name.trim() || !detailsChanged}
                 >
                   {savingDetails ? "Saving…" : "Save details"}
                 </Button>
@@ -444,14 +453,14 @@ export default function GroupSettingsPage() {
               Members
             </CardTitle>
             {canManageMembers ? (
-              <Button
+              <button
                 type="button"
-                variant="link"
-                className="h-auto px-2 py-0 text-xs text-primary dark:text-primary-foreground hover:text-primary/80 cursor-pointer"
+                className="flex cursor-pointer items-center gap-0.5 rounded-md px-1.5 py-0.5 text-sm font-semibold text-primary hover:bg-primary/10 dark:text-indigo-300"
                 onClick={() => setManageOpen(true)}
               >
                 Manage
-              </Button>
+                <ChevronRight className="h-4 w-4" />
+              </button>
             ) : null}
           </CardHeader>
           <CardContent className="space-y-2">
@@ -476,14 +485,14 @@ export default function GroupSettingsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{label}</div>
                     <div className="truncate text-xs text-muted">
-                      {m.email || m.user?.email || "No email"}
+                      {m.userId ? m.email || m.user?.email || "Joined" : "Not joined yet"}
                     </div>
                   </div>
-                  <Badge
-                    variant={m.permission === "ADMIN" ? "default" : "secondary"}
-                  >
-                    {permissionLabel(m.permission)}
-                  </Badge>
+                  {m.userId ? (
+                    <Badge variant={m.permission === "ADMIN" ? "default" : "secondary"}>
+                      {permissionLabel(m.permission)}
+                    </Badge>
+                  ) : null}
                   <div className="hidden text-right text-[11px] text-muted sm:block">
                     <div>{method === "SHARES" ? `${part} Part` : "Equal"}</div>
                     <div>{pct}% Share</div>
@@ -493,6 +502,10 @@ export default function GroupSettingsPage() {
             })}
           </CardContent>
         </Card>
+
+        {canManageSettings ? (
+          <ShareLinkCard groupCode={group.code} />
+        ) : null}
 
         {canDeleteGroup ? (
           <Card className="border-danger/30">
@@ -558,7 +571,7 @@ export default function GroupSettingsPage() {
               type="button"
               onClick={async () => {
                 setCurrencyOpen(false);
-                await saveDetails();
+                if (currency !== group.currency) await saveDetails();
               }}
             >
               Done

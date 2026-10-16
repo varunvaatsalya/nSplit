@@ -17,7 +17,11 @@ describe("upi", () => {
     const link = buildUpiLink({ upiId: "Varun@YBL", name: "Varun K", amountMinor: 45050, note: "Goa trip · nSplit" });
     assert.equal(
       link,
-      "upi://pay?pa=varun%40ybl&pn=Varun%20K&am=450.50&cu=INR&tn=Goa%20trip%20%C2%B7%20nSplit"
+      "upi://pay?pa=varun@ybl&pn=Varun%20K&am=450.50&cu=INR&tn=Goa%20trip%20%C2%B7%20nSplit"
     );
+  });
+
+  it("leaves the amount out when none is given (QR the payer fills in)", () => {
+    assert.equal(buildUpiLink({ upiId: "varun@ybl", name: "Varun" }), "upi://pay?pa=varun@ybl&pn=Varun&cu=INR");
   });
 });

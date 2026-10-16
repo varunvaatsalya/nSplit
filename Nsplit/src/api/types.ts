@@ -39,6 +39,7 @@ export type GroupMember = {
 };
 
 export type GroupDetail = GroupSummary & {
+  description?: string | null;
   members?: GroupMember[];
   settings?: {
     defaultSplitMethod?: string;

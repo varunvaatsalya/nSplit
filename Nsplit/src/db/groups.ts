@@ -7,7 +7,6 @@ import { enqueue } from '@/src/sync/outbox';
 
 import { getDb, runInTransaction } from './client';
 import { createGroupCode, createId } from './ids';
-import { isValidUpiId, normalizeUpiId } from '@nsplit/shared/upi';
 
 type GroupRow = {
   id: string;
@@ -17,6 +16,7 @@ type GroupRow = {
   currency: string;
   my_member_id?: string | null;
   settings_json?: string | null;
+  description?: string | null;
   member_count?: number | null;
 };
 
@@ -136,7 +136,7 @@ export async function listGroups(): Promise<GroupSummary[]> {
 export async function getGroup(idOrCode: string): Promise<GroupDetail | null> {
   const db = await getDb();
   const group = await db.getFirstAsync<GroupRow>(
-    `SELECT id, code, name, icon, currency, my_member_id, settings_json
+    `SELECT id, code, name, icon, currency, my_member_id, settings_json, description
      FROM groups
      WHERE deleted_at IS NULL AND (id = ? OR code = ?)
      LIMIT 1`,
@@ -158,6 +158,7 @@ export async function getGroup(idOrCode: string): Promise<GroupDetail | null> {
 
   return {
     ...mapSummary({ ...group, member_count: members.length }),
+    description: group.description || null,
     members,
     myPermission: mine?.permission || null,
     myMembershipId: group.my_member_id || mine?._id || null,
@@ -277,18 +278,20 @@ export async function setGroupMyMember(groupId: string, memberId: string | null)
 
 export async function updateGroup(
   groupId: string,
-  input: { name?: string; icon?: string | null; currency?: string }
+  input: { name?: string; icon?: string | null; currency?: string; description?: string | null }
 ) {
   const group = await getGroup(groupId);
   if (!group) throw new Error('Group not found');
   const db = await getDb();
   await runInTransaction(db, async () => {
     await db.runAsync(
-      `UPDATE groups SET name = ?, icon = ?, currency = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE groups SET name = ?, icon = ?, currency = ?, description = ?, updated_at = ? WHERE id = ?`,
       [
         (input.name ?? group.name).trim(),
         input.icon ?? group.icon ?? null,
         input.currency ?? group.currency ?? 'INR',
+        // undefined keeps the current text; null or "" clears it.
+        input.description !== undefined ? input.description?.trim() || null : group.description ?? null,
         new Date().toISOString(),
         group._id,
       ]
@@ -367,12 +370,10 @@ export async function isGroupSynced(groupId: string) {
 export async function updateGroupMember(
   groupId: string,
   memberId: string,
-  input: { name: string; upiId?: string | null }
+  input: { name: string }
 ) {
   const displayName = input.name.trim();
   if (!displayName) throw new Error('Name required');
-  const upiId = input.upiId ? normalizeUpiId(input.upiId) : null;
-  if (upiId && !isValidUpiId(upiId)) throw new Error('That UPI ID does not look right');
   const group = await getGroup(groupId);
   if (!group) throw new Error('Group not found');
   const member = (group.members || []).find((m) => m._id === memberId);
@@ -381,8 +382,8 @@ export async function updateGroupMember(
   const db = await getDb();
   await runInTransaction(db, async () => {
     await db.runAsync(
-      `UPDATE group_members SET display_name = ?, upi_id = ? WHERE id = ? AND group_id = ?`,
-      [displayName, upiId, memberId, group._id]
+      `UPDATE group_members SET display_name = ? WHERE id = ? AND group_id = ?`,
+      [displayName, memberId, group._id]
     );
     await db.runAsync(`UPDATE groups SET updated_at = ? WHERE id = ?`, [
       new Date().toISOString(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useImperativeHandle, useState } from "react";
 import { Plus } from "lucide-react";
 import { ExpenseForm } from "@/components/expenses/expense-form";
 import { TransferForm } from "@/components/transfers/transfer-form";
@@ -34,6 +34,11 @@ export function AddRecordModal({
   onEditClose,
   currentUserId = null,
   canAdd = true,
+  // Members: the FAB opens the same forms, which send requests instead of saving.
+  requestMode = false,
+  onRequested,
+  // Lets the page open the add form, e.g. from an empty state.
+  ref,
 }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("expense");
@@ -45,6 +50,8 @@ export function AddRecordModal({
     setOpen(true);
   }
 
+  useImperativeHandle(ref, () => ({ openCreate }));
+
   useEffect(() => {
     if (!editExpense?._id && !editTransfer?._id) return;
     setTab(editTransfer?._id ? "transfer" : "expense");
@@ -53,7 +60,7 @@ export function AddRecordModal({
 
   useEffect(() => {
     function onKeyDown(e) {
-      if (open || isEdit || !canAdd) return;
+      if (open || isEdit || (!canAdd && !requestMode)) return;
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key.toLowerCase() !== ADD_HOTKEY) return;
       if (isTypingTarget(e.target)) return;
@@ -62,7 +69,7 @@ export function AddRecordModal({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, isEdit, canAdd]);
+  }, [open, isEdit, canAdd, requestMode]);
 
   function handleOpenChange(next) {
     setOpen(next);
@@ -72,12 +79,13 @@ export function AddRecordModal({
   function handleSaved() {
     setOpen(false);
     onEditClose?.();
-    onCreated?.();
+    if (requestMode) onRequested?.();
+    else onCreated?.();
   }
 
   return (
     <>
-      {canAdd ? (
+      {canAdd || requestMode ? (
       <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40">
         <div className="mx-auto flex max-w-3xl justify-end px-4 sm:px-6">
           <div className="group/fab pointer-events-auto relative">
@@ -179,6 +187,7 @@ export function AddRecordModal({
               embedded
               active={open && tab === "expense"}
               currentUserId={currentUserId}
+              requestMode={requestMode}
               onClose={() => handleOpenChange(false)}
               onCreated={handleSaved}
               onUpdated={handleSaved}
@@ -188,6 +197,7 @@ export function AddRecordModal({
               key={editingTransfer ? `edit-${editTransfer._id}` : "create"}
               group={group}
               transfer={editTransfer}
+              requestMode={requestMode}
               embedded
               active={open && tab === "transfer"}
               currentUserId={currentUserId}

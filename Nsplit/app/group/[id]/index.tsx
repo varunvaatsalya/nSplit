@@ -1,6 +1,6 @@
 import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,17 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AddNotes from "@/assets/illustrations/add-notes-amico.svg";
 import BalanceAmico from "@/assets/illustrations/balence-amico.svg";
 import { BalanceView } from "@/components/balance/balance-view";
-import { OfflineBanner } from "@/components/offline-banner";
+import { GroupFeed, groupFeedItems, type FeedItem } from "@/components/groups/group-feed";
 import { RecordDetailModal } from "@/components/records/record-detail-modal";
-import { UserAvatar } from "@/components/user-avatar";
 import { useColors } from "@/hooks/use-colors";
-import type {
-  Expense,
-  GroupBalance,
-  GroupDetail,
-  GroupMember,
-  Transfer,
-} from "@/src/api/types";
+import type { Expense, GroupBalance, GroupDetail, Transfer } from "@/src/api/types";
 import { useAuth } from "@/src/auth/auth-context";
 import { groupBalance, listExpenses } from "@/src/db/expenses";
 import { listPendingRequests } from "@/src/api/requests";
@@ -36,145 +29,9 @@ import { listTransfers } from "@/src/db/transfers";
 import { useIdentity } from "@/src/identity/identity-context";
 import { remoteChanges } from "@/src/sync/events";
 import { useSync } from "@/src/sync/sync-context";
-import {
-  dateHeaderLabel,
-  formatMinor,
-  formatRowTime,
-  memberName,
-} from "@/src/lib/format";
 import { buildLedger } from "@/src/lib/ledger";
-import { getExpenseEmoji, getGroupEmoji } from "@/src/lib/icons";
-import { isSelfMember, resolveMyMember } from "@/src/lib/members";
-
-type FeedItem =
-  | { kind: "expense"; id: string; date: Date; expense: Expense }
-  | { kind: "transfer"; id: string; date: Date; transfer: Transfer };
-
-function feedDayKey(date: Date) {
-  if (Number.isNaN(date.getTime())) return "unknown";
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
-
-function groupFeedItems(expenses: Expense[], transfers: Transfer[]) {
-  const items: FeedItem[] = [
-    ...expenses.map((expense) => ({
-      kind: "expense" as const,
-      id: expense._id,
-      date: new Date(expense.expenseDate || expense.createdAt || ""),
-      expense,
-    })),
-    ...transfers.map((transfer) => ({
-      kind: "transfer" as const,
-      id: transfer._id,
-      date: new Date(transfer.transferDate || transfer.createdAt || ""),
-      transfer,
-    })),
-  ];
-  const map = new Map<string, { key: string; date: Date; items: FeedItem[] }>();
-  for (const item of items) {
-    const key = feedDayKey(item.date);
-    if (!map.has(key)) map.set(key, { key, date: item.date, items: [] });
-    map.get(key)!.items.push(item);
-  }
-  for (const section of map.values()) {
-    section.items.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }
-  return [...map.values()].sort((a, b) => b.date.getTime() - a.date.getTime());
-}
-
-function payerMembers(expense: Expense, members: GroupMember[]) {
-  return (expense.payers || [])
-    .map((p) => members.find((m) => m._id === p.memberId))
-    .filter(Boolean) as GroupMember[];
-}
-
-function MemberInline({
-  member,
-  currentUserId,
-  myMemberId,
-}: {
-  member?: GroupMember | null;
-  currentUserId?: string | null;
-  myMemberId?: string | null;
-  // colors: ReturnType<typeof useColors>;
-}) {
-  const self = isSelfMember(member, currentUserId, myMemberId);
-  return (
-    <>
-      <Text
-        style={{
-          fontWeight: "700",
-          fontSize: 12,
-        }}
-      >
-        {memberName(member)}
-      </Text>
-      {self ? (
-        <Text style={{ fontSize: 11, fontWeight: "700" }}> (me)</Text>
-      ) : null}
-    </>
-  );
-}
-
-function FeedRow({
-  icon,
-  title,
-  amount,
-  meta,
-  onPress,
-  colors,
-}: {
-  icon: string;
-  title: string;
-  amount: string;
-  meta: ReactNode;
-  onPress?: () => void;
-  colors: ReturnType<typeof useColors>;
-}) {
-  const body = (
-    <>
-      <View className="min-w-0 flex-1 flex-row items-center gap-2">
-        <View style={styles.expenseIcon}>
-          <Text style={{ fontSize: 24 }}>{icon}</Text>
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            style={[styles.expenseTitle, { color: colors.text }]}
-            numberOfLines={2}
-          >
-            {title}
-          </Text>
-          {meta}
-        </View>
-      </View>
-      <Text
-        style={[
-          styles.amount,
-          { color: colors.text, flexShrink: 0, paddingRight: 8 },
-        ]}
-      >
-        {amount}
-      </Text>
-    </>
-  );
-  const rowStyle = [styles.expenseRow, { backgroundColor: colors.softSurface }];
-  if (onPress) {
-    return (
-      <Pressable
-        onPress={onPress}
-        className="flex-row items-center gap-3"
-        style={rowStyle}
-      >
-        {body}
-      </Pressable>
-    );
-  }
-  return (
-    <View className="flex-row items-center" style={rowStyle}>
-      {body}
-    </View>
-  );
-}
+import { getGroupEmoji } from "@/src/lib/icons";
+import { resolveMyMember } from "@/src/lib/members";
 
 export default function GroupScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -276,6 +133,8 @@ export default function GroupScreen() {
     [members, me, myName, matchByName, group?.myMembershipId],
   );
   const canAdd = true;
+  // Joined via the link: views everything, sends additions for approval.
+  const isMember = group?.myPermission === "VIEW_ONLY";
   const feedItems = useMemo(
     () => grouped.flatMap((section) => section.items),
     [grouped],
@@ -325,7 +184,6 @@ export default function GroupScreen() {
       style={[styles.safe, { backgroundColor: colors.background }]}
       edges={["top"]}
     >
-      <OfflineBanner />
       <View style={styles.topBar}>
         <Pressable
           onPress={() => router.back()}
@@ -356,6 +214,27 @@ export default function GroupScreen() {
             <MaterialIcons name="ios-share" size={22} color={colors.text} />
           </Pressable>
         ) : null} */}
+        {user && group.myPermission ? (
+          <Pressable
+            onPress={() =>
+              router.push({ pathname: "/group/[id]/requests", params: { id: String(id) } })
+            }
+            hitSlop={10}
+            style={styles.iconBtn}
+            accessibilityLabel={
+              pendingRequests ? `Requests, ${pendingRequests} waiting` : "Requests"
+            }
+          >
+            <Feather name="bell" size={22} color={colors.text} />
+            {pendingRequests > 0 ? (
+              <View style={[styles.badge, { backgroundColor: colors.danger }]}>
+                <Text style={styles.badgeText}>
+                  {pendingRequests > 9 ? "9+" : pendingRequests}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={() =>
             router.push({
@@ -369,31 +248,6 @@ export default function GroupScreen() {
           <Feather name="settings" size={22} color={colors.text} />
         </Pressable>
       </View>
-
-      {pendingRequests > 0 ? (
-        <Pressable
-          onPress={() =>
-            router.push({ pathname: "/group/[id]/requests", params: { id: String(id) } })
-          }
-          style={[
-            styles.requestsBanner,
-            { borderColor: colors.primary, backgroundColor: colors.softSurface },
-          ]}
-        >
-          <View style={[styles.requestsIcon, { backgroundColor: colors.primary }]}>
-            <MaterialIcons name="inbox" size={18} color={colors.primaryForeground} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.text, fontWeight: "700" }}>
-              {pendingRequests} request{pendingRequests === 1 ? "" : "s"} waiting for approval
-            </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }}>
-              Sent from your share link
-            </Text>
-          </View>
-          <Text style={{ color: colors.primary, fontWeight: "700" }}>Review</Text>
-        </Pressable>
-      ) : null}
 
       <View style={styles.toggleWrap}>
         <View style={[styles.toggle, { backgroundColor: colors.softSurface }]}>
@@ -466,149 +320,20 @@ export default function GroupScreen() {
             currentUserId={me?._id}
             myMemberId={myMember?._id}
             onPaid={load}
+            canSettle={!isMember}
             onExport={() =>
               router.push({ pathname: "/group/[id]/export", params: { id: String(id) } })
             }
           />
         ) : (
-          grouped.map((section) => (
-            <View key={section.key} style={{ marginBottom: 18 }}>
-              <Text style={[styles.dateHead, { color: colors.text }]}>
-                {dateHeaderLabel(section.date)}
-              </Text>
-              <View style={{ gap: 10 }}>
-                {section.items.map((item) => {
-                  if (item.kind === "transfer") {
-                    const transfer = item.transfer;
-                    const from = members.find(
-                      (m) => m._id === transfer.fromMemberId,
-                    );
-                    const to = members.find(
-                      (m) => m._id === transfer.toMemberId,
-                    );
-                    return (
-                      <FeedRow
-                        key={transfer._id}
-                        icon={transfer.icon || "💸"}
-                        title={transfer.title || "Transfer"}
-                        amount={formatMinor(
-                          transfer.amountMinor,
-                          transfer.currency || group.currency,
-                        )}
-                        colors={colors}
-                        onPress={() => openRecord("transfer", transfer._id)}
-                        meta={
-                          <Text
-                            style={[
-                              styles.meta,
-                              { color: colors.textSecondary },
-                            ]}
-                            numberOfLines={2}
-                          >
-                            <MemberInline
-                              member={from}
-                              currentUserId={me?._id}
-                              myMemberId={myMember?._id}
-                            />
-                            {" → "}
-                            <MemberInline
-                              member={to}
-                              currentUserId={me?._id}
-                              myMemberId={myMember?._id}
-                            />
-                            {" · "}
-                            {formatRowTime(item.date)}
-                          </Text>
-                        }
-                      />
-                    );
-                  }
-
-                  const expense = item.expense;
-                  const payers = payerMembers(expense, members);
-                  const when = new Date(
-                    expense.expenseDate || expense.createdAt || "",
-                  );
-                  return (
-                    <FeedRow
-                      key={expense._id}
-                      icon={getExpenseEmoji(expense.icon, expense.categoryKey)}
-                      title={expense.title}
-                      amount={formatMinor(
-                        expense.amountMinor,
-                        expense.currency || group.currency,
-                      )}
-                      colors={colors}
-                      onPress={() => openRecord("expense", expense._id)}
-                      meta={
-                        payers.length > 1 ? (
-                          <View style={styles.paidRow}>
-                            <Text
-                              style={[
-                                styles.meta,
-                                { color: colors.textSecondary },
-                              ]}
-                            >
-                              Paid by{" "}
-                            </Text>
-                            <View style={styles.avatars}>
-                              {payers.slice(0, 3).map((m, i) => (
-                                <View
-                                  key={m._id}
-                                  style={{
-                                    marginLeft: i === 0 ? 0 : -4,
-                                    zIndex: 3 - i,
-                                    borderWidth: 1.5,
-                                    borderColor: colors.softSurface,
-                                    borderRadius: 10,
-                                  }}
-                                >
-                                  <UserAvatar
-                                    name={memberName(m)}
-                                    avatar={m.avatar || m.user?.avatar}
-                                    seed={m.userId || m._id}
-                                    size={16}
-                                  />
-                                </View>
-                              ))}
-                            </View>
-                            <Text
-                              style={[
-                                styles.meta,
-                                {
-                                  color: colors.textSecondary,
-                                },
-                              ]}
-                            >
-                              {" · "}
-                              {formatRowTime(when)}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text
-                            style={[
-                              styles.meta,
-                              { color: colors.textSecondary },
-                            ]}
-                            numberOfLines={2}
-                          >
-                            Paid by{" "}
-                            <MemberInline
-                              member={payers[0]}
-                              currentUserId={me?._id}
-                              myMemberId={myMember?._id}
-                            />
-                            {" · "}
-                            {formatRowTime(when)}
-                          </Text>
-                        )
-                      }
-                    />
-                  );
-                })}
-              </View>
-            </View>
-          ))
+          <GroupFeed
+            sections={grouped}
+            members={members}
+            currency={group.currency || "INR"}
+            currentUserId={me?._id}
+            myMemberId={myMember?._id}
+            onOpen={openRecord}
+          />
         )}
       </ScrollView>
 
@@ -633,6 +358,7 @@ export default function GroupScreen() {
           currentUserId={me?._id}
           myMemberId={myMember?._id}
           ledger={ledger}
+          readOnly={isMember}
           onEditExpense={(item) => {
             setDetailOpen(false);
             router.push({
@@ -711,59 +437,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  requestsBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 10,
-  },
-  requestsIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  badge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
     alignItems: "center",
     justifyContent: "center",
   },
-  dateHead: {
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    paddingHorizontal: 5,
-  },
-  expenseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
-  expenseIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  expenseTitle: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
-  meta: {
-    marginTop: 2,
-    fontSize: 11,
-    fontWeight: "300",
-    lineHeight: 15,
-  },
-  paidRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
-    flexWrap: "wrap",
-  },
-  avatars: { flexDirection: "row", alignItems: "center" },
-  amount: { fontSize: 14, fontWeight: "700" },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
   fab: {
     position: "absolute",
     right: 24,

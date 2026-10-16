@@ -50,6 +50,7 @@ export function ExpenseDetailPage({
   ledger,
   onEdit,
   onDeleted,
+  readOnly = false,
 }: {
   expense: Expense;
   group: GroupDetail;
@@ -58,6 +59,8 @@ export function ExpenseDetailPage({
   ledger?: Ledger;
   onEdit: (expense: Expense) => void;
   onDeleted: () => void;
+  /** Viewers and members: no edit or delete. */
+  readOnly?: boolean;
 }) {
   const colors = useColors();
   const [deleting, setDeleting] = useState(false);
@@ -105,7 +108,7 @@ export function ExpenseDetailPage({
         <View style={[styles.emoji, { backgroundColor: colors.softSurface }]}>
           <Text style={{ fontSize: 28 }}>{getExpenseEmoji(expense.icon, expense.categoryKey)}</Text>
         </View>
-        <View className="flex-row gap-1">
+        <View className="flex-row gap-1" style={readOnly ? { display: 'none' } : undefined}>
           <Pressable onPress={() => onEdit(expense)} style={styles.iconHit} hitSlop={8}>
             <MaterialIcons name="edit" size={20} color={colors.text} />
           </Pressable>

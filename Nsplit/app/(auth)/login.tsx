@@ -1,138 +1,91 @@
 import { Link } from 'expo-router';
-import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRef, useState } from 'react';
+import { StyleSheet, Text, type TextInput } from 'react-native';
 
-import { NsplitBrand } from '@/components/nsplit-logo';
-import { OfflineBanner } from '@/components/offline-banner';
-import { Field } from '@/components/ui/field';
+import { AuthField } from '@/components/auth/auth-field';
+import { AuthScreen } from '@/components/auth/auth-screen';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/src/auth/auth-context';
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen() {
   const colors = useColors();
   const { login, pending } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+  const passwordRef = useRef<TextInput>(null);
 
   async function onSubmit() {
-    setError('');
-    if (!email.trim() || !password) {
-      setError('Enter email and password');
-      return;
-    }
+    const next: typeof errors = {};
+    if (!EMAIL.test(email.trim())) next.email = 'Enter a valid email address';
+    if (!password) next.password = 'Enter your password';
+    setErrors(next);
+    if (next.email || next.password) return;
     try {
       await login(email.trim(), password);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Login failed');
+      setErrors({ form: e instanceof Error ? e.message : 'Could not log in. Try again.' });
     }
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled">
-          <NsplitBrand
-            color={colors.primary}
-            logoSize={36}
-            fontSize={26}
-            align="center"
-            style={styles.brand}
-          />
-          <OfflineBanner />
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}>
-            <Text style={[styles.title, { color: colors.text }]}>Welcome</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Log in to Nsplit
-            </Text>
-
-            <View style={styles.form}>
-              <Field
-                label="Email"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                value={email}
-                onChangeText={setEmail}
-                editable={!pending}
-              />
-              <Field
-                label="Password"
-                secureTextEntry
-                autoComplete="password"
-                value={password}
-                onChangeText={setPassword}
-                editable={!pending}
-              />
-              {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
-              <PrimaryButton
-                title={pending ? 'Signing in…' : 'Log in'}
-                loading={pending}
-                onPress={onSubmit}
-              />
-            </View>
-
-            <Pressable disabled style={[styles.google, { borderColor: colors.border }]}>
-              <Text style={{ color: colors.textSecondary }}>Continue with Google · Coming soon</Text>
-            </Pressable>
-
-            <Text style={[styles.footer, { color: colors.textSecondary }]}>
-              No account?{' '}
-              <Link href="/signup" style={{ color: colors.primary }}>
-                Sign up
-              </Link>
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <AuthScreen
+      title="Welcome back"
+      subtitle="Log in to back up your groups and keep them in sync across devices."
+      footer={
+        <Text style={{ color: colors.textSecondary, fontSize: 15 }}>
+          New to nSplit?{' '}
+          <Link href="/signup" replace style={{ color: colors.primary, fontWeight: '700' }}>
+            Create an account
+          </Link>
+        </Text>
+      }>
+      <AuthField
+        label="Email"
+        icon="mail"
+        placeholder="you@example.com"
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        value={email}
+        onChangeText={(v) => {
+          setEmail(v);
+          setErrors((e) => ({ ...e, email: undefined, form: undefined }));
+        }}
+        error={errors.email}
+        editable={!pending}
+      />
+      <AuthField
+        ref={passwordRef}
+        label="Password"
+        icon="lock"
+        password
+        placeholder="Your password"
+        autoComplete="password"
+        textContentType="password"
+        returnKeyType="go"
+        onSubmitEditing={onSubmit}
+        value={password}
+        onChangeText={(v) => {
+          setPassword(v);
+          setErrors((e) => ({ ...e, password: undefined, form: undefined }));
+        }}
+        error={errors.password}
+        editable={!pending}
+      />
+      {errors.form ? <Text style={[styles.formError, { color: colors.danger }]}>{errors.form}</Text> : null}
+      <PrimaryButton title={pending ? 'Logging in…' : 'Log in'} loading={pending} onPress={onSubmit} />
+    </AuthScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  flex: { flex: 1 },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  brand: {
-    marginBottom: 20,
-  },
-  card: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 22,
-  },
-  title: { fontSize: 24, fontWeight: '700' },
-  subtitle: { marginTop: 4, fontSize: 14 },
-  form: { marginTop: 20, gap: 14 },
-  error: { fontSize: 14 },
-  google: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  footer: { marginTop: 16, textAlign: 'center', fontSize: 14 },
+  formError: { fontSize: 14, textAlign: 'center' },
 });

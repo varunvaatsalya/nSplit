@@ -23,7 +23,7 @@ export function shareInfo(request, group) {
 }
 
 /**
- * Everything a link viewer may see: names, avatars, UPI ids and the ledger.
+ * Everything a link viewer may see: names, avatars and the ledger.
  * Never emails, user ids, invitations or who created which record.
  */
 export async function loadSharedLedger(token) {
@@ -48,7 +48,8 @@ export async function loadSharedLedger(token) {
           _id: String(m._id),
           displayName: m.displayName,
           avatar: { url: null, letters: m.avatar?.letters || null, bg: m.avatar?.bg || null },
-          upiId: m.upiId || null,
+          // Only whether someone joined as this name, never who.
+          claimed: Boolean(m.userId),
         })),
     },
     expenses: expenses.map((e) => ({

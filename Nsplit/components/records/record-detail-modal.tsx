@@ -34,6 +34,7 @@ export function RecordDetailModal({
   onEditExpense,
   onEditTransfer,
   onDeleted,
+  readOnly = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -47,6 +48,7 @@ export function RecordDetailModal({
   onEditExpense: (expense: Expense) => void;
   onEditTransfer: (transfer: Transfer) => void;
   onDeleted: () => void;
+  readOnly?: boolean;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -156,6 +158,7 @@ export function RecordDetailModal({
                       ledger={ledger}
                       onEdit={onEditExpense}
                       onDeleted={handleDeleted}
+                      readOnly={readOnly}
                     />
                   ) : (
                     <TransferDetailPage
@@ -165,6 +168,7 @@ export function RecordDetailModal({
                       myMemberId={myMemberId}
                       onEdit={onEditTransfer}
                       onDeleted={handleDeleted}
+                      readOnly={readOnly}
                     />
                   )}
                 </View>

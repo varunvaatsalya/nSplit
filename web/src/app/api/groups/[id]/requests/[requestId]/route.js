@@ -40,13 +40,15 @@ export async function POST(request, { params }) {
   const existing = await ShareRequest.findOne({ _id: requestId, groupId: membership.groupId }).lean();
   if (!existing) return fail("Request not found", 404);
 
-  // Reviewing needs the same right as adding that kind of record yourself.
+  // Joins need member management; records need the right to add them yourself.
+  const needed =
+    existing.kind === "join"
+      ? Actions.MANAGE_MEMBERS
+      : existing.kind === "expense"
+        ? Actions.ADD_EXPENSE
+        : Actions.ADD_TRANSFER;
   try {
-    await requireGroupPermission(
-      auth.user._id,
-      code,
-      existing.kind === "expense" ? Actions.ADD_EXPENSE : Actions.ADD_TRANSFER
-    );
+    await requireGroupPermission(auth.user._id, code, needed);
   } catch (e) {
     return fail(e.message, e.status || 403, e.code || "FORBIDDEN");
   }

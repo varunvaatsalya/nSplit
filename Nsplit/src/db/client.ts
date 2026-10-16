@@ -49,6 +49,7 @@ async function migrate(database: SqlExecutor) {
   // 1 once the server is known to hold this group (pushed or pulled).
   await addColumnIfMissing(database, 'groups', 'synced', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing(database, 'group_members', 'upi_id', 'TEXT');
+  await addColumnIfMissing(database, 'groups', 'description', 'TEXT');
   if (version > 0 && version < 5) {
     // Upgrading from a version without sync: give records server-compatible ids,
     // then queue everything so the first sync uploads it.

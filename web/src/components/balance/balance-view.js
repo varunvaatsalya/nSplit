@@ -148,7 +148,7 @@ export function BalanceView({ group, balance, ledger, currentUserId, canSettle, 
       </Link>
       ) : null}
 
-      <p className="-mb-2 px-0.5 text-xs text-muted">Tap a member to see their balance sheet.</p>
+      <p className="px-0.5 text-xs text-muted">Tap a member to see their balance sheet.</p>
 
       {owe.length ? (
         <div>

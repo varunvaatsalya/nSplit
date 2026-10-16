@@ -25,14 +25,18 @@ export function BalanceView({
   myMemberId,
   onPaid,
   onExport,
+  canSettle = true,
 }: {
   group: GroupDetail;
   balance: GroupBalance | null;
   ledger: Ledger;
   currentUserId?: string | null;
   myMemberId?: string | null;
-  onPaid: () => Promise<void> | void;
-  onExport: () => void;
+  onPaid?: () => Promise<void> | void;
+  /** Omit to hide the export card (e.g. the read-only shared view). */
+  onExport?: () => void;
+  /** Members and viewers can't record payments directly. */
+  canSettle?: boolean;
 }) {
   const colors = useColors();
   const members = group.members || [];
@@ -72,7 +76,7 @@ export function BalanceView({
         createdById: currentUserId,
       });
       setPending(null);
-      await onPaid();
+      await onPaid?.();
     } catch {
       Alert.alert('Could not mark as paid', 'Try again.');
     } finally {
@@ -136,6 +140,7 @@ export function BalanceView({
 
   return (
     <View style={{ gap: 18 }}>
+      {onExport ? (
       <Pressable
         onPress={onExport}
         style={[styles.exportCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -150,6 +155,7 @@ export function BalanceView({
         </View>
         <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
       </Pressable>
+      ) : null}
 
       <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: -8, paddingHorizontal: 2 }}>
         Tap a member to see their balance sheet.
@@ -204,13 +210,15 @@ export function BalanceView({
                   <Text style={[styles.settleAmount, { color: colors.text }]}>
                     {formatMinor(p.amountMinor, currency)}
                   </Text>
-                  <Pressable
-                    onPress={() => setPending(p)}
-                    style={[styles.paidBtn, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.paidBtnText, { color: colors.primaryForeground }]}>
-                      Mark as paid
-                    </Text>
-                  </Pressable>
+                  {canSettle ? (
+                    <Pressable
+                      onPress={() => setPending(p)}
+                      style={[styles.paidBtn, { backgroundColor: colors.primary }]}>
+                      <Text style={[styles.paidBtnText, { color: colors.primaryForeground }]}>
+                        Mark as paid
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               );
             })}

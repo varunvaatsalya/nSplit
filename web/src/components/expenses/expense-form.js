@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, Minus, Plus, Tag, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -200,6 +200,8 @@ export function ExpenseForm({
   onClose,
   expense = null,
   currentUserId = null,
+  // Members can't add directly: the same form sends it to an admin for approval.
+  requestMode = false,
 }) {
   const isEdit = Boolean(expense?._id);
   const members = useMemo(
@@ -218,6 +220,7 @@ export function ExpenseForm({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [title, setTitle] = useState("");
+  const titleRef = useRef(null);
   const [categoryKey, setCategoryKey] = useState("other");
   // Set once the user picks a category; title edits then stop re-suggesting.
   const [categoryManual, setCategoryManual] = useState(false);
@@ -832,18 +835,25 @@ export function ExpenseForm({
         })),
       };
 
-      const res = await fetch(
-        isEdit
-          ? `/api/groups/${group.code}/expenses/${expense._id}`
-          : `/api/groups/${group.code}/expenses`,
-        {
-          method: isEdit ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            isEdit ? { ...payload, baseVersion: expense.version } : payload,
-          ),
-        },
-      );
+      const { categoryId, ...rest } = payload;
+      const res = requestMode
+        ? await fetch(`/api/groups/${group.code}/requests`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind: "expense", expense: { ...rest, categoryKey: categoryId } }),
+          })
+        : await fetch(
+            isEdit
+              ? `/api/groups/${group.code}/expenses/${expense._id}`
+              : `/api/groups/${group.code}/expenses`,
+            {
+              method: isEdit ? "PATCH" : "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(
+                isEdit ? { ...payload, baseVersion: expense.version } : payload,
+              ),
+            },
+          );
       const json = await res.json();
       if (!res.ok) {
         bumpShake();
@@ -870,6 +880,13 @@ export function ExpenseForm({
       <div className="nsplit-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3">
         <div key={`amount-${shakeKey}`}>
           <Input
+            onKeyDown={(e) => {
+              // Enter after the amount moves on to the title instead of submitting a nameless record.
+              if (e.key === "Enter" && !title.trim()) {
+                e.preventDefault();
+                titleRef.current?.focus();
+              }
+            }}
             inputMode="decimal"
             placeholder="0.00"
             value={amount}
@@ -904,6 +921,7 @@ export function ExpenseForm({
             {icon}
           </button>
           <Input
+            ref={titleRef}
             placeholder="Title"
             value={title}
             onChange={(e) => {
@@ -1139,7 +1157,15 @@ export function ExpenseForm({
 
       <div className="shrink-0 border-t border-border bg-surface p-4">
         <Button type="submit" className="w-full" disabled={saving}>
-          {saving ? "Saving…" : isEdit ? "Save changes" : "Add expense"}
+          {saving
+            ? requestMode
+              ? "Sending…"
+              : "Saving…"
+            : requestMode
+              ? "Send for approval"
+              : isEdit
+                ? "Save changes"
+                : "Add expense"}
         </Button>
       </div>
     </form>

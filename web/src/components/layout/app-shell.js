@@ -7,7 +7,7 @@ import { BellIcon } from "lucide-react";
 
 export function AppShell({ user, children }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="nsplit-backdrop min-h-screen">
       <div className="mx-auto flex flex-col items-center min-h-screen py-4 px-4 sm:px-6">
         <header className="w-full max-w-3xl flex shrink-0 items-center justify-between gap-3 px-4 sm:px-6">
           <Link href="/groups" className="min-w-0 flex items-center gap-2">

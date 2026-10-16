@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 
 import { ExpenseForm } from '@/components/expenses/expense-form';
 import { RecordTypeTabs, type RecordTab } from '@/components/records/record-type-tabs';
@@ -86,8 +86,22 @@ export default function AddExpenseScreen() {
     );
   }
 
+  // Members joined via the link send records for an admin to approve.
+  const requestMode = !isEdit && group.myPermission === 'VIEW_ONLY';
+  const done = () => {
+    if (requestMode) {
+      Alert.alert('Sent for approval', 'An admin of this group will review it. You can follow it under Requests.');
+    }
+    router.back();
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {requestMode ? (
+        <Text style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center', paddingTop: 8 }}>
+          An admin approves this before it is added.
+        </Text>
+      ) : null}
       {isEdit ? null : (
         <View style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 }}>
           <RecordTypeTabs value={tab} onChange={setTab} />
@@ -98,7 +112,8 @@ export default function AddExpenseScreen() {
           group={group}
           currentUserId={user?._id}
           transfer={transfer}
-          onSaved={() => router.back()}
+          requestMode={requestMode}
+          onSaved={done}
         />
       ) : (
         <ExpenseForm
@@ -108,7 +123,8 @@ export default function AddExpenseScreen() {
           matchByName={matchByName}
           myMemberId={group.myMembershipId}
           expense={expense}
-          onSaved={() => router.back()}
+          requestMode={requestMode}
+          onSaved={done}
         />
       )}
     </View>

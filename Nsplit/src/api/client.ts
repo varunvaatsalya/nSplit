@@ -32,13 +32,26 @@ function hostFromExpo(): string | null {
   return null;
 }
 
+const PRODUCTION_API = 'https://nsplit.vercel.app';
+const LOOPBACK = /^(https?:\/\/)(localhost|127\.0\.0\.1|0\.0\.0\.0)(?=[:/]|$)/i;
+
 export function getApiBase() {
   const env = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
-  if (env) return env;
-  const host = hostFromExpo();
-  if (host) return `http://${host}:3000`;
-  if (Platform.OS === 'android') return 'https://nsplit.vercel.app';
-  return 'https://nsplit.vercel.app';
+  const devHost = hostFromExpo();
+  if (env) {
+    // On a phone, "localhost" is the phone itself. Point it at the computer that
+    // is running Expo (same machine as the local web server), keeping the port.
+    if (Platform.OS !== 'web' && devHost && LOOPBACK.test(env)) {
+      return env.replace(LOOPBACK, `$1${devHost}`);
+    }
+    return env;
+  }
+  if (devHost) return `http://${devHost}:3000`;
+  return PRODUCTION_API;
+}
+
+if (__DEV__) {
+  console.log(`[nsplit] API server: ${getApiBase()}`);
 }
 
 async function storageGet(key: string): Promise<string | null> {
@@ -107,7 +120,7 @@ export function networkError(message?: string): ApiError {
 
 export async function apiFetch<T = unknown>(
   path: string,
-  { timeoutMs = 6000, ...options }: RequestInit & { timeoutMs?: number } = {}
+  { timeoutMs = 15000, ...options }: RequestInit & { timeoutMs?: number } = {}
 ): Promise<{ ok: boolean; status: number; data: T | null; error: ApiError }> {
   if (!(await isOnline())) {
     return { ok: false, status: 0, data: null, error: networkError() };
@@ -136,12 +149,12 @@ export async function apiFetch<T = unknown>(
       error: json?.error ?? null,
     };
   } catch {
-    return {
-      ok: false,
-      status: 0,
-      data: null,
-      error: networkError(`Cannot reach ${getApiBase()}. Try again when you’re online.`),
-    };
+    // Aborted = the server was reachable but slow (e.g. a cold start); otherwise
+    // nothing answered at that address at all.
+    const message = controller.signal.aborted
+      ? 'The server took too long to answer. Try again in a moment.'
+      : `Cannot reach the server at ${getApiBase()}. Check your connection and try again.`;
+    return { ok: false, status: 0, data: null, error: networkError(message) };
   } finally {
     clearTimeout(timeout);
   }

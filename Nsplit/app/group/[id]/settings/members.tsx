@@ -43,7 +43,6 @@ export default function ManageMembersScreen() {
   const [addingMember, setAddingMember] = useState(false);
   const [editMember, setEditMember] = useState<GroupMember | null>(null);
   const [editName, setEditName] = useState('');
-  const [editUpi, setEditUpi] = useState('');
   const [editError, setEditError] = useState('');
   const [savingMember, setSavingMember] = useState(false);
   const [removeMember, setRemoveMember] = useState<GroupMember | null>(null);
@@ -93,7 +92,7 @@ export default function ManageMembersScreen() {
     if (!group || !editMember || !editName.trim()) return;
     setSavingMember(true);
     try {
-      await updateGroupMember(group._id, editMember._id, { name: editName, upiId: editUpi.trim() || null });
+      await updateGroupMember(group._id, editMember._id, { name: editName });
       setEditMember(null);
       await load();
     } catch (e) {
@@ -194,15 +193,11 @@ export default function ManageMembersScreen() {
                   <Text style={{ color: colors.text, fontWeight: '600' }} numberOfLines={1}>
                     {memberListLabel(member, user?._id, myMember?._id)}
                   </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12 }} numberOfLines={1}>
-                    {member.upiId ? `UPI · ${member.upiId}` : 'No UPI ID'}
-                  </Text>
                 </View>
                 <Pressable
                   onPress={() => {
                     setEditMember(member);
                     setEditName(member.displayName || '');
-                    setEditUpi(member.upiId || '');
                     setEditError('');
                   }}
                   hitSlop={8}
@@ -257,29 +252,6 @@ export default function ManageMembersScreen() {
               style={[
                 styles.input,
                 { color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-              ]}
-            />
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 12, marginBottom: 6 }}>
-              UPI ID (optional) · lets people pay them from a shared link
-            </Text>
-            <TextInput
-              value={editUpi}
-              onChangeText={(next) => {
-                setEditUpi(next);
-                setEditError('');
-              }}
-              placeholder="name@okhdfcbank"
-              placeholderTextColor={colors.textSecondary}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              style={[
-                styles.input,
-                {
-                  color: colors.text,
-                  borderColor: editError ? colors.danger : colors.border,
-                  backgroundColor: colors.background,
-                },
               ]}
             />
             {editError ? <Text style={{ color: colors.danger, fontSize: 12, marginTop: 6 }}>{editError}</Text> : null}

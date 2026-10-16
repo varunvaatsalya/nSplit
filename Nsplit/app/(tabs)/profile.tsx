@@ -4,7 +4,6 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppearanceSettings } from '@/components/profile/appearance-settings';
-import { OfflineBanner } from '@/components/offline-banner';
 import { Field } from '@/components/ui/field';
 import { SyncStatusCard } from '@/components/sync/sync-status-card';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -75,7 +74,6 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Profile</Text>
         </View>
-        <OfflineBanner />
 
         {user ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

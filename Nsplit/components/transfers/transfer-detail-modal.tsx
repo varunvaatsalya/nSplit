@@ -72,6 +72,7 @@ export function TransferDetailPage({
   myMemberId,
   onEdit,
   onDeleted,
+  readOnly = false,
 }: {
   transfer: Transfer;
   group: GroupDetail;
@@ -79,6 +80,8 @@ export function TransferDetailPage({
   myMemberId?: string | null;
   onEdit: (transfer: Transfer) => void;
   onDeleted: () => void;
+  /** Viewers and members: no edit or delete. */
+  readOnly?: boolean;
 }) {
   const colors = useColors();
   const [deleting, setDeleting] = useState(false);
@@ -119,7 +122,7 @@ export function TransferDetailPage({
         <View style={[styles.emoji, { backgroundColor: colors.softSurface }]}>
           <Text style={{ fontSize: 28 }}>{transfer.icon || '💸'}</Text>
         </View>
-        <View className="flex-row gap-1">
+        <View className="flex-row gap-1" style={readOnly ? { display: 'none' } : undefined}>
           <Pressable onPress={() => onEdit(transfer)} style={styles.iconHit} hitSlop={8}>
             <MaterialIcons name="edit" size={20} color={colors.text} />
           </Pressable>

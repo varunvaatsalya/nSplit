@@ -35,6 +35,7 @@ import { useColors } from "@/hooks/use-colors";
 import { cn } from "@/lib/utils";
 import type { Expense, GroupDetail, GroupMember } from "@/src/api/types";
 import { getCategoryMemory, rememberCategory } from "@/src/db/category-memory";
+import { sendMemberRequest } from "@/src/api/shares";
 import { saveExpense } from "@/src/db/expenses";
 import { getCategoryByKey, suggestCategory } from "@/src/lib/expense-icons";
 import {
@@ -100,6 +101,7 @@ export function ExpenseForm({
   myMemberId,
   expense = null,
   onSaved,
+  requestMode = false,
 }: {
   group: GroupDetail;
   currentUserId?: string | null;
@@ -108,6 +110,8 @@ export function ExpenseForm({
   myMemberId?: string | null;
   expense?: Expense | null;
   onSaved: () => void;
+  /** Members can't add directly: the same form sends it to an admin for approval. */
+  requestMode?: boolean;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -749,19 +753,36 @@ export function ExpenseForm({
                 : Math.round(Number(exactInputs[m._id] || 0) * 100),
         })),
       };
-      await saveExpense(
-        group._id,
-        { ...payload, createdById: currentUserId },
-        expense?._id,
-      );
+      if (requestMode) {
+        const { categoryId, ...rest } = payload;
+        const res = await sendMemberRequest(group.code, {
+          kind: "expense",
+          expense: { ...rest, categoryKey: categoryId },
+        });
+        if (!res.ok) throw new Error(res.error?.message || "Could not send for approval");
+      } else {
+        await saveExpense(
+          group._id,
+          { ...payload, createdById: currentUserId },
+          expense?._id,
+        );
+      }
       // Learn from corrections: same title, same category next time.
       if (categoryManual && categoryKey !== suggestCategory(title, categoryMemory).key) {
         rememberCategory(title, categoryKey).catch(() => {});
       }
       Keyboard.dismiss();
       onSaved();
-    } catch {
-      setError(isEdit ? "Failed to save expense" : "Failed to add expense");
+    } catch (e) {
+      setError(
+        requestMode
+          ? e instanceof Error
+            ? e.message
+            : "Could not send for approval"
+          : isEdit
+            ? "Failed to save expense"
+            : "Failed to add expense",
+      );
       setSaving(false);
     }
   }
@@ -1184,7 +1205,17 @@ export function ExpenseForm({
 
         {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
         <PrimaryButton
-          title={saving ? "Saving…" : isEdit ? "Save changes" : "Add expense"}
+          title={
+            saving
+              ? requestMode
+                ? "Sending…"
+                : "Saving…"
+              : requestMode
+                ? "Send for approval"
+                : isEdit
+                  ? "Save changes"
+                  : "Add expense"
+          }
           loading={saving}
           onPress={onSubmit}
         />

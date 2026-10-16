@@ -17,37 +17,72 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SettingsHeader } from '@/components/settings/settings-header';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { useColors } from '@/hooks/use-colors';
-import { listPendingRequests, reviewRequest, type ShareRequest } from '@/src/api/requests';
+import { listRequests, reviewRequest, type ShareRequest } from '@/src/api/requests';
 import type { GroupDetail, GroupMember } from '@/src/api/types';
 import { getGroup } from '@/src/db/groups';
-import { suggestCategory } from '@/src/lib/expense-icons';
-import { getExpenseEmoji } from '@/src/lib/icons';
 import { formatLongDate, formatMinor, memberName } from '@/src/lib/format';
+import { getExpenseEmoji } from '@/src/lib/icons';
 import { useOffline } from '@/src/offline/offline-context';
 import { useSync } from '@/src/sync/sync-context';
 
-/** Plain-English description of what a request would add. */
+const SPLIT_LABELS: Record<string, string> = {
+  EQUAL: 'equally',
+  EXACT: 'by amount',
+  SHARES: 'by parts',
+  PERCENTAGE: 'by percent',
+};
+
+function names(ids: string[], byId: Record<string, GroupMember>) {
+  const list = ids.map((id) => memberName(byId[id]));
+  return list.length <= 3 ? list.join(', ') : `${list.slice(0, 3).join(', ')} +${list.length - 3}`;
+}
+
+/** Plain-English description of what a request asks for. */
 function describe(request: ShareRequest, byId: Record<string, GroupMember>, currency: string) {
   const p = request.payload;
-  if (request.kind === 'payment') {
+  if (request.kind === 'join') {
     return {
-      icon: '💸',
-      title: `${memberName(byId[p.fromMemberId || ''])} paid ${memberName(byId[p.toMemberId || ''])}`,
-      lines: [p.note ? `“${p.note}”` : null].filter(Boolean) as string[],
+      icon: '🙋',
+      title: `Join as ${request.submitterName}`,
+      amount: null,
+      lines: [`${request.requesterName || 'Someone'} · ${request.requesterEmail || 'no email'}`],
     };
   }
-  const count = p.splitMemberIds?.length || 1;
+  if (request.kind === 'payment') {
+    return {
+      icon: p.icon || '💸',
+      title: p.title || `${memberName(byId[p.fromMemberId || ''])} paid ${memberName(byId[p.toMemberId || ''])}`,
+      amount: formatMinor(p.amountMinor || 0, currency),
+      lines: [
+        `${memberName(byId[p.fromMemberId || ''])} → ${memberName(byId[p.toMemberId || ''])}`,
+        p.note ? `“${p.note}”` : null,
+      ].filter(Boolean) as string[],
+    };
+  }
+  const payers = (p.payers || []).map((x) => x.memberId);
+  const split = (p.participants || []).filter((x) => x.included !== false).map((x) => x.memberId);
   return {
-    icon: getExpenseEmoji(null, suggestCategory(p.title || '').key),
+    icon: getExpenseEmoji(p.icon, p.categoryKey),
     title: p.title || 'Expense',
+    amount: formatMinor(p.amountMinor || 0, currency),
     lines: [
-      `Paid by ${memberName(byId[p.paidByMemberId || ''])} · ${formatLongDate(p.expenseDate)}`,
-      `Split equally between ${count} ${count === 1 ? 'person' : 'people'} (about ${formatMinor(Math.floor(p.amountMinor / count), currency)} each)`,
-      p.note ? `“${p.note}”` : null,
+      `Paid by ${names(payers, byId)} · ${formatLongDate(p.expenseDate)}`,
+      `Split ${SPLIT_LABELS[p.splitMethod || ''] || ''} between ${names(split, byId)}`,
+      p.description ? `“${p.description}”` : null,
     ].filter(Boolean) as string[],
   };
 }
 
+const STATUS: Record<ShareRequest['status'], { label: string; color: 'warning' | 'success' | 'danger' }> = {
+  PENDING: { label: 'Waiting for approval', color: 'warning' },
+  APPROVED: { label: 'Approved', color: 'success' },
+  REJECTED: { label: 'Declined', color: 'danger' },
+};
+
+/**
+ * Requests for a group. Admins approve or decline join requests and suggested
+ * expenses/payments; members follow the ones they sent.
+ */
 export default function RequestsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
@@ -56,6 +91,7 @@ export default function RequestsScreen() {
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [requests, setRequests] = useState<ShareRequest[] | null>(null);
+  const [canReview, setCanReview] = useState(false);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [declining, setDeclining] = useState<ShareRequest | null>(null);
@@ -72,7 +108,7 @@ export default function RequestsScreen() {
       setRequests([]);
       return;
     }
-    const res = await listPendingRequests(local.code);
+    const res = await listRequests(local.code, true);
     if (!res.ok || !res.data) {
       setError(res.error?.message || 'Could not load requests.');
       setRequests([]);
@@ -80,6 +116,7 @@ export default function RequestsScreen() {
     }
     setError('');
     setRequests(res.data.requests);
+    setCanReview(res.data.canReview);
   }, [id, online]);
 
   useFocusEffect(
@@ -94,16 +131,16 @@ export default function RequestsScreen() {
     setError('');
     try {
       const res = await reviewRequest(group.code, request._id, action, action === 'reject' ? reason.trim() : null);
-      // 409: someone else already reviewed it; either way it leaves the inbox.
+      // 409: someone else already reviewed it.
       if (!res.ok && res.status !== 409) {
         setError(res.error?.message || 'Could not update this request.');
         return;
       }
-      setRequests((prev) => (prev || []).filter((r) => r._id !== request._id));
       setDeclining(null);
       setReason('');
-      // Approval created the record on the server; bring it to this phone.
+      // Approving created a record or a member on the server; bring it here.
       if (action === 'approve') syncNow().catch(() => {});
+      await load();
     } finally {
       setBusyId(null);
     }
@@ -111,10 +148,74 @@ export default function RequestsScreen() {
 
   const byId = Object.fromEntries((group?.members || []).map((m) => [m._id, m]));
   const currency = group?.currency || 'INR';
+  const pending = (requests || []).filter((r) => r.status === 'PENDING');
+  const reviewed = (requests || []).filter((r) => r.status !== 'PENDING');
+
+  function card(r: ShareRequest) {
+    const d = describe(r, byId, currency);
+    const busy = busyId === r._id;
+    const status = STATUS[r.status];
+    const showActions = canReview && r.status === 'PENDING';
+    return (
+      <View key={r._id} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        {canReview && r.kind !== 'join' ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>
+            <Text style={{ color: colors.text, fontWeight: '700' }}>{r.submitterName}</Text>
+            {r.kind === 'payment' ? ' recorded a payment' : ' suggested an expense'} · {formatLongDate(r.createdAt)}
+            {r.requesterEmail ? `\n${r.requesterEmail}` : ''}
+          </Text>
+        ) : null}
+        <View style={styles.row}>
+          <View style={[styles.icon, { backgroundColor: colors.softSurface }]}>
+            <Text style={{ fontSize: 18 }}>{d.icon}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={styles.titleRow}>
+              <Text style={{ flex: 1, color: colors.text, fontWeight: '700' }}>{d.title}</Text>
+              {d.amount ? <Text style={{ color: colors.text, fontWeight: '700' }}>{d.amount}</Text> : null}
+            </View>
+            {d.lines.map((line) => (
+              <Text key={line} style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                {line}
+              </Text>
+            ))}
+            {!showActions ? (
+              <Text style={{ color: colors[status.color], fontSize: 12, fontWeight: '700', marginTop: 6 }}>
+                {status.label}
+                {r.status === 'REJECTED' && r.rejectReason ? (
+                  <Text style={{ color: colors.textSecondary, fontWeight: '400' }}> · {r.rejectReason}</Text>
+                ) : null}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        {showActions ? (
+          <View style={[styles.row, { marginTop: 12 }]}>
+            <Pressable
+              disabled={busy}
+              onPress={() => {
+                setReason('');
+                setDeclining(r);
+              }}
+              style={[styles.ghostBtn, { borderColor: colors.border }]}>
+              <Text style={{ color: colors.text, fontWeight: '600' }}>Decline</Text>
+            </Pressable>
+            <View style={{ flex: 1 }}>
+              <PrimaryButton
+                title={busy ? 'Approving…' : r.kind === 'join' ? 'Approve join' : 'Approve'}
+                loading={busy}
+                onPress={() => void act(r, 'approve')}
+              />
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
-      <SettingsHeader title="Requests" />
+      <SettingsHeader title={canReview ? 'Requests' : 'Your requests'} />
       <ScrollView
         contentContainerStyle={styles.body}
         refreshControl={
@@ -128,7 +229,9 @@ export default function RequestsScreen() {
           />
         }>
         <Text style={{ color: colors.textSecondary, marginBottom: 14, lineHeight: 19 }}>
-          Sent by people using this group’s share link. Approving adds it to the ledger.
+          {canReview
+            ? 'People asking to join this group, and expenses or payments members sent for approval.'
+            : 'Expenses and payments you sent. They are added once an admin approves them.'}
         </Text>
         {error ? <Text style={{ color: colors.danger, marginBottom: 12 }}>{error}</Text> : null}
 
@@ -137,51 +240,25 @@ export default function RequestsScreen() {
         ) : requests.length === 0 && !error ? (
           <View style={styles.empty}>
             <MaterialIcons name="inbox" size={32} color={colors.textSecondary} />
-            <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Nothing waiting. You’re all caught up.</Text>
+            <Text style={{ color: colors.textSecondary, marginTop: 8 }}>
+              {canReview ? 'Nothing waiting. You’re all caught up.' : 'You haven’t sent anything yet.'}
+            </Text>
           </View>
         ) : (
-          requests.map((r) => {
-            const d = describe(r, byId, currency);
-            const busy = busyId === r._id;
-            return (
-              <View key={r._id} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>{r.submitterName}</Text>
-                  {r.kind === 'payment' ? ' says they paid' : ' suggested an expense'} · {formatLongDate(r.createdAt)}
-                </Text>
-                <View style={styles.row}>
-                  <View style={[styles.icon, { backgroundColor: colors.softSurface }]}>
-                    <Text style={{ fontSize: 18 }}>{d.icon}</Text>
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={styles.titleRow}>
-                      <Text style={{ flex: 1, color: colors.text, fontWeight: '700' }}>{d.title}</Text>
-                      <Text style={{ color: colors.text, fontWeight: '700' }}>{formatMinor(r.payload.amountMinor, currency)}</Text>
-                    </View>
-                    {d.lines.map((line) => (
-                      <Text key={line} style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-                        {line}
-                      </Text>
-                    ))}
-                  </View>
-                </View>
-                <View style={[styles.row, { marginTop: 12 }]}>
-                  <Pressable
-                    disabled={busy}
-                    onPress={() => {
-                      setReason('');
-                      setDeclining(r);
-                    }}
-                    style={[styles.ghostBtn, { borderColor: colors.border }]}>
-                    <Text style={{ color: colors.text, fontWeight: '600' }}>Decline</Text>
-                  </Pressable>
-                  <View style={{ flex: 1 }}>
-                    <PrimaryButton title={busy ? 'Adding…' : 'Approve'} loading={busy} onPress={() => void act(r, 'approve')} />
-                  </View>
-                </View>
-              </View>
-            );
-          })
+          <>
+            {pending.length ? (
+              <>
+                <Text style={[styles.section, { color: colors.textSecondary }]}>WAITING ({pending.length})</Text>
+                {pending.map(card)}
+              </>
+            ) : null}
+            {reviewed.length ? (
+              <>
+                <Text style={[styles.section, { color: colors.textSecondary }]}>REVIEWED</Text>
+                {reviewed.map(card)}
+              </>
+            ) : null}
+          </>
         )}
       </ScrollView>
 
@@ -191,12 +268,14 @@ export default function RequestsScreen() {
           <View style={[styles.sheet, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
             <Text style={{ color: colors.text, fontSize: 17, fontWeight: '700' }}>Decline this request?</Text>
             <Text style={{ color: colors.textSecondary, marginTop: 4, marginBottom: 12 }}>
-              {declining?.submitterName} will see it was declined, with your reason.
+              {declining?.kind === 'join'
+                ? `${declining?.requesterName || 'They'} will see the request was declined.`
+                : `${declining?.submitterName} will see it was declined, with your reason.`}
             </Text>
             <TextInput
               value={reason}
               onChangeText={setReason}
-              placeholder="Reason (optional), e.g. already added"
+              placeholder="Reason (optional)"
               placeholderTextColor={colors.textSecondary}
               maxLength={200}
               autoFocus
@@ -224,6 +303,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   body: { paddingHorizontal: 20, paddingBottom: 40 },
   empty: { alignItems: 'center', marginTop: 40 },
+  section: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, marginTop: 8, marginBottom: 8 },
   card: { borderWidth: 1, borderRadius: 18, padding: 14, marginBottom: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },

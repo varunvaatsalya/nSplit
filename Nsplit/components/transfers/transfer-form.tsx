@@ -1,6 +1,7 @@
 import { Check, ChevronDown, User } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -21,6 +22,7 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Text as UIText } from '@/components/ui/text';
 import { useColors } from '@/hooks/use-colors';
 import type { GroupDetail, GroupMember, Transfer } from '@/src/api/types';
+import { sendMemberRequest } from '@/src/api/shares';
 import { saveTransfer } from '@/src/db/transfers';
 import { matchCategory } from '@/src/lib/expense-icons';
 import { memberListLabel, sortMembersByName } from '@/src/lib/members';
@@ -101,11 +103,14 @@ export function TransferForm({
   currentUserId,
   transfer,
   onSaved,
+  requestMode = false,
 }: {
   group: GroupDetail;
   currentUserId?: string | null;
   transfer?: Transfer | null;
   onSaved: () => void;
+  /** Members can't record directly: the same form sends it to an admin for approval. */
+  requestMode?: boolean;
 }) {
   const colors = useColors();
   const members = useMemo(() => sortMembersByName(group.members || []), [group.members]);
@@ -190,23 +195,27 @@ export function TransferForm({
 
     setSaving(true);
     try {
-      await saveTransfer(
-        group._id,
-        {
-          title: title.trim(),
-          icon,
-          amountMinor: Math.round(n * 100),
-          fromMemberId,
-          toMemberId,
-          transferDate: transferAt.toISOString(),
-          createdById: currentUserId,
-        },
-        transfer?._id
-      );
+      const record = {
+        title: title.trim(),
+        icon,
+        amountMinor: Math.round(n * 100),
+        fromMemberId,
+        toMemberId,
+        transferDate: transferAt.toISOString(),
+      };
+      if (requestMode) {
+        const res = await sendMemberRequest(group.code, { kind: 'payment', payment: record });
+        if (!res.ok) throw new Error(res.error?.message || 'Could not send for approval');
+      } else {
+        await saveTransfer(group._id, { ...record, createdById: currentUserId }, transfer?._id);
+      }
       Keyboard.dismiss();
       onSaved();
-    } catch {
+    } catch (e) {
       setSaving(false);
+      if (requestMode) {
+        Alert.alert('Could not send', e instanceof Error ? e.message : 'Try again when you are online.');
+      }
     }
   }
 
@@ -341,7 +350,17 @@ export function TransferForm({
         </View>
 
         <PrimaryButton
-          title={saving ? 'Saving…' : isEdit ? 'Save changes' : 'Record transfer'}
+          title={
+            saving
+              ? requestMode
+                ? 'Sending…'
+                : 'Saving…'
+              : requestMode
+                ? 'Send for approval'
+                : isEdit
+                  ? 'Save changes'
+                  : 'Record transfer'
+          }
           loading={saving}
           onPress={onSubmit}
         />

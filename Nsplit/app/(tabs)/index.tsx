@@ -1,22 +1,53 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import GroupDiscussion from '@/assets/illustrations/group-discussion-amico.svg';
+import { AddGroupSheet } from '@/components/groups/add-group-sheet';
+import { SavedGroupCard } from '@/components/groups/saved-group-card';
 import { NsplitBrand } from '@/components/nsplit-logo';
 import { OfflineBanner } from '@/components/offline-banner';
 import { Button } from '@/components/ui/button';
 import { Text as UIText } from '@/components/ui/text';
 import { useColors } from '@/hooks/use-colors';
+import { listSavedShares, removeSavedShare, type SavedShare } from '@/src/api/shares';
+import { useAuth } from '@/src/auth/auth-context';
+import { getCachedSavedShares, setCachedSavedShares } from '@/src/db/saved-shares';
 import { useGroups } from '@/src/groups/groups-context';
+import { useOffline } from '@/src/offline/offline-context';
 import { getGroupEmoji } from '@/src/lib/icons';
 
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const { groups, reload } = useGroups();
+  const { user } = useAuth();
+  const { online } = useOffline();
+  // Groups added by link (view only), shown in the same list.
+  const [shares, setShares] = useState<SavedShare[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const loadShares = useCallback(async () => {
+    if (!user) {
+      setShares([]);
+      return;
+    }
+    setShares(await getCachedSavedShares());
+    if (!online) return;
+    const res = await listSavedShares();
+    if (res.ok && res.data) {
+      setShares(res.data.shares);
+      await setCachedSavedShares(res.data.shares);
+    }
+  }, [user, online]);
+
+  async function removeShare(token: string) {
+    setShares((prev) => prev.filter((s) => s.token !== token));
+    await removeSavedShare(token).catch(() => {});
+    loadShares().catch(() => {});
+  }
   const { width } = useWindowDimensions();
   const artWidth = Math.min(280, Math.round(width * 0.72));
   const artHeight = Math.round(artWidth * (419.74 / 474.81));
@@ -24,11 +55,12 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       reload();
-    }, [reload])
+      loadShares().catch(() => {});
+    }, [reload, loadShares])
   );
 
   function openCreate() {
-    router.push('/group/new');
+    setAddOpen(true);
   }
 
   return (
@@ -38,7 +70,7 @@ export default function HomeScreen() {
       </View>
       <OfflineBanner />
 
-      {groups.length === 0 ? (
+      {groups.length === 0 && shares.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6 pb-16">
           <GroupDiscussion width={artWidth} height={artHeight} />
           <UIText className="mt-4 text-center text-xl font-bold">No groups yet</UIText>
@@ -46,7 +78,7 @@ export default function HomeScreen() {
             Make a group, add your people, and start splitting expenses.
           </UIText>
           <Button variant="link" onPress={openCreate} className="mt-4">
-            <UIText>Create new group</UIText>
+            <UIText>Add a group</UIText>
           </Button>
         </View>
       ) : (
@@ -78,6 +110,14 @@ export default function HomeScreen() {
               <MaterialIcons name="chevron-right" size={22} color={colors.textSecondary} />
             </Pressable>
           ))}
+          {shares.map((share) => (
+            <SavedGroupCard
+              key={`share-${share.token}`}
+              share={share}
+              onOpen={() => router.push({ pathname: '/s/[token]', params: { token: share.token } })}
+              onRemove={() => void removeShare(share.token)}
+            />
+          ))}
         </ScrollView>
       )}
 
@@ -86,6 +126,15 @@ export default function HomeScreen() {
         style={[styles.fab, { backgroundColor: colors.primary }]}>
         <MaterialIcons name="add" size={28} color="#ffffff" />
       </Pressable>
+
+      <AddGroupSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdded={() => {
+          reload();
+          loadShares().catch(() => {});
+        }}
+      />
     </SafeAreaView>
   );
 }

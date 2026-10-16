@@ -221,3 +221,61 @@ body {
     scroll-behavior: smooth;
   }
 }
+/*
+ * Quiet backdrop for the signed-in app and shared group pages: a faint primary
+ * glow at the top and a dot grid that fades out, so content cards stand out
+ * without the background competing for attention.
+ */
+.nsplit-backdrop {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--background);
+}
+
+.nsplit-backdrop::before,
+.nsplit-backdrop::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.nsplit-backdrop::before {
+  background: radial-gradient(
+    ellipse 70% 45% at 50% -8%,
+    color-mix(in oklch, var(--primary) 14%, transparent),
+    transparent 72%
+  );
+}
+
+.nsplit-backdrop::after {
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--foreground) 9%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 0%, transparent 75%);
+}
+
+.dark .nsplit-backdrop::before {
+  background: radial-gradient(
+    ellipse 70% 45% at 50% -8%,
+    color-mix(in oklch, var(--primary) 32%, transparent),
+    transparent 72%
+  );
+}
+
+.dark .nsplit-backdrop::after {
+  background-image: radial-gradient(
+    color-mix(in oklch, var(--foreground) 7%, transparent) 1px,
+    transparent 1.2px
+  );
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .nsplit-backdrop::after {
+    display: none;
+  }
+}

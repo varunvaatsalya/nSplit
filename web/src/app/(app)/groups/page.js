@@ -2,11 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Link2, Plus, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { UserAvatar } from "@/components/user-avatar";
+import { AddExistingDialog } from "@/components/groups/add-existing-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SavedGroupCard } from "@/components/groups/saved-group-card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -45,18 +53,16 @@ function GroupsListSkeleton() {
   );
 }
 
+// Members are just names, as in the app. People join through the share link,
+// so nobody needs an email or an account to be part of a group.
 function emptyMember() {
-  return { name: "", email: "", invite: false, permission: "ADD" };
+  return { name: "" };
 }
 
 function contactMatchesRow(member, contact) {
-  const email = contact.email?.trim().toLowerCase();
   const name = contact.name?.trim().toLowerCase();
-  const mEmail = member.email?.trim().toLowerCase();
   const mName = member.name?.trim().toLowerCase();
-  if (email && mEmail && email === mEmail) return true;
-  if (name && mName && name === mName && (!email || !mEmail)) return true;
-  return false;
+  return Boolean(name && mName && name === mName);
 }
 
 function isContactTaken(members, contact, exceptIndex) {
@@ -74,15 +80,16 @@ function filterContactSuggestions(contacts, members, index, query) {
   return contacts
     .filter((c) => {
       if (isContactTaken(members, c, index)) return false;
-      const name = (c.name || "").toLowerCase();
-      const email = (c.email || "").toLowerCase();
-      return name.includes(q) || email.includes(q);
+      return (c.name || "").toLowerCase().includes(q);
     })
     .slice(0, 6);
 }
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
+  // Groups added by link (view only), shown in the same list.
+  const [shares, setShares] = useState([]);
+  const [addExistingOpen, setAddExistingOpen] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState(DEFAULT_GROUP_EMOJI);
@@ -98,9 +105,10 @@ export default function GroupsPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/groups");
-    const json = await res.json();
+    const [res, sharesRes] = await Promise.all([fetch("/api/groups"), fetch("/api/shares")]);
+    const [json, sharesJson] = await Promise.all([res.json(), sharesRes.json().catch(() => null)]);
     if (res.ok) setGroups(json.data.groups || []);
+    if (sharesRes.ok) setShares(sharesJson?.data?.shares || []);
     setLoading(false);
   }
 
@@ -139,20 +147,14 @@ export default function GroupsPage() {
   }
 
   function applyContact(index, contact) {
-    updateMember(index, {
-      name: contact.name || "",
-      email: contact.email || "",
-      invite: Boolean(contact.email),
-      permission: "ADD",
-    });
+    updateMember(index, { name: contact.name || "" });
     setSuggestKey(null);
   }
 
-  function suggestionsFor(index, field) {
+  function suggestionsFor(index) {
     const member = members[index];
     if (!member) return [];
-    const query = field === "email" ? member.email : member.name;
-    return filterContactSuggestions(contacts, members, index, query);
+    return filterContactSuggestions(contacts, members, index, member.name);
   }
 
   function resetForm() {
@@ -171,14 +173,7 @@ export default function GroupsPage() {
     setError("");
     setCreating(true);
 
-    const cleaned = members
-      .map((m) => ({
-        name: m.name.trim(),
-        email: m.email.trim() || null,
-        invite: Boolean(m.invite),
-        permission: m.invite ? m.permission : "ADD",
-      }))
-      .filter((m) => m.name);
+    const cleaned = members.map((m) => ({ name: m.name.trim() })).filter((m) => m.name);
 
     try {
       const res = await fetch("/api/groups", {
@@ -215,15 +210,34 @@ export default function GroupsPage() {
             Manage your shared expenses and collaborative budgets.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className={"cursor-pointer"}
-        >
-          <Plus className="h-4 w-4" />
-          New group
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" className="cursor-pointer">
+              <Plus className="h-4 w-4" />
+              Add group
+              <ChevronDown className="h-4 w-4 opacity-80" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onSelect={() => setShowForm(true)}>
+              <Users className="h-4 w-4 text-muted" />
+              <span>
+                <span className="block font-semibold">New group</span>
+                <span className="block text-xs text-muted">Start a group and add people</span>
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setAddExistingOpen(true)}>
+              <Link2 className="h-4 w-4 text-muted" />
+              <span>
+                <span className="block font-semibold">Add existing</span>
+                <span className="block text-xs text-muted">Paste a link someone shared</span>
+              </span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <AddExistingDialog open={addExistingOpen} onOpenChange={setAddExistingOpen} onAdded={load} />
 
       <Dialog
         open={showForm}
@@ -289,69 +303,38 @@ export default function GroupsPage() {
               </div>
 
               {members.map((member, index) => {
-                const nameKey = `${index}:name`;
-                const emailKey = `${index}:email`;
-                const nameSuggestions = suggestionsFor(index, "name");
-                const emailSuggestions = suggestionsFor(index, "email");
-
+                const key = `${index}:name`;
                 return (
-                  <div
-                    key={index}
-                    className="space-y-2 rounded-lg border border-border p-2.5"
-                  >
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-soft text-xs font-semibold text-muted">
+                      {index + 1}
+                    </span>
                     <MemberSuggestField
+                      className="flex-1"
                       value={member.name}
                       placeholder="Name / nickname"
-                      suggestions={nameSuggestions}
-                      open={suggestKey === nameKey}
-                      onOpenChange={(open) =>
-                        setSuggestKey(open ? nameKey : null)
-                      }
+                      suggestions={suggestionsFor(index)}
+                      open={suggestKey === key}
+                      onOpenChange={(open) => setSuggestKey(open ? key : null)}
                       onChange={(next) => updateMember(index, { name: next })}
                       onPick={(contact) => applyContact(index, contact)}
                     />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <MemberSuggestField
-                        type="email"
-                        value={member.email}
-                        placeholder="Email (optional)"
-                        className="min-w-0 flex-1"
-                        suggestions={emailSuggestions}
-                        open={suggestKey === emailKey}
-                        onOpenChange={(open) =>
-                          setSuggestKey(open ? emailKey : null)
-                        }
-                        onChange={(next) =>
-                          updateMember(index, {
-                            email: next,
-                            invite: next.trim() ? member.invite : false,
-                          })
-                        }
-                        onPick={(contact) => applyContact(index, contact)}
-                      />
-                      <label className="flex items-center gap-1.5 text-xs text-muted">
-                        <Checkbox
-                          checked={member.invite}
-                          disabled={!member.email.trim()}
-                          onCheckedChange={(v) =>
-                            updateMember(index, { invite: Boolean(v) })
-                          }
-                        />
-                        Invite
-                      </label>
-                      {members.length > 1 ? (
-                        <button
-                          type="button"
-                          onClick={() => removeMember(index)}
-                          className="text-xs text-muted hover:text-danger"
-                        >
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
+                    {members.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => removeMember(index)}
+                        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted hover:bg-soft hover:text-danger"
+                        aria-label={`Remove member ${index + 1}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    ) : null}
                   </div>
                 );
               })}
+              <p className="text-xs text-muted">
+                Only names are needed. Share the group link later so everyone can see the ledger.
+              </p>
             </div>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -382,18 +365,25 @@ export default function GroupsPage() {
 
       {loading ? (
         <GroupsListSkeleton />
-      ) : groups.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center">
-          <p className="text-sm text-muted">No groups yet.</p>
-          <Button
-            type="button"
-            variant="link"
-            className="mt-1"
-            onClick={() => setShowForm(true)}
-          >
-            Create your first group
-          </Button>
-        </div>
+      ) : groups.length === 0 && shares.length === 0 ? (
+        <EmptyState
+          illustration="/illustrations/group-discussion-amico.svg"
+          title="No groups yet"
+          actions={
+            <>
+              <Button type="button" onClick={() => setShowForm(true)}>
+                <Users className="h-4 w-4" />
+                New group
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setAddExistingOpen(true)}>
+                <Link2 className="h-4 w-4" />
+                Add existing
+              </Button>
+            </>
+          }
+        >
+          Make a group, add your people, and start splitting expenses.
+        </EmptyState>
       ) : (
         <ul className="space-y-3">
           {groups.map((g) => {
@@ -421,6 +411,11 @@ export default function GroupsPage() {
               </li>
             );
           })}
+          {shares.map((share) => (
+            <li key={`share-${share.token}`}>
+              <SavedGroupCard share={share} onRemoved={load} />
+            </li>
+          ))}
         </ul>
       )}
     </div>
