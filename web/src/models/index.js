@@ -18,3 +18,4 @@ export { MutationLog } from "./MutationLog.js";
 export * from "./_utils.js";
 export { ShareRequest, ShareRequestKind, ShareRequestStatus } from "./ShareRequest.js";
 export { SavedShare } from "./SavedShare.js";
+export { Feedback, FeedbackType } from "./Feedback.js";

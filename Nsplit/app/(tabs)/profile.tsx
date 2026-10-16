@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import Feather from '@expo/vector-icons/Feather';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppearanceSettings } from '@/components/profile/appearance-settings';
+import { FeedbackRow } from '@/components/feedback/feedback-row';
+import { AppearanceRow } from '@/components/profile/appearance-row';
 import { Field } from '@/components/ui/field';
 import { SyncStatusCard } from '@/components/sync/sync-status-card';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -59,6 +61,13 @@ export default function ProfileScreen() {
     }
   }
 
+  function confirmLogout() {
+    Alert.alert('Log out?', 'You can log in again anytime.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: () => void onLogout() },
+    ]);
+  }
+
   async function saveName() {
     const trimmed = draftName.trim();
     setDraftName(trimmed);
@@ -96,8 +105,6 @@ export default function ProfileScreen() {
 
         <SyncStatusCard />
 
-        <AppearanceSettings />
-
         <View style={[styles.settings, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.section, { color: colors.text }]}>In groups</Text>
           <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 10 }}>
@@ -127,15 +134,30 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        <View style={{ paddingHorizontal: 20, marginTop: 16, gap: 10 }}>
+        <View style={{ marginHorizontal: 20, marginTop: 16, gap: 10 }}>
+          <AppearanceRow />
+          <FeedbackRow source="profile" />
+        </View>
+
+        <View style={{ paddingHorizontal: 20, marginTop: 24, alignItems: 'center' }}>
           {user ? (
-            <PrimaryButton
-              title={pending || signingOut ? 'Logging out…' : 'Log out'}
-              loading={pending || signingOut}
-              onPress={onLogout}
-            />
+            <Pressable
+              onPress={confirmLogout}
+              disabled={pending || signingOut}
+              style={[styles.logout, { borderColor: `${colors.danger}55`, opacity: pending || signingOut ? 0.6 : 1 }]}>
+              {pending || signingOut ? (
+                <ActivityIndicator size="small" color={colors.danger} />
+              ) : (
+                <Feather name="log-out" size={16} color={colors.danger} />
+              )}
+              <Text style={{ color: colors.danger, fontWeight: '700' }}>
+                {pending || signingOut ? 'Logging out…' : 'Log out'}
+              </Text>
+            </Pressable>
           ) : (
-            <PrimaryButton title="Log in" onPress={() => router.push('/login')} />
+            <View style={{ alignSelf: 'stretch' }}>
+              <PrimaryButton title="Log in" onPress={() => router.push('/login')} />
+            </View>
           )}
         </View>
       </ScrollView>
@@ -165,6 +187,15 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   section: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  logout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

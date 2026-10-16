@@ -1,6 +1,7 @@
 "use client";
 
 import { ShareLinkCard } from "@/components/groups/share-link-card";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -506,6 +507,8 @@ export default function GroupSettingsPage() {
         {canManageSettings ? (
           <ShareLinkCard groupCode={group.code} />
         ) : null}
+
+        <FeedbackButton source="group-settings" groupRef={group.code} />
 
         {canDeleteGroup ? (
           <Card className="border-danger/30">

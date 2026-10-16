@@ -1,48 +1,38 @@
 import { getSessionUser } from "@/lib/auth/session";
 import { LogoutButton } from "@/components/auth/logout-button";
-import { ThemeSelect } from "@/components/theme-select";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
+import { AppearanceButton } from "@/components/profile/appearance-button";
 import { UserAvatar } from "@/components/user-avatar";
 
 export default async function ProfilePage() {
   const session = await getSessionUser();
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-      <div className="mt-6 space-y-4 rounded-xl border border-border bg-surface p-5 text-sm">
-        <div className="flex items-center gap-3">
-          <UserAvatar
-            className="h-14 w-14"
-            fallbackClassName="text-base"
-            name={session.user.name}
-            avatar={session.user.avatar}
-            seed={session.user._id}
-          />
-          <div className="min-w-0">
-            <div className="truncate font-medium">{session.user.name}</div>
-            <div className="truncate text-muted">{session.user.email}</div>
-          </div>
+    <div className="mx-auto max-w-xl pb-16">
+      <h1 className="text-[22px] font-bold">Profile</h1>
+
+      <div className="mt-4 flex items-center gap-4 rounded-2xl border border-border bg-surface p-5">
+        <UserAvatar
+          className="h-16 w-16"
+          fallbackClassName="text-lg"
+          name={session.user.name}
+          avatar={session.user.avatar}
+          seed={session.user._id}
+        />
+        <div className="min-w-0">
+          <div className="truncate text-lg font-bold">{session.user.name}</div>
+          <div className="truncate text-sm text-muted">{session.user.email}</div>
         </div>
-        <div>
-          <div className="text-muted">Name</div>
-          <div className="font-medium">{session.user.name}</div>
-        </div>
-        <div>
-          <div className="text-muted">Email</div>
-          <div className="font-medium">{session.user.email}</div>
-        </div>
-        <LogoutButton />
       </div>
 
-      <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface p-5">
-        <div>
-          <h2 className="text-sm font-medium">Appearance</h2>
-          <p className="mt-1 text-sm text-muted">
-            Choose how Nsplit looks on this device. Defaults to your system
-            theme.
-          </p>
-        </div>
-        <ThemeSelect />
+      <div className="mb-2 mt-6 text-[11px] font-bold uppercase tracking-[0.08em] text-muted">Settings</div>
+      <div className="space-y-2.5">
+        <AppearanceButton />
+        <FeedbackButton source="profile" />
+      </div>
+
+      <div className="mt-8 flex justify-center">
+        <LogoutButton />
       </div>
     </div>
   );

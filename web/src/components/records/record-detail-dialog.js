@@ -8,7 +8,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UserAvatar } from "@/components/user-avatar";
 import { getExpenseEmoji } from "@/lib/expense-icons";
@@ -53,10 +52,23 @@ function BalanceLine({ line, currency }) {
   );
 }
 
-function Header({ icon, title, when, amount, kind }) {
+function Header({ icon, title, when, amount, kind, canEdit, onEdit, onDelete }) {
   return (
     <>
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-soft text-[28px]">{icon}</span>
+      <div className="flex items-start justify-between">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-soft text-[28px]">{icon}</span>
+        {canEdit ? (
+          // Kept clear of the dialog's close button so Delete isn't hit by mistake.
+          <div className="mr-10 flex gap-1">
+            <button type="button" onClick={onEdit} className="cursor-pointer rounded-lg p-2 hover:bg-soft" aria-label="Edit">
+              <Pencil className="h-4.5 w-4.5" />
+            </button>
+            <button type="button" onClick={onDelete} className="cursor-pointer rounded-lg p-2 text-danger hover:bg-soft" aria-label="Delete">
+              <Trash2 className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        ) : null}
+      </div>
       <h2 className="mt-3 text-[22px] font-bold leading-tight">{title}</h2>
       <p className="mt-1 text-muted">{when}</p>
       <div className="mb-4 mt-2.5 flex items-center justify-between gap-3">
@@ -220,6 +232,9 @@ export function RecordDetailDialog({
                 when={formatDetailWhen(record.expenseDate || record.transferDate || record.createdAt)}
                 amount={formatMinor(record.amountMinor, currency)}
                 kind={item.kind === "expense" ? "Expense" : "Transfer"}
+                canEdit={canEdit}
+                onEdit={() => (item.kind === "expense" ? onEditExpense?.(record) : onEditTransfer?.(record))}
+                onDelete={() => setConfirmOpen(true)}
               />
               {item.kind === "expense" ? (
                 <ExpenseBody
@@ -238,23 +253,6 @@ export function RecordDetailDialog({
                 <span className="truncate">{formatDetailWhen(record.createdAt)}</span>
                 {creator ? <span className="truncate">· by {memberName(creator)}</span> : null}
               </div>
-            </div>
-          ) : null}
-          {record && canEdit ? (
-            // Kept at the bottom, away from the close button, so Delete isn't hit by mistake.
-            <div className="flex shrink-0 items-center gap-2 border-t border-border px-4 py-3">
-              <Button type="button" variant="outline" className="text-danger hover:text-danger" onClick={() => setConfirmOpen(true)}>
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                onClick={() => (item.kind === "expense" ? onEditExpense?.(record) : onEditTransfer?.(record))}
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Button>
             </div>
           ) : null}
           {items.length > 1 ? (

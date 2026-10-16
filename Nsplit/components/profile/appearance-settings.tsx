@@ -12,7 +12,8 @@ const MODES: { id: AppearanceMode; label: string; icon: keyof typeof MaterialIco
   { id: 'dark', label: 'Dark', icon: 'dark-mode' },
 ];
 
-export function AppearanceSettings() {
+/** Light/dark mode and color theme. `embedded` drops the card and heading (for use in a sheet). */
+export function AppearanceSettings({ embedded = false }: { embedded?: boolean }) {
   const colors = useColors();
   const { mode, colorTheme, setMode, setColorTheme } = useAppearance();
 
@@ -29,11 +30,15 @@ export function AppearanceSettings() {
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.section, { color: colors.text }]}>Appearance</Text>
-      <Text style={[styles.hint, { color: colors.textSecondary }]}>
-        Default follows this phone. You can lock light or dark, and pick a color theme.
-      </Text>
+    <View style={embedded ? null : [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {embedded ? null : (
+        <>
+          <Text style={[styles.section, { color: colors.text }]}>Appearance</Text>
+          <Text style={[styles.hint, { color: colors.textSecondary }]}>
+            Default follows this phone. You can lock light or dark, and pick a color theme.
+          </Text>
+        </>
+      )}
 
       <View style={styles.modeRow}>
         {MODES.map((item) => {
