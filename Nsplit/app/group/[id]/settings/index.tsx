@@ -19,6 +19,7 @@ import { SettingsHeader } from '@/components/settings/settings-header';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { UserAvatar } from '@/components/user-avatar';
 import { FeedbackRow } from '@/components/feedback/feedback-row';
+import { LeaveGroupRow } from '@/components/groups/leave-group-row';
 import { useColors } from '@/hooks/use-colors';
 import type { GroupDetail } from '@/src/api/types';
 import { useAuth } from '@/src/auth/auth-context';
@@ -179,6 +180,7 @@ export default function GroupSettingsScreen() {
             Only the group’s admins can change its settings or members.
           </Text>
           <FeedbackRow source="group-settings" groupRef={group.code || String(id)} style={{ marginTop: 16 }} />
+          <LeaveGroupRow group={group} style={{ marginTop: 10 }} />
         </ScrollView>
       </SafeAreaView>
     );
@@ -314,6 +316,7 @@ export default function GroupSettingsScreen() {
           </View>
 
           <FeedbackRow source="group-settings" groupRef={group.code || String(id)} style={{ marginTop: 16 }} />
+          <LeaveGroupRow group={group} style={{ marginTop: 10 }} />
 
           <Pressable
             onPress={() => router.push(settingsPath('delete'))}

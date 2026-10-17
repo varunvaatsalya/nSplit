@@ -28,7 +28,9 @@ import {
   updateGroupMember,
   setGroupMyMember,
 } from '@/src/db/groups';
+import { apiFetch, errorMessage } from '@/src/api/client';
 import { useIdentity } from '@/src/identity/identity-context';
+import { useSync } from '@/src/sync/sync-context';
 import { memberListLabel, resolveMyMember, sortMembersByName } from '@/src/lib/members';
 
 export default function ManageMembersScreen() {
@@ -36,6 +38,7 @@ export default function ManageMembersScreen() {
   const colors = useColors();
   const { user } = useAuth();
   const { name: myName, matchByName } = useIdentity();
+  const { syncNow } = useSync();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [error, setError] = useState('');
@@ -114,10 +117,18 @@ export default function ManageMembersScreen() {
     if (!group || !removeMember) return;
     setRemoving(true);
     try {
-      await removeGroupMember(group._id, removeMember._id);
+      if (removeMember.userId) {
+        // Someone who joined with an account: the server removes them (and keeps an admin).
+        const res = await apiFetch(`/api/groups/${group.code}/members/${removeMember._id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(errorMessage(res.error, 'Could not remove member'));
+        await syncNow().catch(() => {});
+      } else {
+        await removeGroupMember(group._id, removeMember._id);
+      }
       setRemoveMember(null);
       await load();
     } catch (e) {
+      setRemoveMember(null);
       setError(e instanceof Error ? e.message : 'Could not remove member');
     } finally {
       setRemoving(false);
@@ -204,9 +215,14 @@ export default function ManageMembersScreen() {
                   style={styles.iconBtn}>
                   <MaterialIcons name="edit" size={18} color={colors.textSecondary} />
                 </Pressable>
-                <Pressable onPress={() => requestRemove(member)} hitSlop={8} style={styles.iconBtn}>
-                  <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
-                </Pressable>
+                {/* You leave from the group settings instead. */}
+                {user && member.userId === user._id ? (
+                  <View style={styles.iconBtn} />
+                ) : (
+                  <Pressable onPress={() => requestRemove(member)} hitSlop={8} style={styles.iconBtn}>
+                    <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
+                  </Pressable>
+                )}
               </View>
             ))}
             <View className="flex-row items-center gap-2" style={{ paddingTop: 4 }}>

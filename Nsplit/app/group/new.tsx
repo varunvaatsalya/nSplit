@@ -46,6 +46,10 @@ export default function NewGroupScreen() {
   const [iconsOpen, setIconsOpen] = useState(false);
   const [currency, setCurrency] = useState('INR');
   const [currencyOpen, setCurrencyOpen] = useState(false);
+  // The "You" row: this name becomes your member (linked to your account when logged in).
+  // null until you type: shows your saved name, which may load after the screen opens.
+  const [typedMeName, setMeName] = useState<string | null>(null);
+  const meName = typedMeName ?? (myName || user?.name || '');
   const [members, setMembers] = useState([{ name: '' }]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -58,14 +62,6 @@ export default function NewGroupScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => {
-    if (!myName) return;
-    setMembers((prev) => {
-      if (prev.length === 1 && !prev[0].name.trim()) return [{ name: myName }];
-      return prev;
-    });
-  }, [myName]);
-
   function addMember() {
     if (!canAddMember) return;
     setMembers((prev) => [...prev, emptyMember()]);
@@ -77,11 +73,14 @@ export default function NewGroupScreen() {
       setError('Give the group a name');
       return;
     }
-    const cleaned = members.map((m) => ({ name: m.name.trim() })).filter((m) => m.name);
-    if (!user && cleaned.length === 0) {
-      setError('Add at least one member');
+    if (!meName.trim()) {
+      setError('Add your name');
       return;
     }
+    const cleaned = [
+      { name: meName.trim(), isMe: true },
+      ...members.map((m) => ({ name: m.name.trim() })).filter((m) => m.name),
+    ];
     setCreating(true);
     try {
       await createGroup({
@@ -154,6 +153,17 @@ export default function NewGroupScreen() {
           <View style={[styles.membersSection, { borderTopColor: colors.border }]}>
             <Text style={[styles.membersLabel, { color: colors.text }]}>Members</Text>
 
+            <InlineField
+              placeholder="Your name in this group"
+              value={meName}
+              onChangeText={setMeName}
+              left={
+                <View style={[styles.youPill, { backgroundColor: `${colors.primary}1A` }]}>
+                  <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '800' }}>You</Text>
+                </View>
+              }
+            />
+
             {members.map((member, index) => (
               <InlineField
                 key={index}
@@ -165,7 +175,7 @@ export default function NewGroupScreen() {
                   )
                 }
                 left={
-                  <Text style={[styles.countText, { color: colors.textSecondary }]}>{index + 1}</Text>
+                  <Text style={[styles.countText, { color: colors.textSecondary }]}>{index + 2}</Text>
                 }
                 right={
                   members.length > 1 ? (
@@ -303,6 +313,7 @@ const styles = StyleSheet.create({
   },
   membersLabel: { fontSize: 14, fontWeight: '600' },
   countText: { fontSize: 13, fontWeight: '700', minWidth: 16, textAlign: 'center' },
+  youPill: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
   removeBtn: {
     width: 32,
     height: 32,

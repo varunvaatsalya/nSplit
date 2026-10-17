@@ -38,7 +38,8 @@ export type CreateGroupInput = {
   name: string;
   icon?: string | null;
   currency?: string;
-  members: { name: string }[];
+  /** `isMe` marks the "You" row: that member is you (linked to your account when logged in). */
+  members: { name: string; isMe?: boolean }[];
   creator?: Pick<User, '_id' | 'name' | 'email'> | null;
   myName?: string | null;
   matchByName?: boolean;
@@ -186,9 +187,22 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
 
   const members: MemberInsert[] = [];
   const creatorId = input.creator?._id || null;
-  const creatorName = input.creator?.name?.trim();
+  const meRow = input.members.find((m) => m.isMe && m.name.trim());
+  // Your member uses the name you typed in the "You" row; the account name is only a fallback.
+  const creatorName = meRow?.name.trim() || input.creator?.name?.trim();
 
-  if (creatorId && creatorName) {
+  if (meRow && !creatorId) {
+    // Not logged in: you're a plain member, picked as "me" below.
+    const avatar = allocateMemberAvatar(meRow.name.trim(), used);
+    members.push({
+      id: createId(),
+      displayName: meRow.name.trim(),
+      userId: null,
+      email: null,
+      permission: 'ADD',
+      avatar: { letters: avatar.letters, bg: avatar.bg },
+    });
+  } else if (creatorId && creatorName) {
     const avatar = allocateMemberAvatar(creatorName, used);
     members.push({
       id: createId(),
@@ -202,7 +216,7 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
 
   for (const member of input.members) {
     const name = member.name.trim();
-    if (!name) continue;
+    if (!name || member === meRow) continue;
     if (
       creatorName &&
       name.toLowerCase() === creatorName.toLowerCase()
@@ -232,7 +246,8 @@ export async function createGroup(input: CreateGroupInput): Promise<GroupDetail>
       matchByName: input.matchByName !== false,
     }
   );
-  const myMemberId = mine?._id || null;
+  // With a "You" row, the first member is you; otherwise fall back to name matching.
+  const myMemberId = meRow && members[0] ? members[0].id : mine?._id || null;
 
   await runInTransaction(db, async () => {
     await db.runAsync(
@@ -400,6 +415,9 @@ export async function removeGroupMember(groupId: string, memberId: string) {
   if (members.length <= 1) throw new Error('A group needs at least one member');
   const member = members.find((m) => m._id === memberId);
   if (!member) throw new Error('Member not found');
+  // People with an account are removed (or leave) through the server, which
+  // keeps at least one admin; sync would not apply it anyway.
+  if (member.userId) throw new Error('This member has an account. Remove them while online.');
 
   const now = new Date().toISOString();
   const db = await getDb();
@@ -419,6 +437,18 @@ export async function removeGroupMember(groupId: string, memberId: string) {
       group._id,
     ]);
     await enqueue(db, 'group', group._id, group._id);
+  });
+}
+
+/** Drop a group you left from this phone (the server already removed you). */
+export async function forgetGroupLocally(groupId: string) {
+  const db = await getDb();
+  await runInTransaction(db, async () => {
+    await db.runAsync(`DELETE FROM expenses WHERE group_id = ?`, [groupId]);
+    await db.runAsync(`DELETE FROM transfers WHERE group_id = ?`, [groupId]);
+    await db.runAsync(`DELETE FROM group_members WHERE group_id = ?`, [groupId]);
+    await db.runAsync(`DELETE FROM outbox WHERE group_id = ?`, [groupId]);
+    await db.runAsync(`DELETE FROM groups WHERE id = ?`, [groupId]);
   });
 }
 
