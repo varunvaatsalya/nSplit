@@ -245,7 +245,9 @@ async function applyGroup({ change, user, clientUpdatedAt }) {
     if (current) {
       current.displayName = incoming.displayName;
       current.avatar = { ...(current.avatar?.toObject?.() || {}), ...incoming.avatar };
-      current.leftAt = incoming.leftAt;
+      // People with an account leave through /leave or are removed by an admin
+      // through the members API (which guard the last admin); sync can't do it.
+      if (!current.userId) current.leftAt = incoming.leftAt;
       current.upiId = incoming.upiId;
     } else {
       existing.members.push({ ...incoming, permission: "ADD" });

@@ -27,7 +27,8 @@ export default async function HomePage() {
   const ctaHref = isLoggedIn ? "/groups" : "/login";
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-300">
+    <div className="relative isolate min-h-screen bg-background transition-colors duration-300">
+      <div className="hero-doodles" aria-hidden="true" />
       {/* CSS Animation Keyframes for middle section floating visuals */}
       <style
         dangerouslySetInnerHTML={{
@@ -94,31 +95,14 @@ export default async function HomePage() {
           </Link>
         </nav>
 
-        {/* Right Nav Auth CTA */}
-        <div className="flex items-center gap-5">
-          {isLoggedIn ? (
-            <Link
-              href="/groups"
-              className="rounded-full bg-foreground text-background px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
-            >
-              Go to groups
-            </Link>
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Log in
-              </Link>
-              <Link
-                href="/login"
-                className="rounded-full bg-foreground text-background px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
-              >
-                Get Started
-              </Link>
-            </>
-          )}
+        {/* Right Nav CTA: hidden on phones, where the hero buttons are right below. */}
+        <div className="hidden items-center gap-5 md:flex">
+          <Link
+            href={ctaHref}
+            className="rounded-full bg-foreground text-background px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+          >
+            {isLoggedIn ? "Go to groups" : "Get Started"}
+          </Link>
         </div>
       </header>
 

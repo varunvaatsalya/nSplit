@@ -152,6 +152,8 @@ export function ManageMembersDialog({ open, onOpenChange, groupId, members, curr
             {sortedMembers.map((m) => {
               const label = memberListLabel(m, currentUserId);
               const busy = busyId === m._id;
+              // You leave from group settings instead (with the last-admin check).
+              const isMe = Boolean(currentUserId && m.userId && String(m.userId) === String(currentUserId));
               return (
                 <div
                   key={m._id}
@@ -176,18 +178,22 @@ export function ManageMembersDialog({ open, onOpenChange, groupId, members, curr
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="shrink-0 text-muted hover:bg-danger/10 hover:text-danger"
-                    disabled={busy || lastAdminId === m._id}
-                    onClick={() => setRemoving(m)}
-                    aria-label={`Remove ${label}`}
-                    title={lastAdminId === m._id ? "Group needs at least one admin" : "Remove"}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isMe ? (
+                    <span className="h-9 w-9 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 text-muted hover:bg-danger/10 hover:text-danger"
+                      disabled={busy || lastAdminId === m._id}
+                      onClick={() => setRemoving(m)}
+                      aria-label={`Remove ${label}`}
+                      title={lastAdminId === m._id ? "Group needs at least one admin" : "Remove"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               );
             })}

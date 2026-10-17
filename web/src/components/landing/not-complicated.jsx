@@ -2,7 +2,8 @@ import React from "react";
 
 function ExpenseNotComplicated() {
   return (
-    <section className="sticky top-0 h-screen z-6 w-full bg-background flex items-center justify-center overflow-hidden rounded-b-[40px] md:rounded-b-[48px] border-b border-border shadow-2xl">
+    // Pinned full-screen on large screens only; on phones it grows with its content so nothing is cut off.
+    <section className="relative z-6 w-full min-h-screen bg-background flex items-center justify-center overflow-hidden rounded-b-[40px] md:rounded-b-[48px] border-b border-border shadow-2xl py-16 lg:sticky lg:top-0 lg:h-screen lg:py-0">
       <div className="mx-auto w-full max-w-6xl px-6">
         <div className="grid items-center gap-12 lg:grid-cols-12 py-12">
           {/* Left Column: Floating mockup chat & calculations sheet */}
@@ -31,7 +32,7 @@ function ExpenseNotComplicated() {
 
             {/* Card 3: Chat bubble 3 (Unequal Split problem) */}
             <div
-              className="relative bg-card border border-border rounded-2xl p-4 shadow-md max-w-[275px] w-full self-start transition-transform duration-300 hover:rotate-0 hover:scale-105 cursor-pointer animate-float-chat-1"
+              className="relative hidden sm:block bg-card border border-border rounded-2xl p-4 shadow-md max-w-[275px] w-full self-start transition-transform duration-300 hover:rotate-0 hover:scale-105 cursor-pointer animate-float-chat-1"
               style={{ animationDelay: "1.5s" }}
             >
               <p className="text-xs font-semibold text-foreground leading-snug">

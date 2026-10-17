@@ -105,6 +105,9 @@ export async function DELETE(_request, { params }) {
 
   const member = findActiveMemberById(group, memberId);
   if (!member) return fail("Member not found", 404);
+  if (member.userId && String(member.userId) === String(auth.user._id)) {
+    return fail("To leave this group, use Leave group in its settings.", 400, "USE_LEAVE");
+  }
 
   if (member.permission === "ADMIN") {
     const admins = activeMembers(group).filter((m) => m.permission === "ADMIN");

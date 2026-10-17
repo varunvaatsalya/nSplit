@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useRef, useState, useMemo, useEffect } from "react";
-import { motion, useScroll, useTransform, useMotionValueEvent, AnimatePresence } from "framer-motion";
+import React, { useRef, useState } from "react";
+import { motion, useScroll, useMotionValueEvent, AnimatePresence } from "framer-motion";
 import { Check, Scale, Percent, IndianRupee, Users, Handshake, Sparkles, TrendingUp } from "lucide-react";
 
 const SPLIT_METHODS = [
@@ -67,50 +67,61 @@ export default function FeaturesTour() {
   return (
     <div id="features" className="relative w-full bg-background text-foreground z-8">
       {/* 1. Sticky Stacking Splitting Methods Tour */}
-      <section ref={containerRef} className="relative w-full" style={{ height: `${SPLIT_METHODS.length * 120}vh` }}>
+      {/* Scroll moves through the 4 methods; shorter on phones so it doesn't drag. */}
+      <section ref={containerRef} className="relative w-full h-[320vh] lg:h-[480vh]">
         <div className="sticky top-0 z-8 bg-background h-screen flex items-center justify-center overflow-hidden">
-          
+
           {/* Ambient Glows */}
           <div className="absolute top-1/2 left-1/4 -translate-y-1/2 -z-10 h-87.5 w-87.5 rounded-full bg-primary/10 blur-3xl opacity-30 dark:opacity-60" />
           <div className="absolute top-1/3 right-1/4 -translate-y-1/2 -z-10 h-75 w-75 rounded-full bg-emerald-500/5 blur-3xl opacity-20 dark:opacity-40" />
 
-          <div className="mx-auto grid w-full max-w-5xl items-center gap-16 px-6 grid-cols-1 lg:grid-cols-12">
-            
-            {/* Left Column: Stuck Choose How to Split widget */}
-            <div className="lg:col-span-5 flex justify-center items-center relative w-full">
-              <div className="bg-card/85 border border-border rounded-[28px] p-6 shadow-[0_0_60px_rgba(0,0,0,0.15)] dark:shadow-[0_0_60px_rgba(0,0,0,0.5)] backdrop-blur-md w-full max-w-[280px] select-none">
-                
-                {/* Header */}
-                <h3 className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mb-5">
+          {/* Phones: heading, options (2x2), then the card. Desktop: options left, heading + card right. */}
+          <div className="mx-auto grid w-full max-w-5xl grid-cols-1 items-center gap-y-6 px-6 lg:grid-cols-12 lg:gap-x-16">
+
+            {/* Heading */}
+            <div className="order-1 flex flex-col gap-2 lg:order-none lg:col-span-7 lg:col-start-6 lg:row-start-1 lg:self-end lg:pl-8">
+              <div className="mb-1 hidden h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-inner sm:flex">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <h2 className="text-[28px] font-black leading-tight tracking-tight text-foreground sm:text-3xl lg:text-[40px]">
+                Smart splitting options.
+                <span className="mt-1 block text-primary">For any occasion.</span>
+              </h2>
+            </div>
+
+            {/* Choose how to split */}
+            <div className="relative order-2 flex w-full items-center justify-center lg:order-none lg:col-span-5 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+              <div className="w-full max-w-md select-none rounded-[24px] border border-border bg-card/85 p-3 shadow-[0_0_60px_rgba(0,0,0,0.15)] backdrop-blur-md dark:shadow-[0_0_60px_rgba(0,0,0,0.5)] lg:max-w-[280px] lg:rounded-[28px] lg:p-6">
+                <h3 className="mb-3 hidden text-center text-[10px] font-black uppercase tracking-widest text-slate-500 lg:mb-5 lg:block">
                   Choose how to split
                 </h3>
-                
-                {/* Options List */}
-                <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-col lg:gap-3">
                   {SPLIT_METHODS.map((method, idx) => {
                     const isActive = activeIndex === idx;
                     const IconComponent = method.icon;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={method.key}
-                        className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ${
+                        onClick={() => setActiveIndex(idx)}
+                        className={`flex cursor-pointer items-center justify-between rounded-2xl border p-2.5 text-left transition-all duration-300 lg:p-3 ${
                           isActive
-                            ? method.activeColor + " scale-[1.03] shadow-lg shadow-black/10 dark:shadow-black/30"
-                            : "border-slate-200 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-950/20 text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
+                            ? method.activeColor + " shadow-lg shadow-black/10 dark:shadow-black/30 lg:scale-[1.03]"
+                            : "border-slate-200 bg-slate-50/50 text-slate-500 hover:text-slate-800 dark:border-slate-900 dark:bg-slate-950/20 dark:hover:text-slate-300"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-2 lg:gap-3">
                           <div
-                            className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all lg:h-8 lg:w-8 ${
                               isActive ? method.iconBg : "bg-muted/20 dark:bg-slate-900/50"
                             }`}
                           >
-                            <IconComponent className="h-4.5 w-4.5" />
+                            <IconComponent className="h-4 w-4 lg:h-4.5 lg:w-4.5" />
                           </div>
-                          <span className="text-[13px] font-extrabold tracking-tight">{method.label}</span>
+                          <span className="truncate text-[12px] font-extrabold tracking-tight lg:text-[13px]">{method.label}</span>
                         </div>
                         {isActive && (
-                          <div className={`h-4.5 w-4.5 rounded-full flex items-center justify-center text-white ${
+                          <div className={`hidden h-4.5 w-4.5 items-center justify-center rounded-full text-white lg:flex ${
                             activeIndex === 0 ? "bg-emerald-500" :
                             activeIndex === 1 ? "bg-blue-500" :
                             activeIndex === 2 ? "bg-purple-500" : "bg-amber-500"
@@ -118,53 +129,39 @@ export default function FeaturesTour() {
                             <Check className="h-3 w-3 stroke-[3.5]" />
                           </div>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Sliding descriptions */}
-            <div className="lg:col-span-7 flex flex-col gap-6 text-left pl-0 lg:pl-8">
-              {/* Splitting Icon & Section Title */}
-              <div className="flex flex-col gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary mb-2 shadow-inner">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <h2 className="text-3xl lg:text-[40px] font-black tracking-tight leading-tight text-foreground">
-                  Smart splitting options.
-                  <span className="block text-primary mt-1">For any occasion.</span>
-                </h2>
-              </div>
-
-              {/* Steps Horizontal Sliding Card Deck */}
-              <div className="min-h-47.5 flex items-center justify-start mt-2">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeIndex}
-                    initial={{ opacity: 0, x: 40 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -40 }}
-                    transition={{ duration: 0.35, ease: "easeInOut" }}
-                    className="bg-card/60 border border-border rounded-2xl p-6 shadow-2xl backdrop-blur-xs max-w-md w-full flex flex-col gap-3 font-sans"
-                  >
-                    <div className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full self-start ${
-                      activeIndex === 0 ? "bg-emerald-500/10 text-emerald-400" :
-                      activeIndex === 1 ? "bg-blue-500/10 text-blue-400" :
-                      activeIndex === 2 ? "bg-purple-500/10 text-purple-400" : "bg-amber-500/10 text-amber-400"
-                    }`}>
-                      Option {activeIndex + 1} of 4
-                    </div>
-                    <h3 className="text-xl font-black text-foreground tracking-tight mt-1">
-                      {activeMethod.subtitle}
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {activeMethod.desc}
-                    </p>
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+            {/* The selected method */}
+            <div className="order-3 flex min-h-44 items-start lg:order-none lg:col-span-7 lg:col-start-6 lg:row-start-2 lg:pl-8">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeIndex}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="flex w-full max-w-md flex-col gap-3 rounded-2xl border border-border bg-card/60 p-5 font-sans shadow-2xl backdrop-blur-xs lg:p-6"
+                >
+                  <div className={`self-start rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                    activeIndex === 0 ? "bg-emerald-500/10 text-emerald-400" :
+                    activeIndex === 1 ? "bg-blue-500/10 text-blue-400" :
+                    activeIndex === 2 ? "bg-purple-500/10 text-purple-400" : "bg-amber-500/10 text-amber-400"
+                  }`}>
+                    Option {activeIndex + 1} of 4
+                  </div>
+                  <h3 className="mt-1 text-lg font-black tracking-tight text-foreground lg:text-xl">
+                    {activeMethod.subtitle}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {activeMethod.desc}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
             </div>
 
           </div>
@@ -208,7 +205,7 @@ export default function FeaturesTour() {
                     <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider mt-0.5">owes you</span>
                   </div>
                 </div>
-                <span className="text-[14px] font-mono font-black text-emerald-400">+$45.00</span>
+                <span className="text-[14px] font-mono font-black text-emerald-400">+₹450.00</span>
               </div>
 
               {/* Record 2: Priya S. you owe */}
@@ -222,13 +219,13 @@ export default function FeaturesTour() {
                     <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider mt-0.5">you owe</span>
                   </div>
                 </div>
-                <span className="text-[14px] font-mono font-black text-rose-400">-$28.50</span>
+                <span className="text-[14px] font-mono font-black text-rose-400">-₹285.00</span>
               </div>
 
               {/* Total Balance Card */}
               <div className="bg-background border border-border rounded-2xl p-4.5 flex items-center justify-between mt-2.5">
                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Your total balance</span>
-                <span className="text-md font-mono font-black text-emerald-400">+$16.50</span>
+                <span className="text-md font-mono font-black text-emerald-400">+₹165.00</span>
               </div>
 
             </div>
@@ -265,7 +262,7 @@ export default function FeaturesTour() {
               {/* Amount visual pill */}
               <div className="bg-background/60 border border-border/80 py-3.5 px-6 rounded-2xl w-full max-w-50 flex flex-col gap-1 items-center">
                 <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wider">Amount to settle</span>
-                <span className="text-xl font-mono font-black text-emerald-400">$28.50</span>
+                <span className="text-xl font-mono font-black text-emerald-400">₹285.00</span>
               </div>
 
               {/* CTA Button */}

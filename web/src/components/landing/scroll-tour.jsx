@@ -310,8 +310,8 @@ export default function ScrollTour() {
   return (
     <section
       ref={sectionRef}
-      className="relative bg-[#090b11] text-white overflow-visible animate-none z-7"
-      style={{ height: `${n * 160}vh` }}
+      // Shorter scroll on phones; long enough on desktop for the cursor demo to breathe.
+      className="relative bg-[#090b11] text-white overflow-visible animate-none z-7 h-[550vh] lg:h-[800vh]"
     >
       <div className="sticky top-0 z-7 bg-[#090b11] h-screen flex items-center justify-center overflow-hidden w-full">
         {/* Typewriter Blinking Cursor Animation */}
@@ -330,7 +330,31 @@ export default function ScrollTour() {
         />
 
         {/* Responsive Grid layout */}
-        <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 grid-cols-1 lg:grid-cols-12">
+        <div className="mx-auto grid w-full max-w-5xl items-center gap-4 px-6 grid-cols-1 lg:grid-cols-12 lg:gap-12">
+          {/* Phones only: a short caption for the current step (the side copy is desktop-only). */}
+          <div className="flex flex-col items-center gap-1.5 text-center lg:hidden">
+            <h2 className="text-xl font-black tracking-tight text-white">
+              Add an expense <span className="text-primary">in seconds</span>
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary">
+                {activeIndex + 1}/{n}
+              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={activeIndex}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-sm font-semibold text-slate-300"
+                >
+                  {STEP_DETAILS[activeIndex].title.replace(/^\d+\.\s*/, "")}
+                </motion.span>
+              </AnimatePresence>
+            </div>
+          </div>
+
           {/* Left Column: Phone mockup (Pulls to left on desktop, centered on mobile) */}
           <div className="lg:col-span-6 flex justify-center items-center relative w-full">
             {/* Dark Mockup Phone Frame (Scaled slightly down) */}
@@ -737,10 +761,10 @@ export default function ScrollTour() {
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeIndex}
-                  initial={{ opacity: 0, x: 40 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -40 }}
-                  transition={{ duration: 0.35, ease: "easeInOut" }}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
                   className="bg-[#0e111a]/60 border border-slate-900 rounded-2xl p-6 shadow-2xl backdrop-blur-xs max-w-md w-full flex flex-col gap-3 font-sans"
                 >
                   <div className="text-[10px] font-bold text-primary uppercase tracking-widest bg-primary/10 px-2.5 py-1 rounded-full self-start">

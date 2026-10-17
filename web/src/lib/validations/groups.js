@@ -28,6 +28,8 @@ export const createGroupMemberInputSchema = z.object({
 
 export const createGroupSchema = z.object({
   name: z.string().trim().min(1).max(100),
+  // Your own name in this group; defaults to your account name.
+  myName: z.string().trim().max(80).optional().nullable(),
   description: z.string().trim().max(2000).optional().nullable(),
   icon: z.string().trim().max(64).optional().nullable(),
   imageUrl: z.string().url().optional().nullable(),

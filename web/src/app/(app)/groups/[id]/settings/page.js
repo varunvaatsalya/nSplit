@@ -5,7 +5,7 @@ import { FeedbackButton } from "@/components/feedback/feedback-button";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronRight, Minus, Plus } from "lucide-react";
+import { ArrowLeft, ChevronRight, LogOut, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,6 +172,8 @@ export default function GroupSettingsPage() {
   const [manageOpen, setManageOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
 
   async function load() {
     const [gRes, meRes] = await Promise.all([
@@ -322,6 +324,22 @@ export default function GroupSettingsPage() {
       setError("Failed to update icon");
     } finally {
       setSavingIcon(false);
+    }
+  }
+
+  async function leaveGroup() {
+    setLeaving(true);
+    try {
+      const res = await fetch(`/api/groups/${id}/leave`, { method: "POST" });
+      const json = await res.json().catch(() => null);
+      setConfirmLeaveOpen(false);
+      if (!res.ok) {
+        setError(json?.error?.message || "Could not leave the group");
+        return;
+      }
+      router.push("/groups");
+    } finally {
+      setLeaving(false);
     }
   }
 
@@ -510,27 +528,53 @@ export default function GroupSettingsPage() {
 
         <FeedbackButton source="group-settings" groupRef={group.code} />
 
-        {canDeleteGroup ? (
+        {myPermission || canDeleteGroup ? (
           <Card className="border-danger/30">
             <CardHeader>
               <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-danger">
                 Danger zone
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted">
-                Permanently delete this group and all of its expenses. This
-                cannot be undone.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="shrink-0 border-danger text-danger hover:bg-danger/10 hover:text-danger"
-                disabled={deleting}
-                onClick={() => setConfirmDeleteOpen(true)}
-              >
-                Delete group
-              </Button>
+            <CardContent className="divide-y divide-danger/15">
+              {myPermission ? (
+                <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Leave group</p>
+                    <p className="mt-0.5 text-sm text-muted">
+                      You won&apos;t see this group anymore. Expenses you&apos;re part of stay in it.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0 border-danger/50 text-danger hover:bg-danger/10 hover:text-danger"
+                    disabled={leaving}
+                    onClick={() => setConfirmLeaveOpen(true)}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Leave group
+                  </Button>
+                </div>
+              ) : null}
+              {canDeleteGroup ? (
+                <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${myPermission ? "pt-4" : ""}`}>
+                  <div>
+                    <p className="text-sm font-semibold">Delete group</p>
+                    <p className="mt-0.5 text-sm text-muted">
+                      Permanently delete this group and all of its expenses. This cannot be undone.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0 border-danger text-danger hover:bg-danger/10 hover:text-danger"
+                    disabled={deleting}
+                    onClick={() => setConfirmDeleteOpen(true)}
+                  >
+                    Delete group
+                  </Button>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}
@@ -649,6 +693,17 @@ export default function GroupSettingsPage() {
           }
           await load();
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmLeaveOpen}
+        onOpenChange={setConfirmLeaveOpen}
+        title="Leave this group?"
+        description={`You'll stop seeing “${group.name}”. An admin can add you back by approving a new join request.`}
+        confirmLabel="Leave group"
+        cancelLabel="Cancel"
+        loading={leaving}
+        onConfirm={leaveGroup}
       />
 
       <ConfirmDialog

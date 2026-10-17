@@ -97,6 +97,10 @@ export default function GroupsPage() {
   const [iconsOpen, setIconsOpen] = useState(false);
   const [currency, setCurrency] = useState("INR");
   const [members, setMembers] = useState([emptyMember()]);
+  // The "You" row: this name becomes the member linked to your account.
+  const [accountName, setAccountName] = useState("");
+  const [myName, setMyName] = useState("");
+  const [myNameInvalid, setMyNameInvalid] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -112,6 +116,14 @@ export default function GroupsPage() {
     setLoading(false);
   }
 
+  async function loadMe() {
+    const res = await fetch("/api/auth/me");
+    const json = await res.json().catch(() => null);
+    const me = json?.data?.user?.name || "";
+    setAccountName(me);
+    setMyName((prev) => prev || me);
+  }
+
   async function loadContacts() {
     const res = await fetch("/api/contacts");
     const json = await res.json();
@@ -121,6 +133,7 @@ export default function GroupsPage() {
   useEffect(() => {
     load();
     loadContacts();
+    loadMe();
   }, []);
 
   function applyNameSuggestion(nextName) {
@@ -164,6 +177,8 @@ export default function GroupsPage() {
     setIconsOpen(false);
     setCurrency("INR");
     setMembers([emptyMember()]);
+    setMyName(accountName);
+    setMyNameInvalid(false);
     setSuggestKey(null);
     setError("");
   }
@@ -171,6 +186,10 @@ export default function GroupsPage() {
   async function createGroup(e) {
     e.preventDefault();
     setError("");
+    if (!myName.trim()) {
+      setMyNameInvalid(true);
+      return;
+    }
     setCreating(true);
 
     const cleaned = members.map((m) => ({ name: m.name.trim() })).filter((m) => m.name);
@@ -183,6 +202,7 @@ export default function GroupsPage() {
           name: name.trim(),
           icon,
           currency,
+          myName: myName.trim(),
           members: cleaned,
         }),
       });
@@ -302,12 +322,30 @@ export default function GroupsPage() {
                 </button>
               </div>
 
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 shrink-0 items-center justify-center rounded-full bg-primary/10 px-2 text-[11px] font-bold text-primary dark:text-indigo-300">
+                  You
+                </span>
+                <Input
+                  className={`flex-1 ${myNameInvalid ? "border-danger focus-visible:ring-danger/40" : ""}`}
+                  value={myName}
+                  placeholder="Your name in this group"
+                  maxLength={80}
+                  aria-invalid={myNameInvalid || undefined}
+                  onChange={(e) => {
+                    setMyName(e.target.value);
+                    if (e.target.value.trim()) setMyNameInvalid(false);
+                  }}
+                  aria-label="Your name in this group"
+                />
+              </div>
+
               {members.map((member, index) => {
                 const key = `${index}:name`;
                 return (
                   <div key={index} className="flex items-center gap-2">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-soft text-xs font-semibold text-muted">
-                      {index + 1}
+                      {index + 2}
                     </span>
                     <MemberSuggestField
                       className="flex-1"

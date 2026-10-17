@@ -76,7 +76,9 @@ export async function POST(request) {
     defaultSplitMethod,
     defaultSplitConfig,
     members = [],
+    myName,
   } = parsed.data;
+  const creatorName = myName || auth.user.name;
 
   const emails = members.map((m) => m.email).filter(Boolean);
   if (new Set(emails).size !== emails.length) {
@@ -95,7 +97,7 @@ export async function POST(request) {
 
     const used = { letters: [], bgs: [] };
     const creatorAvatar = allocateMemberAvatar(
-      auth.user.name,
+      creatorName,
       used,
       creator
     );
@@ -107,7 +109,7 @@ export async function POST(request) {
         userId: auth.user._id,
         email: auth.user.email,
         permission: "ADMIN",
-        displayName: auth.user.name,
+        displayName: creatorName,
         avatar: creatorAvatar,
         joinedAt: new Date(),
         leftAt: null,
@@ -116,6 +118,8 @@ export async function POST(request) {
     const invitations = [];
 
     for (const member of members) {
+      // Your own name typed again in the list is still you.
+      if (member.name?.trim().toLowerCase() === creatorName.trim().toLowerCase()) continue;
       const email = member.email || null;
       let linkedUser = null;
       if (email) {
