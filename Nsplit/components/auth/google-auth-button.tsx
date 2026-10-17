@@ -37,6 +37,7 @@ export function GoogleAuthButton() {
   const colors = useColors();
   const { loginWithGoogle, pending } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const [error, setError] = useState('');
 
   if (!googleSignInAvailable) return null;
@@ -57,20 +58,26 @@ export function GoogleAuthButton() {
 
   return (
     <View style={styles.wrap}>
+      {/* Styles go on the inner View: function styles on Pressable get dropped here. */}
       <Pressable
         onPress={() => void onPress()}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
         disabled={disabled}
         accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.button,
-          {
-            borderColor: colors.border,
-            backgroundColor: pressed ? colors.softSurface : colors.surface,
-            opacity: disabled && !busy ? 0.6 : 1,
-          },
-        ]}>
-        {busy ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <GoogleLogo />}
-        <Text style={[styles.label, { color: colors.text }]}>{busy ? 'Signing you in…' : 'Continue with Google'}</Text>
+        accessibilityLabel="Continue with Google">
+        <View
+          style={[
+            styles.button,
+            {
+              borderColor: colors.border,
+              backgroundColor: pressed ? colors.softSurface : colors.surface,
+              opacity: disabled && !busy ? 0.6 : 1,
+            },
+          ]}>
+          {busy ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <GoogleLogo />}
+          <Text style={[styles.label, { color: colors.text }]}>{busy ? 'Signing you in…' : 'Continue with Google'}</Text>
+        </View>
       </Pressable>
       {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
       <View style={styles.divider}>
@@ -86,6 +93,7 @@ const styles = StyleSheet.create({
   wrap: { gap: 10, marginBottom: 6 },
   // Same size, corners and border as the email/password fields below it.
   button: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

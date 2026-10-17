@@ -36,15 +36,16 @@ export function InlineField({
   right,
   style,
   editable = true,
+  invalid = false,
   ...props
-}: TextInputProps & { left?: ReactNode; right?: ReactNode }) {
+}: TextInputProps & { left?: ReactNode; right?: ReactNode; /** Red border until the value is fixed. */ invalid?: boolean }) {
   const colors = useColors();
   return (
     <View
       style={[
         styles.inline,
         {
-          borderColor: colors.border,
+          borderColor: invalid ? colors.danger : colors.border,
           backgroundColor: colors.surface,
           opacity: editable === false ? 0.6 : 1,
         },

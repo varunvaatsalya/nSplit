@@ -50,6 +50,7 @@ export default function NewGroupScreen() {
   // null until you type: shows your saved name, which may load after the screen opens.
   const [typedMeName, setMeName] = useState<string | null>(null);
   const meName = typedMeName ?? (myName || user?.name || '');
+  const [meInvalid, setMeInvalid] = useState(false);
   const [members, setMembers] = useState([{ name: '' }]);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -74,7 +75,7 @@ export default function NewGroupScreen() {
       return;
     }
     if (!meName.trim()) {
-      setError('Add your name');
+      setMeInvalid(true);
       return;
     }
     const cleaned = [
@@ -140,15 +141,6 @@ export default function NewGroupScreen() {
             </View>
           </View>
 
-          <Pressable
-            onPress={() => setCurrencyOpen(true)}
-            style={[
-              styles.select,
-              { borderColor: colors.border, backgroundColor: colors.surface },
-            ]}>
-            <Text style={{ color: colors.text, fontSize: 16 }}>{selectedCurrency.label}</Text>
-            <MaterialIcons name="expand-more" size={22} color={colors.textSecondary} />
-          </Pressable>
 
           <View style={[styles.membersSection, { borderTopColor: colors.border }]}>
             <Text style={[styles.membersLabel, { color: colors.text }]}>Members</Text>
@@ -156,7 +148,11 @@ export default function NewGroupScreen() {
             <InlineField
               placeholder="Your name in this group"
               value={meName}
-              onChangeText={setMeName}
+              invalid={meInvalid}
+              onChangeText={(next) => {
+                setMeName(next);
+                if (next.trim()) setMeInvalid(false);
+              }}
               left={
                 <View style={[styles.youPill, { backgroundColor: `${colors.primary}1A` }]}>
                   <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '800' }}>You</Text>
@@ -198,6 +194,19 @@ export default function NewGroupScreen() {
               <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 14 }}>
                 Add member
               </Text>
+            </Pressable>
+          </View>
+
+          {/* Most groups keep the default, so currency is a small row, not a big field. */}
+          <View style={styles.currencyRow}>
+            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Currency</Text>
+            <Pressable
+              onPress={() => setCurrencyOpen(true)}
+              hitSlop={6}
+              style={[styles.currencyChip, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Text style={{ fontSize: 15 }}>{selectedCurrency.flag}</Text>
+              <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>{selectedCurrency.code}</Text>
+              <MaterialIcons name="expand-more" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
 
@@ -297,14 +306,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 2,
   },
-  select: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+  currencyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  currencyChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 6,
   },
   membersSection: {
     borderTopWidth: 1,

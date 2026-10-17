@@ -19,7 +19,7 @@ import { SettingsHeader } from '@/components/settings/settings-header';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { UserAvatar } from '@/components/user-avatar';
 import { FeedbackRow } from '@/components/feedback/feedback-row';
-import { LeaveGroupRow } from '@/components/groups/leave-group-row';
+import { LeaveGroupRow, useCanLeaveGroup } from '@/components/groups/leave-group-row';
 import { useColors } from '@/hooks/use-colors';
 import type { GroupDetail } from '@/src/api/types';
 import { useAuth } from '@/src/auth/auth-context';
@@ -39,6 +39,7 @@ export default function GroupSettingsScreen() {
   const { reload: reloadGroups } = useGroups();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
+  const canLeave = useCanLeaveGroup(group);
   const [error, setError] = useState('');
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('👥');
@@ -180,7 +181,14 @@ export default function GroupSettingsScreen() {
             Only the group’s admins can change its settings or members.
           </Text>
           <FeedbackRow source="group-settings" groupRef={group.code || String(id)} style={{ marginTop: 16 }} />
-          <LeaveGroupRow group={group} style={{ marginTop: 10 }} />
+          {canLeave ? (
+            <>
+              <Text style={[styles.section, { color: colors.danger }]}>Danger zone</Text>
+              <View style={[styles.dangerCard, { borderColor: `${colors.danger}55`, backgroundColor: colors.surface }]}>
+                <LeaveGroupRow group={group} />
+              </View>
+            </>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     );
@@ -313,17 +321,37 @@ export default function GroupSettingsScreen() {
                 </Text>
               </View>
             ))}
+            <Pressable
+              onPress={() =>
+                router.push({ pathname: '/group/[id]/settings/members', params: { id: String(id), add: '1' } })
+              }
+              style={[styles.addMemberRow, { borderTopColor: colors.border }]}>
+              <MaterialIcons name="person-add-alt-1" size={20} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>Add member</Text>
+            </Pressable>
           </View>
 
           <FeedbackRow source="group-settings" groupRef={group.code || String(id)} style={{ marginTop: 16 }} />
-          <LeaveGroupRow group={group} style={{ marginTop: 10 }} />
 
-          <Pressable
-            onPress={() => router.push(settingsPath('delete'))}
-            style={[styles.deleteBtn, { borderColor: colors.danger }]}>
-            <Text style={{ color: colors.danger, fontWeight: '700' }}>Delete group</Text>
-            <MaterialIcons name="chevron-right" size={20} color={colors.danger} />
-          </Pressable>
+          <Text style={[styles.section, { color: colors.danger }]}>Danger zone</Text>
+          <View style={[styles.dangerCard, { borderColor: `${colors.danger}55`, backgroundColor: colors.surface }]}>
+            {canLeave ? (
+              <>
+                <LeaveGroupRow group={group} />
+                <View style={[styles.dangerDivider, { backgroundColor: `${colors.danger}33` }]} />
+              </>
+            ) : null}
+            <Pressable onPress={() => router.push(settingsPath('delete'))} style={styles.dangerRow}>
+              <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.danger, fontWeight: '700' }}>Delete group</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }}>
+                  Removes it and all its expenses for everyone
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.danger} />
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -420,17 +448,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 12,
   },
-  deleteBtn: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+  addMemberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+    gap: 10,
+    paddingTop: 12,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
+  dangerCard: { borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
+  dangerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  dangerDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
   overlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
   backdrop: { ...StyleSheet.absoluteFill },
   sheet: {

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FeedbackRow } from '@/components/feedback/feedback-row';
 import { AppearanceRow } from '@/components/profile/appearance-row';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field } from '@/components/ui/field';
 import { SyncStatusCard } from '@/components/sync/sync-status-card';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -21,6 +22,9 @@ export default function ProfileScreen() {
   const { user, pending } = useAuth();
   const { signOut } = useSync();
   const [signingOut, setSigningOut] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  // Changes still waiting to upload when logging out (0 = none).
+  const [unsynced, setUnsynced] = useState(0);
   const { name: storedName, matchByName, setName, setMatchByName } = useIdentity();
   const [draftName, setDraftName] = useState(storedName);
 
@@ -44,16 +48,7 @@ export default function ProfileScreen() {
     try {
       // Logging out clears this phone, so upload everything first.
       const { unsynced } = await signOut();
-      if (unsynced > 0) {
-        Alert.alert(
-          'Some changes are not backed up',
-          `${unsynced} change${unsynced === 1 ? ' has' : 's have'} not reached the server yet. Logging out now will delete ${unsynced === 1 ? 'it' : 'them'} from this phone.`,
-          [
-            { text: 'Stay logged in', style: 'cancel' },
-            { text: 'Log out anyway', style: 'destructive', onPress: () => void forceLogout() },
-          ]
-        );
-      }
+      if (unsynced > 0) setUnsynced(unsynced);
     } catch {
       Alert.alert('Could not log out', 'Try again.');
     } finally {
@@ -61,12 +56,6 @@ export default function ProfileScreen() {
     }
   }
 
-  function confirmLogout() {
-    Alert.alert('Log out?', 'You can log in again anytime.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => void onLogout() },
-    ]);
-  }
 
   async function saveName() {
     const trimmed = draftName.trim();
@@ -145,7 +134,7 @@ export default function ProfileScreen() {
         {user ? (
           <View style={{ paddingHorizontal: 20, marginTop: 24, alignItems: 'center' }}>
             <Pressable
-              onPress={confirmLogout}
+              onPress={() => setLogoutOpen(true)}
               disabled={pending || signingOut}
               style={[styles.logout, { borderColor: `${colors.danger}55`, opacity: pending || signingOut ? 0.6 : 1 }]}>
               {pending || signingOut ? (
@@ -160,6 +149,31 @@ export default function ProfileScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <ConfirmDialog
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        title="Log out?"
+        description="You can log in again anytime."
+        confirmLabel="Log out"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          setLogoutOpen(false);
+          void onLogout();
+        }}
+      />
+      <ConfirmDialog
+        open={unsynced > 0}
+        onOpenChange={(open) => !open && setUnsynced(0)}
+        title="Some changes are not backed up"
+        description={`${unsynced} change${unsynced === 1 ? ' has' : 's have'} not reached the server yet. Logging out now will delete ${unsynced === 1 ? 'it' : 'them'} from this phone.`}
+        confirmLabel="Log out anyway"
+        cancelLabel="Stay logged in"
+        onConfirm={() => {
+          setUnsynced(0);
+          void forceLogout();
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -34,7 +35,7 @@ import { useSync } from '@/src/sync/sync-context';
 import { memberListLabel, resolveMyMember, sortMembersByName } from '@/src/lib/members';
 
 export default function ManageMembersScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, add } = useLocalSearchParams<{ id: string; add?: string }>();
   const colors = useColors();
   const { user } = useAuth();
   const { name: myName, matchByName } = useIdentity();
@@ -47,6 +48,7 @@ export default function ManageMembersScreen() {
   const [editMember, setEditMember] = useState<GroupMember | null>(null);
   const [editName, setEditName] = useState('');
   const [editError, setEditError] = useState('');
+  const [editIsMe, setEditIsMe] = useState(false);
   const [savingMember, setSavingMember] = useState(false);
   const [removeMember, setRemoveMember] = useState<GroupMember | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -77,6 +79,9 @@ export default function ManageMembersScreen() {
     myMemberId: group?.myMembershipId,
   });
 
+  // With your account linked, you are that member; choosing "me" only applies to groups without it.
+  const accountLinked = Boolean(user && members.some((m) => m.userId === user._id));
+
   async function addMember() {
     if (!group || !newMemberName.trim()) return;
     setAddingMember(true);
@@ -96,6 +101,10 @@ export default function ManageMembersScreen() {
     setSavingMember(true);
     try {
       await updateGroupMember(group._id, editMember._id, { name: editName });
+      const wasMe = myMember?._id === editMember._id;
+      if (!accountLinked && editIsMe !== wasMe) {
+        await setGroupMyMember(group._id, editIsMe ? editMember._id : null);
+      }
       setEditMember(null);
       await load();
     } catch (e) {
@@ -151,45 +160,6 @@ export default function ManageMembersScreen() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
 
-          <Text style={[styles.section, { color: colors.textSecondary }]}>You in this group</Text>
-          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-              This member is you for balances and default payer.
-            </Text>
-            {members.map((member) => {
-              const active = myMember?._id === member._id;
-              return (
-                <Pressable
-                  key={member._id}
-                  onPress={async () => {
-                    await setGroupMyMember(group._id, member._id);
-                    await load();
-                  }}
-                  className="flex-row items-center gap-2.5"
-                  style={[styles.memberRow, active && { backgroundColor: colors.softSurface }]}>
-                  <UserAvatar
-                    name={memberListLabel(member, user?._id, myMember?._id)}
-                    avatar={member.avatar}
-                    seed={member.userId || member._id}
-                    size={32}
-                  />
-                  <Text style={{ flex: 1, color: colors.text, fontWeight: active ? '700' : '500' }} numberOfLines={1}>
-                    {memberListLabel(member, user?._id, myMember?._id)}
-                  </Text>
-                  {active ? <MaterialIcons name="check" size={18} color={colors.primary} /> : null}
-                </Pressable>
-              );
-            })}
-            <Pressable
-              onPress={async () => {
-                await setGroupMyMember(group._id, null);
-                await load();
-              }}
-              style={styles.memberRow}>
-              <Text style={{ color: colors.textSecondary }}>Don’t mark anyone</Text>
-            </Pressable>
-          </View>
-
           <Text style={[styles.section, { color: colors.textSecondary }]}>Members</Text>
           <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
             {members.map((member) => (
@@ -210,6 +180,7 @@ export default function ManageMembersScreen() {
                     setEditMember(member);
                     setEditName(member.displayName || '');
                     setEditError('');
+                    setEditIsMe(myMember?._id === member._id);
                   }}
                   hitSlop={8}
                   style={styles.iconBtn}>
@@ -225,18 +196,28 @@ export default function ManageMembersScreen() {
                 )}
               </View>
             ))}
-            <View className="flex-row items-center gap-2" style={{ paddingTop: 4 }}>
-              <TextInput
-                value={newMemberName}
-                onChangeText={setNewMemberName}
-                placeholder="Add member name"
-                placeholderTextColor={colors.textSecondary}
-                onSubmitEditing={addMember}
+          </View>
+
+          <Text style={[styles.section, { color: colors.textSecondary }]}>Add member</Text>
+          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+            <View className="flex-row items-center gap-2">
+              <View
                 style={[
-                  styles.input,
-                  { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.background },
-                ]}
-              />
+                  styles.addField,
+                  { flex: 1, borderColor: colors.border, backgroundColor: colors.background },
+                ]}>
+                <MaterialIcons name="person-add-alt-1" size={20} color={colors.textSecondary} />
+                <TextInput
+                  value={newMemberName}
+                  onChangeText={setNewMemberName}
+                  placeholder="Name or nickname"
+                  placeholderTextColor={colors.textSecondary}
+                  autoFocus={add === '1'}
+                  returnKeyType="done"
+                  onSubmitEditing={addMember}
+                  style={{ flex: 1, color: colors.text, fontSize: 15, paddingVertical: 10 }}
+                />
+              </View>
               <Pressable
                 onPress={addMember}
                 disabled={addingMember || !newMemberName.trim()}
@@ -244,9 +225,14 @@ export default function ManageMembersScreen() {
                   styles.addBtn,
                   { backgroundColor: colors.primary, opacity: newMemberName.trim() ? 1 : 0.45 },
                 ]}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>+</Text>
+                <Text style={{ color: colors.primaryForeground, fontWeight: '700' }}>
+                  {addingMember ? 'Adding…' : 'Add'}
+                </Text>
               </Pressable>
             </View>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
+              Only a name is needed. They can join later with the group link.
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -271,6 +257,23 @@ export default function ManageMembersScreen() {
               ]}
             />
             {editError ? <Text style={{ color: colors.danger, fontSize: 12, marginTop: 6 }}>{editError}</Text> : null}
+            {accountLinked ? (
+              user && editMember?.userId === user._id ? (
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 10 }}>
+                  This is you. It’s linked to your account.
+                </Text>
+              ) : null
+            ) : (
+              <View style={[styles.meRow, { borderColor: colors.border }]}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>This is me</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                    Used for your balances and as the default payer.
+                  </Text>
+                </View>
+                <Switch value={editIsMe} onValueChange={setEditIsMe} trackColor={{ true: colors.primary }} />
+              </View>
+            )}
             <View className="flex-row gap-2" style={{ marginTop: 12 }}>
               <Pressable
                 onPress={() => setEditMember(null)}
@@ -308,6 +311,21 @@ export default function ManageMembersScreen() {
 }
 
 const styles = StyleSheet.create({
+  addField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  meRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   safe: { flex: 1 },
   flex: { flex: 1 },
   body: { paddingHorizontal: 20, paddingBottom: 40, gap: 10 },
@@ -338,8 +356,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   addBtn: {
-    width: 44,
+    minWidth: 64,
     height: 44,
+    paddingHorizontal: 14,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
